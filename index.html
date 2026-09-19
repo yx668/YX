@@ -3461,14 +3461,14 @@ if(r.returned_at!=null){r.returnedAt=r.returned_at;delete r.returned_at;}
       cloudConnected=true;
       renderAll();
       updateCloudUI();
+      cloudConnected=true;updateCloudUI();
       syncBusy=false;
-      // 本地存在而云端缺失的行（离线新增/刚保存）在拉取后立即补推
-      if(cloudMode&&sess)queuePush();
+      startCloudSync();
+      renderAll();
       return true;
-    }).catch(function(){
-      cloudConnected=false;syncBusy=false;updateCloudUI();
-      // 周期拉取失败的可见提示（去抖 8 秒，避免每 15 秒刷屏）
-      if(Date.now()-syncErrToastAt>8000){syncErrToastAt=Date.now();toast("云端数据拉取失败，请检查网络后重试","err");}
+    }).catch(function(e){
+      cloudConnected=false;updateCloudUI();
+      syncBusy=false;
       return false;
     });
 }
@@ -3707,9 +3707,10 @@ function renderNav(){
     var it=items[i];
     var isShare=it.getAttribute("data-view")==="share";
     var adminOnly=!!it.getAttribute("data-admin");
+    var isUserBtn=it.id==="navUserBtn";
     if(shareMode){
-      // 共享股东：仅显示「我的共享板块」
-      it.classList.toggle("hidden",!isShare);
+      // 共享股东：仅显示「我的共享板块」和退出按钮
+      it.classList.toggle("hidden",!isShare&&!isUserBtn);
       it.classList.toggle("active",isShare);
     }else{
       it.classList.toggle("hidden",isShare||(locked&&adminOnly));
@@ -4055,6 +4056,7 @@ function doShareEnter(c){
   toast("欢迎，"+(c.name||"")+"（共享股东）");
 }
 function renderAuthUI(){
+  var box=$("userBox");
   // 未登录（云模式）锁定主区交互，仅保留登录入口；本地模式不锁定
   if(document.body)document.body.classList.toggle("locked",uiLocked());
   var navUserBtn=$("navUserBtn");
