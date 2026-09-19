@@ -4145,6 +4145,13 @@ function applyCloudHash(){
   toast("已通过扫码自动配置云端，请注册或登录账号");
   return true;
 }
+window.addEventListener("hashchange",function(){
+  if(!applyCloudHash())return;
+  try{
+    if(cloudTimer)return;
+    if(sess)startCloudSync();else openLogin();
+  }catch(e){}
+});
 
 
 /* ---------- 账号管理（管理员） ---------- */
