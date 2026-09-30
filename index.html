@@ -3179,7 +3179,7 @@ var SESS_KEY="bkgbook_sess_v1";
 var cloudCfg=null,sess=null,myRole=null;
 var cloudMode=false,cloudConnected=false,cloudTimer=null,pushTimer=null,syncBusy=false,syncErrToastAt=0;
 
-var DEFAULT_CLOUD=null;
+var DEFAULT_CLOUD={url:"https://hkzxqhzdqddpammtdvfy.supabase.co",anonKey:"sb_publishable_H7MXdCzwYo4UwxA2de7kvQ_XDbrDXWs"};;
 function loadCloudCfg(){
   try{var v=localStorage.getItem(CFG_KEY);if(v)cloudCfg=JSON.parse(v);}catch(e){cloudCfg=null;}
   if(!(cloudCfg&&cloudCfg.url&&cloudCfg.anonKey))cloudCfg=null;
