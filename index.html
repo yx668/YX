@@ -4044,19 +4044,70 @@ function shareLogin(){
   var mob=($("lgShareMob").value||"").trim(),pwd=$("lgSharePwd").value||"";
   var err=$("lgShareErr");
   if(!mob||!pwd){err.textContent="请输入手机号和密码";err.style.display="";return;}
+  // 云端模式优先走云端验证（无需先登录管理员；verify/load RPC 为 SECURITY DEFINER，匿名可调）
+  if(cloudCfg&&cloudCfg.url&&cloudCfg.anonKey){
+    err.textContent="正在验证…";err.style.display="";
+    var hp=hashPwd(pwd);
+    sFetch("/rest/v1/rpc/load_share_data",{method:"POST",body:{phone_input:mob,pwd_hash:hp}}).then(function(r){
+      if(r&&r.ok&&r.json&&r.json.me){
+        var m=r.json.me;
+        var c={id:m.id,name:m.name||mob,phone:mob,type:"shareholder",login_enabled:true,login_pwd:hp};
+        applyShareCloudData(r.json);
+        doShareEnter(c);
+      }else{
+        err.textContent="账号或密码错误，或该账号未开通登录权限（请联系门店管理员在客户档案中开通）";err.style.display="";
+      }
+    }).catch(function(e){
+      // 云端验证失败时回退到本地
+      var c=(DB.customers||[]).find(function(x){return x.type==="shareholder"&&x.login_enabled&&x.phone===mob&&x.login_pwd===hashPwd(pwd);});
+      if(c){doShareEnter(c);}else{err.textContent="账号或密码错误，或该账号未开通登录权限（请联系门店管理员在客户档案中开通）";err.style.display="";}
+    });
+    return;
+  }
+  // 本地模式
   var c=(DB.customers||[]).find(function(x){return x.type==="shareholder"&&x.login_enabled&&x.phone===mob&&x.login_pwd===hashPwd(pwd);});
-  if(c){doShareEnter(c);return;}
-  // 本地未找到，尝试云端查询（适用于首次扫码进入的新设备）
-  if(!cloudMode||!cloudCfg||!cloudCfg.url){err.textContent="账号或密码错误，或该账号未开通登录权限（请联系门店管理员在客户档案中开通）";err.style.display="";return;}
-  err.textContent="正在验证…";err.style.display="";
-  var h={"apikey":cloudCfg.anonKey,"Content-Type":"application/json"};
-  var url=cloudCfg.url.replace(/\/+$/,"")+"/rest/v1/rpc/verify_shareholder";
-  fetch(url,{method:"POST",headers:h,body:JSON.stringify({phone_input:mob,pwd_hash:hashPwd(pwd)})})
-    .then(function(r){return r.json().then(function(j){return{ok:r.ok,status:r.status,json:j};});})
-    .then(function(r){
-      if(r.ok&&r.json&&r.json.id){doShareEnter(r.json);}
-      else{err.textContent="账号或密码错误，或该账号未开通登录权限（请联系门店管理员在客户档案中开通）";err.style.display="";}
-    }).catch(function(e){err.textContent="验证失败："+(e.message||e);err.style.display="";});
+  if(!c){err.textContent="账号或密码错误，或该账号未开通登录权限（请联系门店管理员在客户档案中开通）";err.style.display="";return;}
+  doShareEnter(c);
+}
+// 股东云端登录后：把 load_share_data RPC 返回的可见数据灌入本地 DB（与 cloudPullAll 同款列名转换）
+function applyShareCloudData(d){
+  if(!d||!d.me)return;
+  var svc=(d.services||[]).map(function(s){
+    if(s.price_shareholder!=null){s.priceShareholder=s.price_shareholder;delete s.price_shareholder;}
+    if(s.priceShareholder==null)s.priceShareholder=s.price;
+    if(s.cost==null)s.cost=0;
+    if(s.is_rent!=null){s.isRent=!!s.is_rent;delete s.is_rent;}
+    if(s.rent_days!=null){s.rentDays=s.rent_days;delete s.rent_days;}
+    return s;
+  });
+  DB.services=mergeRows(svc,DB.services);
+  var appt=(d.appointments||[]).map(function(a){
+    if(a.unitprice!=null){a.unitPrice=a.unitprice;delete a.unitprice;}
+    if(a.servicecost!=null){a.serviceCost=a.servicecost;delete a.servicecost;}
+    if(a.rent_days!=null){a.rentDays=a.rent_days;delete a.rent_days;}
+    if(a.rented_at!=null){a.rentedAt=a.rented_at;delete a.rented_at;}
+    if(a.due_date!=null){a.dueDate=a.due_date;delete a.due_date;}
+    if(a.returned_at!=null){a.returnedAt=a.returned_at;delete a.returned_at;}
+    return a;
+  });
+  var byId={};
+  DB.appointments.forEach(function(x){if(x&&x.id)byId[x.id]=x;});
+  appt.forEach(function(x){if(x&&x.id)byId[x.id]=x;});
+  DB.appointments=Object.keys(byId).map(function(k){return byId[k];});
+  cloudSelectedApptIds=appt.map(function(x){return x.id;});
+  (d.customers||[]).forEach(function(c){
+    if(c.wx==null)c.wx="";
+  });
+  DB.customers=mergeRows(d.customers||[],DB.customers);
+  if(d.members&&d.members.length)DB.members=mergeRows(d.members,DB.members);
+  if(d.schedule&&d.schedule[0]){
+    var sc=d.schedule[0];
+    DB.schedule={start:sc.start||"09:00",end:sc.end||"20:00"};
+  }
+  // 合并成功后把「本人」的完整档案写回本地（含头像色、介绍人等渲染字段）
+  var meRow=customerById(d.me.id);
+  if(meRow){try{localStorage.setItem("bkgbook_share_me_"+d.me.id,JSON.stringify(meRow));}catch(e){}}
+  saveDB();
 }
 function doShareEnter(c){
   saveShareSess({cid:c.id,name:c.name,phone:c.phone,ts:Date.now()});
