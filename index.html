@@ -24,18 +24,18 @@ a{color:var(--primary);text-decoration:none}
 
 .layout{display:flex;height:100vh;overflow:hidden}
 /* 侧边栏 */
-.sidebar{width:220px;background:#ffffff;color:#334155;display:flex;flex-direction:column;flex-shrink:0;border-right:1px solid #e5e7eb}
-.brand{display:flex;align-items:center;gap:10px;padding:18px 16px;border-bottom:1px solid #eef0f3}
+.sidebar{width:220px;background:#111827;color:#d1d5db;display:flex;flex-direction:column;flex-shrink:0}
+.brand{display:flex;align-items:center;gap:10px;padding:18px 16px;border-bottom:1px solid rgba(255,255,255,.08)}
 .brand .logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#3b82f6,#8b5cf6);display:flex;align-items:center;justify-content:center;color:#fff;font-size:17px;font-weight:700;flex-shrink:0}
-.brand .name{font-size:15px;font-weight:600;color:#111827;line-height:1.2}
+.brand .name{font-size:15px;font-weight:600;color:#fff;line-height:1.2}
 .brand .sub{font-size:11px;color:#6b7280}
 .nav{flex:1;padding:10px 8px;overflow-y:auto}
-.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;margin-bottom:2px;color:#374151;font-size:14px;transition:background .15s}
-.nav-item:hover{background:rgba(15,23,42,.06);color:#111827}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;margin-bottom:2px;color:#d1d5db;font-size:14px;transition:background .15s}
+.nav-item:hover{background:rgba(255,255,255,.06);color:#fff}
 .nav-item.active{background:var(--primary);color:#fff;font-weight:500}
 .nav-item .ic{width:18px;text-align:center;font-size:15px}
-.nav-group{font-size:11px;color:#64748b;padding:12px 12px 6px;text-transform:none;letter-spacing:.5px}
-.sidebar .foot{padding:12px 16px;font-size:11px;color:#64748b;border-top:1px solid #eef0f3}
+.nav-group{font-size:11px;color:#6b7280;padding:12px 12px 6px;text-transform:none;letter-spacing:.5px}
+.sidebar .foot{padding:12px 16px;font-size:11px;color:#6b7280;border-top:1px solid rgba(255,255,255,.08)}
 .nav-item.hidden,.nav-group.hidden{display:none}
 
 /* 主区 */
@@ -62,9 +62,9 @@ body.locked .main input,body.locked .main textarea,
 body.locked .main .month-cell,body.locked .main .week-appt,body.locked .main .appt-block{pointer-events:none;cursor:not-allowed}
 body.locked .main button,body.locked .main select,
 body.locked .main input,body.locked .main textarea{opacity:.55}
-body.locked .content::before{content:"🔒 未登录：当前仅可查看，全部操作请先登录（左下角「登录 / 注册」）；若一直登录失败，在登录弹窗底部点「清除云端配置」即可回到本地模式";display:block;background:var(--warn-l);border:1px solid #fde68a;color:var(--warn);padding:10px 16px;border-radius:var(--radius);margin-bottom:16px;font-size:13px}
+body.locked .content::before{content:"🔒 未登录：当前仅可查看，全部操作请先登录（右上角「登录 / 注册」）";display:block;background:var(--warn-l);border:1px solid #fde68a;color:var(--warn);padding:10px 16px;border-radius:var(--radius);margin-bottom:16px;font-size:13px}
 
-.content{flex:1;overflow-y:auto;min-height:0;padding:24px}
+.content{flex:1;overflow-y:auto;padding:24px}
 .page{display:none}
 .page.active{display:block}
 .section{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:20px;overflow:hidden}
@@ -261,44 +261,11 @@ tr:hover td{background:#fafbfc}
 .login-tip b{font-weight:600}
 
 @media(max-width:900px){
-  /* 顶部固定导航栏 */
-  .sidebar{position:fixed;top:0;left:0;width:100%;height:56px;flex-direction:row;border-right:none;border-bottom:1px solid #e5e7eb;z-index:100;background:#ffffff}
-  .brand{display:none}
-  .nav-group{display:none}
-  .sidebar .foot{display:none}
-  .nav{flex:1;display:flex;flex-direction:row;align-items:center;padding:0 4px;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none}
-  .nav::-webkit-scrollbar{display:none}
-  .nav-item{flex:1;justify-content:center;gap:2px;padding:4px 2px;font-size:11px;flex-direction:column;border-radius:6px;min-width:56px;white-space:nowrap}
-  .nav-item .ic{width:20px;font-size:16px}
-  .nav-item.active{background:var(--primary);color:#fff;font-weight:500}
-  /* 手机端顶部导航登录/退出按钮 */
-  .nav-item.nav-user{min-width:48px;flex:0 0 auto;padding:4px 6px;font-size:10px}
-  .nav-item.nav-user .ic{font-size:14px}
-  /* 主内容区下移给导航栏留空间 */
-  .main{padding-top:56px}
-  .topbar{height:48px;padding:0 12px}
-  .topbar h1{font-size:16px}
-  #todayLabel{display:none}
-  .topbar .right{gap:8px}
-  #btnGlobalAdd{padding:6px 10px;font-size:13px}
-  .content{padding:14px}
+  .sidebar{width:64px}
+  .brand .name,.brand .sub,.nav-item span,.nav-group,.sidebar .foot{display:none}
+  .nav-item{justify-content:center;padding:12px}
   .form-grid{grid-template-columns:1fr}
   .month-cell{min-height:80px;padding:5px}
-  /* 移动端section-head垂直布局 */
-  .section-head{flex-direction:column;align-items:flex-start;gap:8px;padding:12px 14px}
-  .section-head>div{width:100%}
-  .section-head .desc{white-space:normal;word-break:break-word;line-height:1.4;margin-top:4px;font-size:12px;color:var(--text-2)}
-  .section-head input,.section-head select{width:100%!important;max-width:none;flex:none}
-  /* 移动端滚动与溢出修复 */
-  .layout{overflow-x:hidden}
-  .content{-webkit-overflow-scrolling:touch}
-  .section-body{overflow-x:auto;max-width:100%}
-  .stats{grid-template-columns:1fr}
-  table{display:block;overflow-x:auto;white-space:nowrap}
-  .list-toolbar{flex-direction:column;align-items:stretch}
-  .list-toolbar>*{width:100%!important}
-  .month-grid{font-size:12px}
-  .month-cell{min-height:56px;padding:3px}
 }
 </style>
 </head>
@@ -328,8 +295,6 @@ tr:hover td{background:#fafbfc}
       <button class="nav-item" data-view="config" data-admin="1" type="button"><span class="ic">⚙️</span><span>项目与时段</span></button>
       <div class="nav-group" id="ngData">数据管理</div>
       <button class="nav-item" data-view="data" data-admin="1" type="button"><span class="ic">💾</span><span>备份与恢复</span></button>
-      <!-- 手机端登录/退出入口（桌面端隐藏） -->
-      <button class="nav-item nav-user" id="navUserBtn" type="button" style="display:none"><span class="ic">👤</span><span id="navUserLabel">登录</span></button>
     </nav>
     <div class="foot">本地应用 · 数据存于本机<br><span id="storageTag"></span><div id="userBox" style="margin-top:8px"></div></div>
   </aside>
@@ -871,11 +836,6 @@ tr:hover td{background:#fafbfc}
         <div class="form-item" style="margin-top:10px"><label>密码</label><input id="lgPass" type="password" placeholder="至少 6 位"></div>
         <div class="form-item" style="margin-top:10px;display:none" id="lgPass2Wrap"><label>确认密码</label><input id="lgPass2" type="password" placeholder="再次输入密码"></div>
         <div id="lgErr" style="margin-top:10px;color:var(--danger);font-size:13px;display:none"></div>
-</div>
-      <div id="lgEscape" style="display:none;margin-top:14px;border:1px dashed var(--danger-b);border-radius:10px;padding:12px 14px;background:var(--danger-l)">
-        <div style="font-size:13px;font-weight:600;color:var(--danger)">登录不了？可能是云端配置问题</div>
-        <div style="font-size:12px;color:var(--text-2);margin-top:6px;line-height:1.7">如果之前填写的云端密钥有误，登录会一直失败。<br>点下面的按钮可清除本机保存的云端配置，回到<b>单机本地模式</b>，再重新配置即可。</div>
-        <button class="btn btn-ghost-danger btn-sm" type="button" style="margin-top:10px" onclick="doEscapeCloudCfg()">清除云端配置（回本地模式）</button>
       </div>
     </div>
     <div class="modal-foot" style="justify-content:space-between">
@@ -3219,31 +3179,6 @@ var SESS_KEY="bkgbook_sess_v1";
 var cloudCfg=null,sess=null,myRole=null;
 var cloudMode=false,cloudConnected=false,cloudTimer=null,pushTimer=null,syncBusy=false,syncErrToastAt=0;
 
-/* 删除墓碑：本地删除后记录 id，云端删除成功才清除；pull 合并时过滤墓碑行，
-   避免「云端删除请求往返期间恰逢周期拉取，把已删行拉回后又被全量推回」的复活竞态 */
-var TOMB_KEY="bkgbook_tomb_v1";
-var tomb={};
-function loadTomb(){try{var v=localStorage.getItem(TOMB_KEY);if(v)tomb=JSON.parse(v);}catch(e){tomb={};}if(!tomb||typeof tomb!=="object")tomb={};}
-function saveTomb(){try{localStorage.setItem(TOMB_KEY,JSON.stringify(tomb));}catch(e){}}
-function markDeleted(table,id){if(!tomb[table])tomb[table]={};tomb[table][id]=1;saveTomb();}
-function unmarkDeleted(table,id){if(tomb[table]){delete tomb[table][id];saveTomb();}}
-/* 延迟清除墓碑：云端删除已确认成功，但删除前发出的周期拉取快照可能仍在途；
-   若在快照返回前就清除墓碑，该行会被合并回本地并经 queuePush 补推回云端，造成"删了又复活"。
-   因此统一延迟 30 秒（覆盖完整拉取周期 + 余量）后再清除，期间 pull 合并仍过滤该行。 */
-function scheduleUnmark(table,id){setTimeout(function(){unmarkDeleted(table,id);},30000);}
-function isDeletedLocal(table,id){return !!(tomb[table]&&tomb[table][id]);}
-/* pull 时若发现墓碑 id 在云端仍存在（上次删除请求失败/断网），自动补删直到成功 */
-function retryDeleted(table,cloudRows){
-  if(!tomb[table])return;
-  Object.keys(tomb[table]).forEach(function(id){
-    var row=(cloudRows||[]).find(function(r){return r&&r.id===id;});
-    if(!row){unmarkDeleted(table,id);return;}
-    if(row.name&&String(row.name).indexOf("__DEL__")===0){unmarkDeleted(table,id);return;}
-    if(table==="appointments")cloudDeleteRows(table,[id]).catch(function(){});
-    else cloudSoftDelete(table,id).catch(function(){});
-  });
-}
-
 var DEFAULT_CLOUD=null;
 function loadCloudCfg(){
   try{var v=localStorage.getItem(CFG_KEY);if(v)cloudCfg=JSON.parse(v);}catch(e){cloudCfg=null;}
@@ -3321,20 +3256,7 @@ function cloudDeleteRows(table,ids){
   return tokenReady().then(function(ok){
     if(!ok)throw new Error("请先登录");
     var q=ids.map(encodeURIComponent).join(",");
-return sFetch("/rest/v1/"+table+"?id=in.("+q+")",{method:"DELETE"})
-      .then(function(r){
-        if(!r.ok)throw new Error(errMsg(r)||"云端删除失败");
-        // 云端删除成功：延迟清除墓碑（避免在途拉取快照把已删行合并回本地并补推回云端）
-        ids.forEach(function(id){scheduleUnmark(table,id);});
-      });
-  });
-}
-/* v16 软删除广播：不物理删除云端行，而是把 name 改为 "__DEL__"+id 作为删除标记，
-   所有设备 pull 时看到该标记即本地删除该行且永不显示/上推——彻底杜绝「删了又复活」。 */
-function cloudSoftDelete(table,id){
-  return tokenReady().then(function(ok){
-    if(!ok)throw new Error("请先登录");
-    return sFetch("/rest/v1/"+table+"?id=eq."+encodeURIComponent(id),{method:"PATCH",body:{name:"__DEL__"+id}})
+    return sFetch("/rest/v1/"+table+"?id=in.("+q+")",{method:"DELETE"})
       .then(function(r){if(!r.ok)throw new Error(errMsg(r)||"云端删除失败");});
   });
 }
@@ -3367,32 +3289,11 @@ function cloudPullAll(){
   // 取消尚未执行的待推送，避免「保存 400ms 后上推」与「15 秒循环拉取」竞态：
   // 拉取期间若有离线新增，合并逻辑会保留，拉取完成后统一补推
   if(pushTimer){clearTimeout(pushTimer);pushTimer=null;}
-return Promise.all([cloudSelect("members"),cloudSelect("services"),cloudSelect("appointments"),cloudSelect("schedule"),cloudSelect("customers")])
+  return Promise.all([cloudSelect("members"),cloudSelect("services"),cloudSelect("appointments"),cloudSelect("schedule"),cloudSelect("customers")])
     .then(function(res){
-      // 墓碑过滤：本地已删除的行不从云端拉回（防“删除后几秒又变回来”）
-      retryDeleted("members",res[0]);
-      retryDeleted("services",res[1]);
-      retryDeleted("customers",res[4]);
-      // v16 软删广播处理（services/members/customers 共用小函数）
-      var dropSoftDel=function(table,cloudRows){
-        (cloudRows||[]).forEach(function(r){
-          if(r&&r.name&&String(r.name).indexOf("__DEL__")===0){
-            markDeleted(table,r.id);
-            if(table==="services"){
-              DB.services=DB.services.filter(function(x){return x.id!==r.id;});
-              DB.appointments.forEach(function(a){if(a.serviceId===r.id)a.serviceId="";});
-            }else if(table==="members"){DB.members=DB.members.filter(function(x){return x.id!==r.id;});}
-            else if(table==="customers"){DB.customers=DB.customers.filter(function(x){return x.id!==r.id;});}
-          }
-        });
-        return (cloudRows||[]).filter(function(r){return !(r&&r.name&&String(r.name).indexOf("__DEL__")===0);});
-      };
-      res[0]=dropSoftDel("members",res[0]);
-      res[1]=dropSoftDel("services",res[1]);
-      res[4]=dropSoftDel("customers",res[4]);
-      DB.members=mergeRows((res[0]||[]).filter(function(r){return !isDeletedLocal("members",r.id);}).map(stripRow),DB.members);
+      DB.members=mergeRows((res[0]||[]).map(stripRow),DB.members);
       // 云端 snake_case 列 -> 本地 camelCase（price_shareholder -> priceShareholder）
-      var svcCloud=(res[1]||[]).filter(function(r){return !isDeletedLocal("services",r.id);}).map(stripRow).map(function(s){
+      DB.services=mergeRows((res[1]||[]).map(stripRow),DB.services).map(function(s){
         if(s.price_shareholder!=null){s.priceShareholder=s.price_shareholder;delete s.price_shareholder;}
         if(s.priceShareholder==null)s.priceShareholder=s.price;
         if(s.cost==null)s.cost=0;
@@ -3400,17 +3301,6 @@ return Promise.all([cloudSelect("members"),cloudSelect("services"),cloudSelect("
         if(s.rent_days!=null){s.rentDays=s.rent_days;delete s.rent_days;}
         return s;
       });
-      // v16 一次性 seed：云端 services 已清理为真实项目集（授权"全部删除重写"），
-      // 首次同步以云端为权威覆盖本机残留旧行，防止旧缓存/垃圾行被合并后推回云端复活
-      var SEED_KEY="bkgbook_srv_seed_v16";
-      try{
-        if(localStorage.getItem(SEED_KEY)!=="1"&&svcCloud&&svcCloud.length){
-          DB.services=svcCloud;
-          try{localStorage.setItem(SEED_KEY,"1");}catch(e){}
-        }else if(localStorage.getItem(SEED_KEY)==="1"){
-          DB.services=mergeRows(svcCloud,DB.services);
-        }
-      }catch(e){DB.services=mergeRows(svcCloud,DB.services);}
       var cloudRows=(res[2]||[]).map(stripRow).map(function(r){
         // 云端小写列名 -> 本地驼峰：unitprice->unitPrice, servicecost->serviceCost
         // 注意：值为 null 时不强行注入 unitPrice/serviceCost 键，
@@ -3426,11 +3316,10 @@ return Promise.all([cloudSelect("members"),cloudSelect("services"),cloudSelect("
         else delete r.rentedAt;
         if(r.due_date!=null){r.dueDate=r.due_date;delete r.due_date;}
         else delete r.dueDate;
-if(r.returned_at!=null){r.returnedAt=r.returned_at;delete r.returned_at;}
+        if(r.returned_at!=null){r.returnedAt=r.returned_at;delete r.returned_at;}
         else delete r.returnedAt;
         return r;
-      }).filter(function(r){return !isDeletedLocal("appointments",r.id);});
-      retryDeleted("appointments",res[2]);
+      });
       var cloudIds={};
       cloudRows.forEach(function(r){cloudIds[r.id]=1;});
       // 合并策略：云端与本地同 id 时本地优先（单机门店本地为权威数据源，
@@ -3454,21 +3343,21 @@ if(r.returned_at!=null){r.returnedAt=r.returned_at;delete r.returned_at;}
       // 管理员用 upsert 全量合并，天然保留；普通用户对 members/services/schedule 只读，无本地改动
       var sched=res[3]&&res[3][0];
       DB.schedule=sched?{start:sched.start||"09:00",end:sched.end||"20:00"}:DB.schedule||{start:"09:00",end:"20:00"};
-      DB.customers=mergeRows((res[4]||[]).filter(function(r){return !isDeletedLocal("customers",r.id);}).map(stripRow).map(function(c){
+      DB.customers=mergeRows((res[4]||[]).map(stripRow).map(function(c){
         if(c.wx==null)c.wx="";
         return c;
       }),DB.customers);
       cloudConnected=true;
       renderAll();
       updateCloudUI();
-      cloudConnected=true;updateCloudUI();
       syncBusy=false;
-      startCloudSync();
-      renderAll();
+      // 本地存在而云端缺失的行（离线新增/刚保存）在拉取后立即补推
+      if(cloudMode&&sess)queuePush();
       return true;
-    }).catch(function(e){
-      cloudConnected=false;updateCloudUI();
-      syncBusy=false;
+    }).catch(function(){
+      cloudConnected=false;syncBusy=false;updateCloudUI();
+      // 周期拉取失败的可见提示（去抖 8 秒，避免每 15 秒刷屏）
+      if(Date.now()-syncErrToastAt>8000){syncErrToastAt=Date.now();toast("云端数据拉取失败，请检查网络后重试","err");}
       return false;
     });
 }
@@ -3508,12 +3397,12 @@ function pushAll(){
   var jobs=[];
   if(isAdmin()){
     // 管理员：全表 upsert 双向合并，保留本地离线数据上推
-    jobs.push(cloudUpsert("members",DB.members.filter(function(m){return !isDeletedLocal("members",m.id)&&!(m.name&&String(m.name).indexOf("__DEL__")===0);}).map(function(m){
+    jobs.push(cloudUpsert("members",DB.members.map(function(m){
       var o={};
       ["id","name","role","phone","status","color"].forEach(function(k){o[k]=(m[k]!==undefined)?m[k]:null;});
       o.updated_at=now;return o;
     }),"id"));
-    jobs.push(cloudUpsert("services",DB.services.filter(function(s){return !isDeletedLocal("services",s.id)&&!(s.name&&String(s.name).indexOf("__DEL__")===0);}).map(function(s){
+    jobs.push(cloudUpsert("services",DB.services.map(function(s){
       var o={};
       ["id","name","duration","price","price_shareholder","cost","color","is_rent","rent_days"].forEach(function(k){
         if(k==="price_shareholder")o.price_shareholder=(s.priceShareholder!=null)?s.priceShareholder:(s.price!=null?s.price:null);
@@ -3524,12 +3413,10 @@ function pushAll(){
       o.updated_at=now;return o;
     }),"id"));
     jobs.push(cloudUpsert("appointments",DB.appointments.map(function(a){return apptToCloudRow(a,now);}),"id"));
-    jobs.push(cloudUpsert("customers",DB.customers.filter(function(c){return !isDeletedLocal("customers",c.id)&&!(c.name&&String(c.name).indexOf("__DEL__")===0);}).map(function(c){
+    jobs.push(cloudUpsert("customers",DB.customers.map(function(c){
       var o={};
-["id","name","phone","type","referrer","account_email","note","wx","login_enabled","login_pwd"].forEach(function(k){
-        if(k==="login_enabled")o.login_enabled=(c.login_enabled===undefined||c.login_enabled==null)?false:!!c.login_enabled;
-        else if(k==="login_pwd")o.login_pwd=(c.login_pwd===undefined||c.login_pwd==null)?"":c.login_pwd;
-        else o[k]=(c[k]!==undefined)?c[k]:null;
+      ["id","name","phone","type","referrer","account_email","note","wx","login_enabled","login_pwd"].forEach(function(k){
+        o[k]=(c[k]!==undefined)?c[k]:null;
       });
       o.updated_at=now;return o;
     }),"id"));
@@ -3707,10 +3594,9 @@ function renderNav(){
     var it=items[i];
     var isShare=it.getAttribute("data-view")==="share";
     var adminOnly=!!it.getAttribute("data-admin");
-    var isUserBtn=it.id==="navUserBtn";
     if(shareMode){
-      // 共享股东：仅显示「我的共享板块」和退出按钮
-      it.classList.toggle("hidden",!isShare&&!isUserBtn);
+      // 共享股东：仅显示「我的共享板块」
+      it.classList.toggle("hidden",!isShare);
       it.classList.toggle("active",isShare);
     }else{
       it.classList.toggle("hidden",isShare||(locked&&adminOnly));
@@ -4056,27 +3942,9 @@ function doShareEnter(c){
   toast("欢迎，"+(c.name||"")+"（共享股东）");
 }
 function renderAuthUI(){
-  var box=$("userBox");
   // 未登录（云模式）锁定主区交互，仅保留登录入口；本地模式不锁定
   if(document.body)document.body.classList.toggle("locked",uiLocked());
-  var navUserBtn=$("navUserBtn");
-  if(navUserBtn){
-    navUserBtn.style.display="";
-    var navUserLabel=$("navUserLabel");
-    if(shareSess){
-      navUserLabel.textContent="退出";
-      navUserBtn.onclick=function(){doShareLogout();};
-    }else if(!cloudMode){
-      navUserLabel.textContent="登录";
-      navUserBtn.onclick=function(){openLogin();};
-    }else if(!sess){
-      navUserLabel.textContent="登录";
-      navUserBtn.onclick=function(){openLogin();};
-    }else{
-      navUserLabel.textContent="退出";
-      navUserBtn.onclick=function(){doLogout();};
-    }
-  }
+  var box=$("userBox");
   if(shareSess){
     var sc=customerById(shareSess.cid);
     var nm=sc?sc.name:shareSess.name;
@@ -4115,19 +3983,7 @@ function renderLoginUI(){
   $("loginTip").innerHTML=loginMode==="signin"?
     "输入云端注册的邮箱与密码登录。多台设备使用同一个账号即可同步同一份数据。" :
     "<b>第一个注册的账号自动成为管理员</b>（可管理成员、项目、营业时段与数据备份）；之后注册的账号为普通用户（仅可查看与新建预约）。";
-  // 云模式未登录（锁定状态）：在登录弹窗内提供「清除云端配置」逃生入口，避免配置错误导致死锁无法自救
-  var esc=$("lgEscape");
-  if(esc)esc.style.display=uiLocked()?"":"none";
   $("lgEmail").focus();
-}
-function doEscapeCloudCfg(){
-  if(!confirm("确定清除本机保存的云端配置，并回到单机本地模式？\n本机已保存的业务数据不会丢失。"))return;
-  try{localStorage.removeItem(CFG_KEY);}catch(e){}
-  cloudCfg=null;cloudMode=false;cloudConnected=false;
-  clearSess();startCloudSync();
-  closeModal("loginMask");
-  renderAll();updateCloudUI();
-  toast("已清除云端配置，回到本地模式；可在「备份与恢复」重新配置云端");
 }
 function toggleLoginMode(){loginMode=loginMode==="signin"?"signup":"signin";renderLoginUI();}
 function showLgErr(msg){var el=$("lgErr");el.textContent=msg;el.style.display="";}
@@ -4208,8 +4064,8 @@ function testCloudCfg(){
   var url=($("ccUrl").value||"").trim().replace(/\/+$/,"");
   var key=($("ccKey").value||"").trim();
   if(!/^https?:\/\//.test(url)||!key){toast("请先填写完整的项目地址与密钥","err");return;}
-var saved=cloudCfg;cloudCfg={url:url,anonKey:key};
-  fetch(url+"/rest/v1/members?select=id&limit=1",{headers:{"apikey":key}})
+  var saved=cloudCfg;cloudCfg={url:url,anonKey:key};
+  fetch(url+"/rest/v1/",{headers:{"apikey":key}})
     .then(function(r){
       toast(r.ok?"连接成功：云端服务可达（HTTP "+r.status+"）":"连接失败（HTTP "+r.status+"）",r.ok?"ok":"err");
     })
@@ -4984,9 +4840,9 @@ function delCustomer(id){
   var refs=(DB.customers||[]).filter(function(x){return x.referrer===id;});
   var tip=refs.length?("（还有 "+refs.length+" 位客户以其为介绍人，删除后这些客户的介绍人将被清空）"):"";
   if(!confirm("确定删除客户「"+c.name+"」？"+tip))return;
-DB.customers=DB.customers.filter(function(x){return x.id!==id;});
+  DB.customers=DB.customers.filter(function(x){return x.id!==id;});
   DB.customers.forEach(function(x){if(x.referrer===id)x.referrer="";});
-  if(cloudMode&&sess){markDeleted("customers",id);cloudSoftDelete("customers",id).catch(function(e){toast("云端删除失败："+(e&&e.message?e.message:e),"err");});}
+  if(cloudMode&&sess)cloudDeleteRows("customers",[id]).catch(function(e){toast("云端删除失败："+(e&&e.message?e.message:e),"err");});
   saveDB();toast("客户已删除");
 }
 function onCustPickChange(){
@@ -5068,9 +4924,9 @@ function delMember(id){
   var rel=DB.appointments.filter(function(a){return a.memberId===id;}).length;
   var tip=rel?"（该成员名下还有 "+rel+" 条预约记录，删除后这些预约将显示为「未分配」）":"";
   if(!confirm("确定删除成员「"+m.name+"」？"+tip))return;
-DB.members=DB.members.filter(function(x){return x.id!==id;});
+  DB.members=DB.members.filter(function(x){return x.id!==id;});
   DB.appointments.forEach(function(a){if(a.memberId===id)a.memberId="";});
-  if(cloudMode&&sess){markDeleted("members",id);cloudSoftDelete("members",id).catch(function(e){toast("云端删除失败："+(e&&e.message?e.message:e),"err");});}
+  if(cloudMode&&sess)cloudDeleteRows("members",[id]).catch(function(e){toast("云端删除失败："+(e&&e.message?e.message:e),"err");});
   saveDB();toast("成员已删除");
 }
 
@@ -5154,9 +5010,9 @@ function delService(id){
   var rel=DB.appointments.filter(function(a){return a.serviceId===id;}).length;
   var tip=rel?("（还有 "+rel+" 条预约使用该项目，删除后这些预约将显示为「未指定项目」）"):"";
   if(!confirm("确定删除项目「"+s.name+"」？"+tip))return;
-DB.services=DB.services.filter(function(x){return x.id!==id;});
+  DB.services=DB.services.filter(function(x){return x.id!==id;});
   DB.appointments.forEach(function(a){if(a.serviceId===id)a.serviceId="";});
-  if(cloudMode&&sess){markDeleted("services",id);cloudSoftDelete("services",id).catch(function(e){toast("云端删除失败："+(e&&e.message?e.message:e),"err");});}
+  if(cloudMode&&sess)cloudDeleteRows("services",[id]).catch(function(e){toast("云端删除失败："+(e&&e.message?e.message:e),"err");});
   saveDB();toast("项目已删除");
 }
 function renderSchedule(){
@@ -5284,8 +5140,8 @@ function delAppt(id){
   var a=DB.appointments.find(function(x){return x.id===id;});
   if(!a)return;
   if(!confirm("确定删除 "+(a.date+" "+a.time)+" "+(a.client)+" 的这条预约？"))return;
-DB.appointments=DB.appointments.filter(function(x){return x.id!==id;});
-  if(cloudMode&&sess){markDeleted("appointments",id);cloudDeleteRows("appointments",[id]).catch(function(e){toast("云端删除失败："+(e&&e.message?e.message:e),"err");});}
+  DB.appointments=DB.appointments.filter(function(x){return x.id!==id;});
+  if(cloudMode&&sess)cloudDeleteRows("appointments",[id]).catch(function(e){toast("云端删除失败："+(e&&e.message?e.message:e),"err");});
   saveDB();toast("预约已删除");
 }
 $("btnGlobalAdd").addEventListener("click",function(){
@@ -5838,7 +5694,6 @@ function initSectionFolds(){
 loadCloudCfg();
 applyCloudHash();
 loadSess();
-loadTomb();
 loadDB();
 if(cloudCfg&&cloudCfg.url&&cloudCfg.anonKey){
   cloudMode=true;cloudConnected=false;
