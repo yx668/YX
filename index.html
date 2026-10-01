@@ -432,7 +432,7 @@ tr:hover td{background:#fafbfc}
               <option value="returned">已归还</option>
             </select>
             <select id="lfMember" onchange="renderList()"><option value="">全部成员</option></select>
-              <input type="search" id="lfQ" placeholder="搜索客户 / 电话 / 备注" autocomplete="off" oninput="renderList()" style="flex:1;min-width:160px">
+              <input type="search" id="lfSearch" placeholder="搜索客户 / 电话 / 备注" autocomplete="off" oninput="renderList()" style="flex:1;min-width:160px">
             <button class="btn btn-ghost btn-sm" type="button" onclick="clearListFilters()">重置</button>
           </div>
           <div class="section-body no-pad" id="listBody"></div>
@@ -530,7 +530,7 @@ tr:hover td{background:#fafbfc}
           <div class="section-head">
             <div><h2>客户档案</h2><div class="desc">管理客户的共享股东/普通身份、归属介绍人与两级层级关系</div></div>
             <div style="display:flex;gap:8px;align-items:center">
-              <input type="search" id="custQ" placeholder="搜索姓名 / 电话 / 介绍人" autocomplete="off" oninput="renderCustomers()" style="min-width:200px">
+              <input type="search" id="custSearch" placeholder="搜索姓名 / 电话 / 介绍人" autocomplete="off" oninput="renderCustomers()" style="min-width:200px">
               <select id="custTypeF" onchange="renderCustomers()" style="max-width:130px">
                 <option value="">全部身份</option>
 <option value="shareholder">共享股东</option>
@@ -883,6 +883,24 @@ tr:hover td{background:#fafbfc}
       <button class="btn btn-primary" type="button" id="lgSubmitBtn" onclick="submitLogin()" style="display:none">登录</button>
       <span class="hint">门店共用设备：管理员登录后，共享股东也可在此登录查看自己的数据</span>
     </div>
+  </div>
+</div>
+
+<!-- 股东详情弹窗（管理员端查看） -->
+<div class="mask" id="shareholderDetailMask">
+  <div class="modal" style="max-width:720px">
+    <div class="modal-head"><h3 id="shareholderDetailTitle">股东详情</h3><button class="modal-x" type="button" onclick="closeModal('shareholderDetailMask')">✕</button></div>
+    <div class="modal-body" id="shareholderDetailBody"></div>
+    <div class="modal-foot"><button class="btn btn-ghost" type="button" onclick="closeModal('shareholderDetailMask')">关闭</button></div>
+  </div>
+</div>
+
+<!-- 客户消费详情弹窗（股东端查看） -->
+<div class="mask" id="customerDetailForShareMask">
+  <div class="modal" style="max-width:680px">
+    <div class="modal-head"><h3 id="customerDetailForShareTitle">客户消费详情</h3><button class="modal-x" type="button" onclick="closeModal('customerDetailForShareMask')">✕</button></div>
+    <div class="modal-body" id="customerDetailForShareBody"></div>
+    <div class="modal-foot"><button class="btn btn-ghost" type="button" onclick="closeModal('customerDetailForShareMask')">关闭</button></div>
   </div>
 </div>
 
@@ -3382,18 +3400,16 @@ function cloudPullAll(){
   if(!cloudMode||!sess)return Promise.resolve(false);
   if(syncBusy)return Promise.resolve(false);
   syncBusy=true;
-  // 取消尚未执行的待推送，避免「保存 400ms 后上推」与「15 秒循环拉取」竞态：
-  // 拉取期间若有离线新增，合并逻辑会保留，拉取完成后统一补推
   if(pushTimer){clearTimeout(pushTimer);pushTimer=null;}
-  // 备份当前 DB，拉取失败时回滚，防止断网/云端异常导致数据被清空
   var _dbBackup={members:DB.members.slice(),services:DB.services.slice(),appointments:DB.appointments.slice(),customers:DB.customers.slice(),schedule:JSON.parse(JSON.stringify(DB.schedule||{start:"09:00",end:"20:00"}))};
-return Promise.all([cloudSelect("members"),cloudSelect("services"),cloudSelect("appointments"),cloudSelect("schedule"),cloudSelect("customers")])
+  // 拉取前记录本地已有预约ID集合，用于检测新增
+  var localApptIds={};
+  DB.appointments.forEach(function(a){if(a&&a.id)localApptIds[a.id]=1;});
+  return Promise.all([cloudSelect("members"),cloudSelect("services"),cloudSelect("appointments"),cloudSelect("schedule"),cloudSelect("customers")])
     .then(function(res){
-      // 墓碑过滤：本地已删除的行不从云端拉回（防“删除后几秒又变回来”）
       retryDeleted("members",res[0]);
       retryDeleted("services",res[1]);
       retryDeleted("customers",res[4]);
-      // v16 软删广播处理（services/members/customers 共用小函数）
       var dropSoftDel=function(table,cloudRows){
         (cloudRows||[]).forEach(function(r){
           if(r&&r.name&&String(r.name).indexOf("__DEL__")===0){
@@ -3404,6 +3420,104 @@ return Promise.all([cloudSelect("members"),cloudSelect("services"),cloudSelect("
             }else if(table==="members"){DB.members=DB.members.filter(function(x){return x.id!==r.id;});}
             else if(table==="customers"){DB.customers=DB.customers.filter(function(x){return x.id!==r.id;});}
           }
+        });
+        return (cloudRows||[]).filter(function(r){return !(r&&r.name&&String(r.name).indexOf("__DEL__")===0);});
+      };
+      res[0]=dropSoftDel("members",res[0]);
+      res[1]=dropSoftDel("services",res[1]);
+      res[4]=dropSoftDel("customers",res[4]);
+      DB.members=mergeRows((res[0]||[]).filter(function(r){return !isDeletedLocal("members",r.id);}).map(stripRow),DB.members);
+      var svcCloud=(res[1]||[]).filter(function(r){return !isDeletedLocal("services",r.id);}).map(stripRow).map(function(s){
+        if(s.price_shareholder!=null){s.priceShareholder=s.price_shareholder;delete s.price_shareholder;}
+        if(s.priceShareholder==null)s.priceShareholder=s.price;
+        if(s.cost==null)s.cost=0;
+        if(s.is_rent!=null){s.isRent=!!s.is_rent;delete s.is_rent;}
+        if(s.rent_days!=null){s.rentDays=s.rent_days;delete s.rent_days;}
+        return s;
+      });
+      var SEED_KEY="bkgbook_srv_seed_v16";
+      try{
+        if(localStorage.getItem(SEED_KEY)!=="1"&&svcCloud&&svcCloud.length){
+          DB.services=svcCloud;
+          try{localStorage.setItem(SEED_KEY,"1");}catch(e){}
+        }else if(localStorage.getItem(SEED_KEY)==="1"){
+          DB.services=mergeRows(svcCloud,DB.services);
+        }
+      }catch(e){DB.services=mergeRows(svcCloud,DB.services);}
+      var cloudRows=(res[2]||[]).map(stripRow).map(function(r){
+        if(r.unitprice!=null){r.unitPrice=r.unitprice;delete r.unitprice;}
+        else delete r.unitPrice;
+        if(r.servicecost!=null){r.serviceCost=r.servicecost;delete r.servicecost;}
+        else delete r.serviceCost;
+        if(r.rent_days!=null){r.rentDays=r.rent_days;delete r.rent_days;}
+        else delete r.rentDays;
+        if(r.rented_at!=null){r.rentedAt=r.rented_at;delete r.rented_at;}
+        else delete r.rentedAt;
+        if(r.due_date!=null){r.dueDate=r.due_date;delete r.due_date;}
+        else delete r.dueDate;
+        if(r.returned_at!=null){r.returnedAt=r.returned_at;delete r.returned_at;}
+        else delete r.returnedAt;
+        return r;
+      }).filter(function(r){return !isDeletedLocal("appointments",r.id);});
+      retryDeleted("appointments",res[2]);
+      var cloudIds={};
+      cloudRows.forEach(function(r){cloudIds[r.id]=1;});
+      var lmap={};
+      DB.appointments.forEach(function(a){if(a&&a.id)lmap[a.id]=a;});
+      var pending=cloudRows.map(function(r){return lmap[r.id]||r;});
+      var seen={};
+      pending.forEach(function(r){seen[r.id]=1;});
+      DB.appointments.forEach(function(a){
+        if(a&&a.id&&!cloudIds[a.id]&&cloudSelectedApptIds.indexOf(a.id)<0&&!seen[a.id]){
+          pending.push(a);seen[a.id]=1;
+        }
+      });
+      DB.appointments=pending;
+      // 检测云端新增预约（其他设备/股东创建）并提醒管理员
+      var newAppts=cloudRows.filter(function(r){return r&&r.id&&!localApptIds[r.id];});
+      if(newAppts.length&&isAdmin()){
+        newAppts.forEach(function(a){
+          var detail="预约客户：「"+(a.client||"未知")+"」<br>预约时间："+(a.date||"")+" "+(a.time||"");
+          if(a.serviceId){var svc=serviceById(a.serviceId);if(svc)detail+="<br>预约项目："+svc.name;}
+          if(a.memberId){var mem=memberById(a.memberId);if(mem)detail+="<br>服务人员："+mem.name;}
+          $("apptNotifyDetail").innerHTML=detail;
+          $("apptNotifyMask").classList.add("show");
+          var speakText="您有一单客户预约需要处理。客户"+(a.client||"未知")+"，预约时间"+(a.date||"")+" "+(a.time||"");
+          if(a.serviceId){var svc2=serviceById(a.serviceId);if(svc2)speakText+="，预约项目"+svc2.name;}
+          if(a.memberId){var mem2=memberById(a.memberId);if(mem2)speakText+="，服务人员"+mem2.name;}
+          speakNotifyText(speakText);
+          notifyAppt("您有一单客户预约需要处理","预约客户：「"+(a.client||"未知")+"」\n预约时间："+(a.date||"")+" "+(a.time||""));
+        });
+      }
+      cloudSelectedApptIds=cloudRows.map(function(r){return r.id;});
+      var sched=res[3]&&res[3][0];
+      DB.schedule=sched?{start:sched.start||"09:00",end:sched.end||"20:00"}:DB.schedule||{start:"09:00",end:"20:00"};
+      DB.customers=mergeRows((res[4]||[]).filter(function(r){return !isDeletedLocal("customers",r.id);}).map(stripRow).map(function(c){
+        if(c.wx==null)c.wx="";
+        return c;
+      }),DB.customers);
+      cloudConnected=true;
+      renderAll();
+      updateCloudUI();
+      cloudConnected=true;updateCloudUI();
+      syncBusy=false;
+      startCloudSync();
+      renderAll();
+      return true;
+    }).catch(function(e){
+      DB.members=_dbBackup.members;DB.services=_dbBackup.services;
+      DB.appointments=_dbBackup.appointments;DB.customers=_dbBackup.customers;
+      DB.schedule=_dbBackup.schedule;
+      cloudConnected=false;updateCloudUI();
+      syncBusy=false;
+      if(!navigator.onLine){
+        toast("网络已断开，数据已保存在本地，联网后将自动同步","warn");
+      }else{
+        toast("云端同步失败，已保留本地数据："+(e&&e.message?e.message:e),"err");
+      }
+      return false;
+    });
+}
         });
         return (cloudRows||[]).filter(function(r){return !(r&&r.name&&String(r.name).indexOf("__DEL__")===0);});
       };
@@ -3876,6 +3990,125 @@ function viewLv1Customers(cid){
   $("custLv1Body").innerHTML=head+body;
   showModal("custLv1Mask");
 }
+/* 管理员端：查看共享股东详情（个人资料 + 名下客户消费明细） */
+function viewShareholderDetail(cid){
+  var c=customerById(cid);
+  if(!c||c.type!=="shareholder"){toast("该客户不是共享股东","err");return;}
+  $("shareholderDetailTitle").textContent=esc(c.name)+" 股东详情";
+  // 1) 个人资料
+  var ref=c.referrer?customerById(c.referrer):null;
+  var cs=commissionSummary(c.id);
+  var html='<div style="margin-bottom:16px">'+
+    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">'+
+    '<span class="avatar" style="background:'+esc(c.color||"#d97706")+';width:44px;height:44px;font-size:18px">'+esc((c.name||"?")[0])+'</span>'+
+    '<div><div style="font-size:16px;font-weight:700">'+esc(c.name)+' <span class="tag tag-warn">共享股东</span></div>'+
+    '<div class="hint">电话：'+(esc(c.phone)||"-")+(ref?"　介绍人："+esc(ref.name):"　介绍人：无")+"</div></div></div>"+
+    '<div style="display:flex;gap:12px;flex-wrap:wrap">'+
+    '<div style="flex:1;min-width:120px;background:var(--bg-1);border-radius:10px;padding:12px;text-align:center">'+
+    '<div style="font-size:24px;font-weight:800;color:var(--primary)">'+fmtMoney(cs.total)+'</div><div class="hint">总佣金</div></div>'+
+    '<div style="flex:1;min-width:120px;background:var(--bg-1);border-radius:10px;padding:12px;text-align:center">'+
+    '<div style="font-size:24px;font-weight:800;color:var(--text-1)">'+fmtMoney(cs.withdrawn)+'</div><div class="hint">已提现</div></div>'+
+    '<div style="flex:1;min-width:120px;background:var(--bg-1);border-radius:10px;padding:12px;text-align:center">'+
+    '<div style="font-size:24px;font-weight:800;color:#16a34a">'+fmtMoney(cs.pending)+'</div><div class="hint">待提现</div></div>'+
+    '</div></div>';
+  // 2) 名下一级客户明细（含消费详情）
+  var lv1=(DB.customers||[]).filter(function(x){return x.referrer===c.id;});
+  if(!lv1.length){
+    html+='<div class="empty"><div class="big">👤</div><h3>暂无一级客户</h3></div>';
+  }else{
+    html+='<div style="font-size:14px;font-weight:700;color:var(--text-1);margin-bottom:8px">一级客户（'+lv1.length+' 人）</div>'+
+      '<table><tr><th>客户</th><th>电话</th><th>预约次数</th><th>已消费</th><th>已拿佣金</th><th style="text-align:right">操作</th></tr>';
+    lv1.forEach(function(x){
+      var apps=DB.appointments.filter(function(a){return a.customer_id===x.id&&a.status!=="cancelled";});
+      var spent=apps.reduce(function(s,a){return s+(((a.status==="done"||(a.kind==="rent"&&a.status==="returned"))?(+a.amount||0):0));},0);
+      var tag=x.type==="shareholder"?'<span class="tag tag-warn">共享股东</span>':'<span class="tag tag-blue">客户</span>';
+      html+='<tr><td><div class="member-cell"><span class="avatar" style="background:'+esc(x.color||"#6b7280")+'">'+esc((x.name||"?")[0])+'</span>'+
+        '<div class="info"><div class="name">'+esc(x.name)+' '+tag+'</div></div></div></td>'+
+        '<td>'+(esc(x.phone)||'<span class="hint">-</span>')+'</td>'+
+        '<td><span class="tag tag-blue">'+apps.length+'</span></td>'+
+        '<td>'+fmtMoney(spent)+'</td>'+
+        '<td>'+fmtMoney(commissionTotal(x.id))+'</td>'+
+        '<td style="text-align:right"><button class="btn btn-ghost btn-xs" type="button" onclick="closeModal(\'shareholderDetailMask\');viewLv1Customers(\''+c.id+'\')">👥 查看层级</button></td></tr>';
+    });
+    html+='</table>';
+  }
+  // 3) 二级客户统计
+  var lv1Ids={};lv1.forEach(function(y){lv1Ids[y.id]=1;});
+  var lv2=(DB.customers||[]).filter(function(x){return x.referrer&&lv1Ids[x.referrer];});
+  if(lv2.length){
+    var lv2Total=lv2.reduce(function(s,x){
+      var apps=DB.appointments.filter(function(a){return a.customer_id===x.id&&a.status!=="cancelled";}).reduce(function(ss,a){return ss+(((a.status==="done"||(a.kind==="rent"&&a.status==="returned"))?(+a.amount||0):0));},0);
+      return s+apps;
+    },0);
+    html+='<div style="margin-top:16px;font-size:14px;font-weight:700;color:var(--text-1);margin-bottom:8px">二级客户（'+lv2.length+' 人 · 已消费 '+fmtMoney(lv2Total)+'）</div>'+
+      '<table><tr><th>客户</th><th>归属一级</th><th>电话</th><th>预约次数</th><th>已消费</th></tr>';
+    lv2.forEach(function(x){
+      var ref=customerById(x.referrer);
+      var apps=DB.appointments.filter(function(a){return a.customer_id===x.id&&a.status!=="cancelled";});
+      var spent=apps.reduce(function(s,a){return s+(((a.status==="done"||(a.kind==="rent"&&a.status==="returned"))?(+a.amount||0):0));},0);
+      html+='<tr><td><div class="member-cell"><span class="avatar" style="background:'+esc(x.color||"#6b7280")+'">'+esc((x.name||"?")[0])+'</span><div class="info"><div class="name">'+esc(x.name)+'</div></div></div></td>'+
+        '<td>'+(ref?esc(ref.name):'<span class="hint">-</span>')+'</td>'+
+        '<td>'+(esc(x.phone)||'<span class="hint">-</span>')+'</td>'+
+        '<td><span class="tag tag-blue">'+apps.length+'</span></td>'+
+        '<td>'+fmtMoney(spent)+'</td></tr>';
+    });
+    html+='</table>';
+  }
+  // 4) 本人预约记录
+  var selfApps=DB.appointments.filter(function(a){return a.customer_id===c.id&&a.status!=="cancelled";});
+  if(selfApps.length){
+    html+='<div style="margin-top:16px;font-size:14px;font-weight:700;color:var(--text-1);margin-bottom:8px">本人预约记录（'+selfApps.length+' 条）</div>'+
+      '<table><tr><th>日期</th><th>时间</th><th>项目</th><th>状态</th><th style="text-align:right">金额</th></tr>';
+    selfApps.forEach(function(a){
+      var sv=a.serviceId?serviceById(a.serviceId):null;
+      var stm=statusMap[a.status]||["未知","tag-gray"];
+      html+='<tr><td>'+a.date+'</td><td>'+esc(a.time)+'</td><td>'+esc(sv?sv.name:(a.kind==="rent"?"苗衣出租":"预约"))+'</td>'+
+        '<td><span class="tag '+stm[1]+'">'+stm[0]+'</span></td>'+
+        '<td style="text-align:right">'+fmtMoney(a.amount||0)+'</td></tr>';
+    });
+    html+='</table>';
+  }
+  $("shareholderDetailBody").innerHTML=html;
+  showModal("shareholderDetailMask");
+}
+
+/* 股东端：查看名下客户消费详情 */
+function viewCustomerDetailForShare(cid){
+  var c=customerById(cid);
+  if(!c){toast("未找到该客户","err");return;}
+  $("customerDetailForShareTitle").textContent=esc(c.name)+" 消费详情";
+  var ref=c.referrer?customerById(c.referrer):null;
+  var apps=DB.appointments.filter(function(a){return a.customer_id===c.id&&a.status!=="cancelled";}).sort(function(x,y){return x.date<y.date?-1:1;});
+  var totalSpent=apps.reduce(function(s,a){return s+(((a.status==="done"||(a.kind==="rent"&&a.status==="returned"))?(+a.amount||0):0));},0);
+  var html='<div style="margin-bottom:16px">'+
+    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">'+
+    '<span class="avatar" style="background:'+esc(c.color||"#6b7280")+';width:40px;height:40px;font-size:16px">'+esc((c.name||"?")[0])+'</span>'+
+    '<div><div style="font-size:16px;font-weight:700">'+esc(c.name)+(c.type==="shareholder"?' <span class="tag tag-warn">共享股东</span>':' <span class="tag tag-blue">客户</span>')+'</div>'+
+    '<div class="hint">电话：'+(esc(c.phone)||"-")+(ref?"　归属："+esc(ref.name):"")+'</div></div></div>'+
+    '<div style="display:flex;gap:12px;flex-wrap:wrap">'+
+    '<div style="flex:1;min-width:120px;background:var(--bg-1);border-radius:10px;padding:12px;text-align:center">'+
+    '<div style="font-size:22px;font-weight:800;color:var(--primary)">'+apps.length+'</div><div class="hint">预约次数</div></div>'+
+    '<div style="flex:1;min-width:120px;background:var(--bg-1);border-radius:10px;padding:12px;text-align:center">'+
+    '<div style="font-size:22px;font-weight:800;color:#16a34a">'+fmtMoney(totalSpent)+'</div><div class="hint">已消费</div></div>'+
+    '</div></div>';
+  if(!apps.length){
+    html+='<div class="empty"><div class="big">📅</div><h3>暂无预约记录</h3></div>';
+  }else{
+    html+='<table><tr><th>日期</th><th>时间</th><th>项目</th><th>状态</th><th style="text-align:right">金额</th></tr>';
+    apps.forEach(function(a){
+      var sv=a.serviceId?serviceById(a.serviceId):null;
+      var stm=statusMap[a.status]||["未知","tag-gray"];
+      var payTag=((a.status==="done"||(a.kind==="rent"&&a.status==="returned"))&&(+a.amount||0)>0)?' <span class="tag tag-green">已收款</span>':"";
+      html+='<tr><td>'+a.date+'</td><td>'+esc(a.time)+'</td><td>'+esc(sv?sv.name:(a.kind==="rent"?"苗衣出租":"预约"))+'</td>'+
+        '<td><span class="tag '+stm[1]+'">'+stm[0]+'</span></td>'+
+        '<td style="text-align:right"><b>'+fmtMoney(a.amount||0)+'</b>'+payTag+'</td></tr>';
+    });
+    html+='</table>';
+  }
+  $("customerDetailForShareBody").innerHTML=html;
+  showModal("customerDetailForShareMask");
+}
+
 function renderShareBoard(){
   if(!shareSess)return;
   var me=customerById(shareSess.cid);
@@ -3948,7 +4181,7 @@ function renderShareBoard(){
       var projHtml=Object.keys(proj).map(function(k){return esc(k)+" "+proj[k]+" 次";}).join("、");
       var tag=c.type==="shareholder"?'<span class="tag tag-warn">共享股东</span>':'<span class="tag tag-blue">普通客户</span>';
       lv1Html+='<tr><td><div class="member-cell"><span class="avatar" style="background:'+esc(c.color||"#6b7280")+'">'+esc((c.name||"?")[0])+"</span>"+
-        '<div class="info"><div class="name">'+esc(c.name)+" "+tag+"</div><div class=\"role\">"+esc(c.phone||"-")+"</div></div></div></td>"+
+        '<div class="info"><div class="name" style="cursor:pointer;color:var(--primary);text-decoration:underline" onclick="viewCustomerDetailForShare(\''+c.id+'\')" title="点击查看该客户全部消费详情">'+esc(c.name)+" "+tag+"</div><div class=\"role\">"+esc(c.phone||"-")+"</div></div></div></td>"+
         '<td><span class="tag tag-blue">'+apps.length+"</span></td><td>"+fmtMoney(spent)+'</td>'+
         '<td style="font-size:12px;line-height:1.7">'+(projHtml||'<span class="hint">-</span>')+"</td>"+
         '<td style="text-align:right"><button class="btn btn-primary btn-xs" type="button" onclick="openShareBook(\''+c.id+'\')">＋ 为其预约</button></td></tr>';
@@ -4638,7 +4871,7 @@ function dayTimelineHTML(date,appts){
 
 /* ================= 预约列表 ================= */
 function renderList(){
-  var d=$("lfDate").value,st=$("lfState").value,fm=$("lfMember").value,q=$("lfQ").value.trim().toLowerCase();
+  var d=$("lfDate").value,st=$("lfState").value,fm=$("lfMember").value,q=$("lfSearch").value.trim().toLowerCase();
   var list=DB.appointments.slice().sort(function(a,b){return (a.date+a.time).localeCompare(b.date+b.time);});
   list=list.filter(function(a){
     if(d&&a.date!==d)return false;
@@ -4674,7 +4907,7 @@ function renderList(){
   body.innerHTML=html+'</table><div style="padding:12px 16px;font-size:12px;color:var(--text-3)">共 '+list.length+" 条记录</div>";
 }
 function clearListFilters(){
-  $("lfDate").value="";$("lfState").value="";$("lfMember").value="";$("lfQ").value="";
+  $("lfDate").value="";$("lfState").value="";$("lfMember").value="";$("lfSearch").value="";
   renderList();
 }
 
@@ -4958,7 +5191,7 @@ function custChainHtml(c){
 function renderCustomers(){
   var el=$("customerGrid");
   if(!el)return;
-  var q=($("custQ").value||"").trim().toLowerCase();
+  var q=($("custSearch").value||"").trim().toLowerCase();
   var tf=$("custTypeF").value;
   var list=(DB.customers||[]).slice().filter(function(c){
     if(q){
@@ -4987,8 +5220,11 @@ function renderCustomers(){
        '<button class="btn btn-ghost-danger btn-xs" type="button" onclick="delCustomer(\''+c.id+'\')">删除</button>'):"";
     if(c.type==="shareholder"&&canEdit())acts='<button class="btn btn-ghost btn-xs" type="button" title="查看该股东佣金并办理提现" onclick="openWithdrawModal(\''+c.id+'\')">💰 提现</button>'+acts;
     acts='<button class="btn btn-ghost btn-xs" type="button" title="查看其名下的一级客户与二级客户" onclick="viewLv1Customers(\''+c.id+'\')">👥 '+lv1Cnt+'</button>'+acts;
+    var nameClick=c.type==="shareholder"&&canEdit()?
+      'onclick="viewShareholderDetail(\''+c.id+'\')" style="cursor:pointer;color:var(--primary);text-decoration:underline" title="点击查看股东详情（名下客户、消费记录）"':
+      'onclick="quickBookFor(\''+c.id+'\')" style="cursor:pointer" title="点击为此客户快捷新建预约"';
     html+='<tr><td><div class="member-cell"><span class="avatar" style="background:'+esc(c.color||"#6b7280")+'">'+esc((c.name||"?")[0])+"</span>"+
-      '<div class="info"><div class="name" style="cursor:pointer" title="点击为此客户快捷新建预约" onclick="quickBookFor(\''+c.id+'\')">'+esc(c.name)+' <span class="tag tag-green" title="已拿佣金：历史累计，仅共享股东按名下客户已成交消费计提">💰 已拿 '+fmtMoney(commissionTotal(c.id))+'</span> <span class="tag tag-blue" style="cursor:pointer">＋预约</span></div>'+(c.note?'<div class="role">'+esc(c.note)+"</div>":"")+"</div></div></td>"+
+      '<div class="info"><div class="name" '+nameClick+'>'+esc(c.name)+' <span class="tag tag-green" title="已拿佣金：历史累计，仅共享股东按名下客户已成交消费计提">💰 已拿 '+fmtMoney(commissionTotal(c.id))+'</span> '+(c.type==="shareholder"?'':'<span class="tag tag-blue" style="cursor:pointer">＋预约</span>')+'</div>'+(c.note?'<div class="role">'+esc(c.note)+"</div>":"")+"</div></div></td>"+
       "<td>"+custTypeTag(c)+(c.login_enabled?' <span class="tag tag-blue" title="已开通登录账号">🔐 可登录</span>':"")+"</td>"+
       "<td>"+custChainHtml(c)+"</td>"+
       "<td>"+(esc(c.phone)||'<span class="hint">-</span>')+"</td>"+
