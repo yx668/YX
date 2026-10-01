@@ -888,6 +888,21 @@ tr:hover td{background:#fafbfc}
 
 <div id="toasts"></div>
 
+<!-- 新预约持久提醒弹窗 -->
+<div id="apptNotifyMask" class="mask" style="z-index:9999">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-head">🔔 新预约提醒</div>
+    <div class="modal-body" style="text-align:center;padding:24px">
+      <div style="font-size:48px;margin-bottom:12px">📅</div>
+      <div style="font-size:17px;font-weight:600;color:var(--text-1);margin-bottom:8px">您有一单客户预约需要处理</div>
+      <div id="apptNotifyDetail" style="font-size:14px;color:var(--text-2);line-height:1.6"></div>
+    </div>
+    <div class="modal-foot" style="justify-content:center">
+      <button class="btn btn-primary" type="button" onclick="closeModal('apptNotifyMask')">确认</button>
+    </div>
+  </div>
+</div>
+
 <script>
 /* QR Code Generator for JavaScript (c) 2009 Kazuhiko Arase, MIT - 内嵌，供扫码自动配置 */
 //---------------------------------------------------------------------
@@ -5380,8 +5395,14 @@ function saveAppt(){
   }else{
     DB.appointments.push(data);
     toast("预约已创建");
-    notifyAppt("您有一单客户预约需要处理","预约客户：「"+client+"」\n预约时间："+date+" "+time);
+    // 持久提醒弹窗（必须点击确认才关闭）
+    var detail="预约客户：「"+client+"」<br>预约时间："+date+" "+time;
+    if(svid){var svc=serviceById(svid);if(svc)detail+="<br>预约项目："+svc.name;}
+    if(mid){var mem=memberById(mid);if(mem)detail+="<br>服务人员："+mem.name;}
+    $("apptNotifyDetail").innerHTML=detail;
+    $("apptNotifyMask").classList.add("show");
     playNotifySound();
+    notifyAppt("您有一单客户预约需要处理","预约客户：「"+client+"」\n预约时间："+date+" "+time);
     // 共享股东：直接单条推送云端（绕过 sess 限制）
     if(shareSess)pushShareAppt(data);
   }
@@ -5952,8 +5973,11 @@ function playNotifySound(){
 /* 共享股东：单条预约直接推送云端（绕过 sess 限制） */
 function pushShareAppt(data){
   if(!cloudMode||!cloudCfg||!navigator.onLine)return;
+  // 共享股东无 sess，使用匿名 key 直接 REST upsert（绕过 sess 限制）
   var row=apptToCloudRow(data,new Date().toISOString());
-  sFetch("/rest/v1/rpc/save_shareholder_appt",{method:"POST",body:{appt:row}})
+  // 若已有 id 冲突则执行 update（on_conflict=upsert）
+  var body=[row];
+  sFetch("/rest/v1/appointments?on_conflict=id",{method:"POST",headers:{"Prefer":"resolution=merge-duplicates"},body:body})
     .then(function(r){
       if(r&&r.ok){toast("预约已同步到云端","ok");}
       else{toast("云端同步失败："+(r&&r.json&&r.json.message?r.json.message:"未知错误"),"err");}
