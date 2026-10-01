@@ -432,7 +432,7 @@ tr:hover td{background:#fafbfc}
               <option value="returned">已归还</option>
             </select>
             <select id="lfMember" onchange="renderList()"><option value="">全部成员</option></select>
-            <input type="text" id="lfQ" placeholder="搜索客户 / 电话 / 备注" oninput="renderList()" style="flex:1;min-width:160px">
+              <input type="text" id="lfQ" placeholder="搜索客户 / 电话 / 备注" autocomplete="off" oninput="renderList()" style="flex:1;min-width:160px">
             <button class="btn btn-ghost btn-sm" type="button" onclick="clearListFilters()">重置</button>
           </div>
           <div class="section-body no-pad" id="listBody"></div>
