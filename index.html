@@ -5931,11 +5931,11 @@ function showModal(id){$(id).classList.add("show");}
 function closeModal(id){$(id).classList.remove("show");}
 document.querySelectorAll(".mask").forEach(function(m){
   m.addEventListener("click",function(e){
-    if(e.target===m&&m.id!=="loginMask")closeModal(m.id);
+    if(e.target===m&&m.id!=="loginMask"&&m.id!=="apptNotifyMask")closeModal(m.id);
   });
 });
 document.addEventListener("keydown",function(e){
-  if(e.key==="Escape")document.querySelectorAll(".mask.show").forEach(function(m){if(m.id!=="loginMask")closeModal(m.id);});
+  if(e.key==="Escape")document.querySelectorAll(".mask.show").forEach(function(m){if(m.id!=="loginMask"&&m.id!=="apptNotifyMask")closeModal(m.id);});
 });
 function toast(msg,type){
   var t=document.createElement("div");
@@ -5950,7 +5950,7 @@ function notifyAppt(title,body){
   if(Notification.permission==="granted"){
     try{new Notification(title,{body:body});}catch(e){}
   }else if(Notification.permission!=="denied"){
-    Notification.requestPermission().then(function(p){if(p==="granted")try{new Notification(title,{body:body});}catch(e){}});
+    try{Notification.requestPermission().then(function(p){if(p==="granted")try{new Notification(title,{body:body});}catch(e){}});}catch(e){}
   }
 }
 function playNotifySound(){
