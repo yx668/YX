@@ -3289,7 +3289,7 @@ function sFetch(path,opts){
 }
 function authReq(path,body){
   return fetch(cBase()+path,{method:"POST",headers:{"apikey":cloudCfg.anonKey,"Content-Type":"application/json"},body:JSON.stringify(body)})
-    .then(function(r){return r.text().then(function(t){var j=null;try{j=JSON.parse(t);}catch(e){}return {ok:r.ok,status:r.status,json:j};});});
+    .then(function(r){return r.text().then(function(t){var j=null;try{j=JSON.parse(t);}catch(e){}return {ok:r.ok,status:r.status,text:t,json:j};});});
 }
 function cloudSignUp(email,password){return authReq("/auth/v1/signup",{email:email,password:password});}
 function cloudSignIn(email,password){return authReq("/auth/v1/token?grant_type=password",{email:email,password:password});}
@@ -5394,17 +5394,23 @@ function saveAppt(){
     notifyAppt("您有一单客户预约需要处理","预约客户：「"+client+"」\n预约时间："+date+" "+time);
   }else{
     DB.appointments.push(data);
-    toast("预约已创建");
-    // 持久提醒弹窗（必须点击确认才关闭）
-    var detail="预约客户：「"+client+"」<br>预约时间："+date+" "+time;
-    if(svid){var svc=serviceById(svid);if(svc)detail+="<br>预约项目："+svc.name;}
-    if(mid){var mem=memberById(mid);if(mem)detail+="<br>服务人员："+mem.name;}
-    $("apptNotifyDetail").innerHTML=detail;
-    $("apptNotifyMask").classList.add("show");
-    playNotifySound();
-    notifyAppt("您有一单客户预约需要处理","预约客户：「"+client+"」\n预约时间："+date+" "+time);
-    // 共享股东：直接单条推送云端（绕过 sess 限制）
-    if(shareSess)pushShareAppt(data);
+    if(shareSess){
+      // 股东：不弹窗、不语音、不通知，仅根据云端结果提示
+      pushShareAppt(data);
+    }else{
+      // 管理员：持久弹窗 + 语音播报 + 浏览器通知
+      toast("预约已创建");
+      var detail="预约客户：「"+client+"」<br>预约时间："+date+" "+time;
+      if(svid){var svc=serviceById(svid);if(svc)detail+="<br>预约项目："+svc.name;}
+      if(mid){var mem=memberById(mid);if(mem)detail+="<br>服务人员："+mem.name;}
+      $("apptNotifyDetail").innerHTML=detail;
+      $("apptNotifyMask").classList.add("show");
+      var speakText="您有一单客户预约需要处理。客户"+client+"，预约时间"+date+" "+time;
+      if(svid){var svc2=serviceById(svid);if(svc2)speakText+="，预约项目"+svc2.name;}
+      if(mid){var mem2=memberById(mid);if(mem2)speakText+="，服务人员"+mem2.name;}
+      speakNotifyText(speakText);
+      notifyAppt("您有一单客户预约需要处理","预约客户：「"+client+"」\n预约时间："+date+" "+time);
+    }
   }
   saveDB();
   closeModal("apptMask");
@@ -5953,35 +5959,39 @@ function notifyAppt(title,body){
     try{Notification.requestPermission().then(function(p){if(p==="granted")try{new Notification(title,{body:body});}catch(e){}});}catch(e){}
   }
 }
-function playNotifySound(){
+/* 语音播报提醒（播报文案内容） */
+function speakNotifyText(text){
   try{
-    var AudioContext=window.AudioContext||window.webkitAudioContext;
-    if(!AudioContext)return;
-    var ctx=new AudioContext();
-    var osc=ctx.createOscillator();
-    var gain=ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.frequency.value=880;
-    osc.type="sine";
-    gain.gain.setValueAtTime(0.3,ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01,ctx.currentTime+0.5);
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime+0.5);
+    if(!("speechSynthesis" in window))return;
+    var u=new SpeechSynthesisUtterance(text);
+    u.lang="zh-CN";
+    u.rate=1.0;
+    u.pitch=1.0;
+    u.volume=1.0;
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(u);
   }catch(e){}
 }
-/* 共享股东：单条预约直接推送云端（绕过 sess 限制） */
+/* 共享股东：通过 RPC 推送单条预约到云端（绕过 sess 与 RLS 限制） */
 function pushShareAppt(data){
-  if(!cloudMode||!cloudCfg||!navigator.onLine)return;
-  // 共享股东无 sess，使用匿名 key 直接 REST upsert（绕过 sess 限制）
+  if(!cloudMode||!cloudCfg){toast("预约暂未上传到总部：未配置云端","err");return;}
+  if(!navigator.onLine){toast("预约暂未上传到总部：网络已断开","err");return;}
   var row=apptToCloudRow(data,new Date().toISOString());
-  // 若已有 id 冲突则执行 update（on_conflict=upsert）
-  var body=[row];
-  sFetch("/rest/v1/appointments?on_conflict=id",{method:"POST",headers:{"Prefer":"resolution=merge-duplicates"},body:body})
+  authReq("/rest/v1/rpc/save_shareholder_appt",{appt:row})
     .then(function(r){
-      if(r&&r.ok){toast("预约已同步到云端","ok");}
-      else{toast("云端同步失败："+(r&&r.json&&r.json.message?r.json.message:"未知错误"),"err");}
-    }).catch(function(e){toast("云端同步失败，已保存本地："+(e&&e.message?e.message:e),"err");});
+      var ok=false,msg="未知错误";
+      if(r&&r.ok&&r.json){
+        if(Array.isArray(r.json)){
+          if(r.json.length>0&&r.json[0].success)ok=true;
+          else if(r.json.length>0&&r.json[0].message)msg=r.json[0].message;
+          else if(r.json.length>0&&r.json[0].error)msg=r.json[0].error;
+        }else if(r.json.success)ok=true;
+        else if(r.json.message)msg=r.json.message;
+        else if(r.json.error)msg=r.json.error;
+      }else if(r&&!r.ok&&r.text){msg=r.text;}
+      if(ok){toast("预约成功","ok");}
+      else{toast("预约暂未上传到总部："+msg,"err");}
+    }).catch(function(e){toast("预约暂未上传到总部："+(e&&e.message?e.message:e),"err");});
 }
 
 /* ================= 初始化 ================= */
