@@ -432,7 +432,7 @@ tr:hover td{background:#fafbfc}
               <option value="returned">已归还</option>
             </select>
             <select id="lfMember" onchange="renderList()"><option value="">全部成员</option></select>
-              <input type="text" id="lfQ" placeholder="搜索客户 / 电话 / 备注" autocomplete="off" oninput="renderList()" style="flex:1;min-width:160px">
+              <input type="search" id="lfQ" placeholder="搜索客户 / 电话 / 备注" autocomplete="off" oninput="renderList()" style="flex:1;min-width:160px">
             <button class="btn btn-ghost btn-sm" type="button" onclick="clearListFilters()">重置</button>
           </div>
           <div class="section-body no-pad" id="listBody"></div>
@@ -530,7 +530,7 @@ tr:hover td{background:#fafbfc}
           <div class="section-head">
             <div><h2>客户档案</h2><div class="desc">管理客户的共享股东/普通身份、归属介绍人与两级层级关系</div></div>
             <div style="display:flex;gap:8px;align-items:center">
-              <input type="text" id="custQ" placeholder="搜索姓名 / 电话 / 介绍人" autocomplete="off" oninput="renderCustomers()" style="min-width:200px">
+              <input type="search" id="custQ" placeholder="搜索姓名 / 电话 / 介绍人" autocomplete="off" oninput="renderCustomers()" style="min-width:200px">
               <select id="custTypeF" onchange="renderCustomers()" style="max-width:130px">
                 <option value="">全部身份</option>
 <option value="shareholder">共享股东</option>
@@ -5376,9 +5376,14 @@ function saveAppt(){
     var idx=DB.appointments.findIndex(function(x){return x.id===editingApptId;});
     DB.appointments[idx]=data;
     toast("预约已更新");
+    notifyAppt("您有一单客户预约需要处理","预约客户：「"+client+"」\n预约时间："+date+" "+time);
   }else{
     DB.appointments.push(data);
     toast("预约已创建");
+    notifyAppt("您有一单客户预约需要处理","预约客户：「"+client+"」\n预约时间："+date+" "+time);
+    playNotifySound();
+    // 共享股东：直接单条推送云端（绕过 sess 限制）
+    if(shareSess)pushShareAppt(data);
   }
   saveDB();
   closeModal("apptMask");
@@ -5917,6 +5922,42 @@ function toast(msg,type){
   t.innerHTML='<span class="ic">'+(type==="err"?"⚠":"✓")+"</span><span>"+esc(msg)+"</span>";
   $("toasts").appendChild(t);
   setTimeout(function(){t.style.transition="opacity .3s";t.style.opacity="0";setTimeout(function(){t.remove();},300);},2600);
+}
+/* 浏览器通知 + 提示音 */
+function notifyAppt(title,body){
+  if(!("Notification" in window))return;
+  if(Notification.permission==="granted"){
+    try{new Notification(title,{body:body});}catch(e){}
+  }else if(Notification.permission!=="denied"){
+    Notification.requestPermission().then(function(p){if(p==="granted")try{new Notification(title,{body:body});}catch(e){}});
+  }
+}
+function playNotifySound(){
+  try{
+    var AudioContext=window.AudioContext||window.webkitAudioContext;
+    if(!AudioContext)return;
+    var ctx=new AudioContext();
+    var osc=ctx.createOscillator();
+    var gain=ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.value=880;
+    osc.type="sine";
+    gain.gain.setValueAtTime(0.3,ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01,ctx.currentTime+0.5);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime+0.5);
+  }catch(e){}
+}
+/* 共享股东：单条预约直接推送云端（绕过 sess 限制） */
+function pushShareAppt(data){
+  if(!cloudMode||!cloudCfg||!navigator.onLine)return;
+  var row=apptToCloudRow(data,new Date().toISOString());
+  sFetch("/rest/v1/rpc/save_shareholder_appt",{method:"POST",body:{appt:row}})
+    .then(function(r){
+      if(r&&r.ok){toast("预约已同步到云端","ok");}
+      else{toast("云端同步失败："+(r&&r.json&&r.json.message?r.json.message:"未知错误"),"err");}
+    }).catch(function(e){toast("云端同步失败，已保存本地："+(e&&e.message?e.message:e),"err");});
 }
 
 /* ================= 初始化 ================= */
