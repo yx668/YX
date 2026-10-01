@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>银绣智享管理系统</title>
+<title>银绣智享管理系统 v25</title>
 <style>
 :root{
   --bg:#f3f5f9; --panel:#ffffff; --border:#e5e7eb;
@@ -3518,104 +3518,6 @@ function cloudPullAll(){
       return false;
     });
 }
-        });
-        return (cloudRows||[]).filter(function(r){return !(r&&r.name&&String(r.name).indexOf("__DEL__")===0);});
-      };
-      res[0]=dropSoftDel("members",res[0]);
-      res[1]=dropSoftDel("services",res[1]);
-      res[4]=dropSoftDel("customers",res[4]);
-      DB.members=mergeRows((res[0]||[]).filter(function(r){return !isDeletedLocal("members",r.id);}).map(stripRow),DB.members);
-      // 云端 snake_case 列 -> 本地 camelCase（price_shareholder -> priceShareholder）
-      var svcCloud=(res[1]||[]).filter(function(r){return !isDeletedLocal("services",r.id);}).map(stripRow).map(function(s){
-        if(s.price_shareholder!=null){s.priceShareholder=s.price_shareholder;delete s.price_shareholder;}
-        if(s.priceShareholder==null)s.priceShareholder=s.price;
-        if(s.cost==null)s.cost=0;
-        if(s.is_rent!=null){s.isRent=!!s.is_rent;delete s.is_rent;}
-        if(s.rent_days!=null){s.rentDays=s.rent_days;delete s.rent_days;}
-        return s;
-      });
-      // v16 一次性 seed：云端 services 已清理为真实项目集（授权"全部删除重写"），
-      // 首次同步以云端为权威覆盖本机残留旧行，防止旧缓存/垃圾行被合并后推回云端复活
-      var SEED_KEY="bkgbook_srv_seed_v16";
-      try{
-        if(localStorage.getItem(SEED_KEY)!=="1"&&svcCloud&&svcCloud.length){
-          DB.services=svcCloud;
-          try{localStorage.setItem(SEED_KEY,"1");}catch(e){}
-        }else if(localStorage.getItem(SEED_KEY)==="1"){
-          DB.services=mergeRows(svcCloud,DB.services);
-        }
-      }catch(e){DB.services=mergeRows(svcCloud,DB.services);}
-      var cloudRows=(res[2]||[]).map(stripRow).map(function(r){
-        // 云端小写列名 -> 本地驼峰：unitprice->unitPrice, servicecost->serviceCost
-        // 注意：值为 null 时不强行注入 unitPrice/serviceCost 键，
-        // 否则与直购记录（有实际值）的键集合不一致，pushAll 批量上推会被云端拒为
-        // "All object keys must match"（PostgREST 要求批内每行 key 集合完全相同）
-        if(r.unitprice!=null){r.unitPrice=r.unitprice;delete r.unitprice;}
-        else delete r.unitPrice;
-        if(r.servicecost!=null){r.serviceCost=r.servicecost;delete r.servicecost;}
-        else delete r.serviceCost;
-        if(r.rent_days!=null){r.rentDays=r.rent_days;delete r.rent_days;}
-        else delete r.rentDays;
-        if(r.rented_at!=null){r.rentedAt=r.rented_at;delete r.rented_at;}
-        else delete r.rentedAt;
-        if(r.due_date!=null){r.dueDate=r.due_date;delete r.due_date;}
-        else delete r.dueDate;
-if(r.returned_at!=null){r.returnedAt=r.returned_at;delete r.returned_at;}
-        else delete r.returnedAt;
-        return r;
-      }).filter(function(r){return !isDeletedLocal("appointments",r.id);});
-      retryDeleted("appointments",res[2]);
-      var cloudIds={};
-      cloudRows.forEach(function(r){cloudIds[r.id]=1;});
-      // 合并策略：云端与本地同 id 时本地优先（单机门店本地为权威数据源，
-      // 避免 15 秒周期拉取把「本地刚归还/刚结账但尚未上推」的记录回滚为云端旧值）；
-      // 云端独有行（其他设备新增）与本地独有行（离线新增）均保留。
-      var lmap={};
-      DB.appointments.forEach(function(a){if(a&&a.id)lmap[a.id]=a;});
-      var pending=cloudRows.map(function(r){return lmap[r.id]||r;});
-      var seen={};
-      pending.forEach(function(r){seen[r.id]=1;});
-      DB.appointments.forEach(function(a){
-        if(a&&a.id&&!cloudIds[a.id]&&cloudSelectedApptIds.indexOf(a.id)<0&&!seen[a.id]){
-          pending.push(a);seen[a.id]=1;
-        }
-      });
-      DB.appointments=pending;
-      // 仅记录云端真实存在的预约 id：本地已新建但尚未上传成功的记录不得被标记为"已在云端"，
-      // 否则下一次拉取会把它当作云端记录而丢弃（曾导致直购/离线记录丢失）
-      cloudSelectedApptIds=cloudRows.map(function(r){return r.id;});
-      // appointments 以外在本地离线新增/修改（管理员场景）需保留并稍后上推：
-      // 管理员用 upsert 全量合并，天然保留；普通用户对 members/services/schedule 只读，无本地改动
-      var sched=res[3]&&res[3][0];
-      DB.schedule=sched?{start:sched.start||"09:00",end:sched.end||"20:00"}:DB.schedule||{start:"09:00",end:"20:00"};
-      DB.customers=mergeRows((res[4]||[]).filter(function(r){return !isDeletedLocal("customers",r.id);}).map(stripRow).map(function(c){
-        if(c.wx==null)c.wx="";
-        return c;
-      }),DB.customers);
-      cloudConnected=true;
-      renderAll();
-      updateCloudUI();
-      cloudConnected=true;updateCloudUI();
-      syncBusy=false;
-      startCloudSync();
-      renderAll();
-      return true;
-    }).catch(function(e){
-      // 拉取失败：回滚到备份数据，防止本地数据被意外清空
-      DB.members=_dbBackup.members;DB.services=_dbBackup.services;
-      DB.appointments=_dbBackup.appointments;DB.customers=_dbBackup.customers;
-      DB.schedule=_dbBackup.schedule;
-      cloudConnected=false;updateCloudUI();
-      syncBusy=false;
-      // 断网期间标记稍后重试推送
-      if(!navigator.onLine){
-        toast("网络已断开，数据已保存在本地，联网后将自动同步","warn");
-      }else{
-        toast("云端同步失败，已保留本地数据："+(e&&e.message?e.message:e),"err");
-      }
-      return false;
-    });
-}
 function queuePush(){
   if(!cloudMode||!sess)return;
   if(pushTimer)clearTimeout(pushTimer);
@@ -4429,6 +4331,7 @@ function renderAuthUI(){
       navUserBtn.onclick=function(){doLogout();};
     }
   }
+  if(box){
   if(shareSess){
     var sc=customerById(shareSess.cid);
     var nm=sc?sc.name:shareSess.name;
@@ -4447,6 +4350,7 @@ function renderAuthUI(){
     '<div style="margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">'+
     '<span style="max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(sess.user.email||"")+"</span>"+
     '<button class="btn btn-ghost btn-xs" type="button" onclick="doLogout()">退出</button></div>';
+  }
 }
 function doShareLogout(){
   var nm=shareSess?shareSess.name:"";
@@ -4457,6 +4361,9 @@ function doShareLogout(){
 }
 function openLogin(){
   loginMode="signin";renderLoginUI();loginTab="share";switchLoginTab("share");showModal("loginMask");
+}
+function closeMasks(){
+  document.querySelectorAll(".mask.show").forEach(function(m){if(m.id!=="loginMask"&&m.id!=="apptNotifyMask")closeModal(m.id);});
 }
 function renderLoginUI(){
   $("loginTitle").textContent=loginMode==="signin"?"登录云端账号":"注册账号";
