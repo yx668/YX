@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>银绣智享管理系统 v25</title>
+<title>银绣智享管理系统 v26</title>
 <style>
 :root{
   --bg:#f3f5f9; --panel:#ffffff; --border:#e5e7eb;
@@ -320,6 +320,7 @@ tr:hover td{background:#fafbfc}
       <button class="nav-item" data-view="list" type="button"><span class="ic">📋</span><span>预约列表</span></button>
       <div class="nav-group" id="ngCash">前台收银</div>
       <button class="nav-item" data-view="buy" data-admin="1" type="button"><span class="ic">🛒</span><span>直接购买</span></button>
+      <button class="nav-item" data-view="consumption" data-admin="1" type="button"><span class="ic">💰</span><span>总消费记录</span></button>
       <div class="nav-group" id="ngStat">经营分析</div>
       <button class="nav-item" data-view="report" data-admin="1" type="button"><span class="ic">📈</span><span>统计报表</span></button>
       <div class="nav-group" id="ngBase">基础档案</div>
@@ -361,7 +362,7 @@ tr:hover td{background:#fafbfc}
         </div>
         <div class="section">
           <div class="section-head">
-            <div><h2>名下客户预约与消费</h2><div class="desc">您直接介绍的客户的预约与已结账消费</div></div>
+            <div><h2>名下客户预约与消费</h2><div class="desc">您直接介绍的客户的预约与消费，消费仅统计本月（次月清零）· 本月总消费 <b id="shareLv1MonthTotal" style="color:#16a34a">¥0</b></div></div>
             <input id="shareLv1Q" class="input" style="width:200px;flex-shrink:0" placeholder="🔍 搜索客户…" oninput="renderShareBoard()">
           </div>
           <div class="section-body no-pad" id="shareLv1"></div>
@@ -634,6 +635,13 @@ tr:hover td{background:#fafbfc}
               <tr><td><b>清空全部数据</b><br><span class="hint">删除本机保存的所有数据，操作不可恢复</span></td><td style="text-align:right"><button class="btn btn-ghost-danger" type="button" onclick="confirmClear()">清空数据</button></td></tr>
             </table>
           </div>
+        </div>
+      </section>
+      <!-- 总消费记录 -->
+      <section class="page" id="page-consumption">
+        <div class="section">
+          <div class="section-head"><div><h2>总消费记录</h2><div class="desc">所有客户的历史消费记录，可编辑可删除</div></div><button class="btn btn-primary" type="button" onclick="openConsumptionModal()">＋ 新增消费记录</button></div>
+          <div class="section-body no-pad" id="consumptionBody"></div>
         </div>
       </section>
     </div>
@@ -3342,13 +3350,36 @@ function errMsg(r){
   if(!r||!r.json)return "";
   return r.json.message||r.json.error_description||r.json.details||r.json.msg||"";
 }
+function normalizeCloudRow(table,row){
+  if(!row)return row;
+  var o={};
+  for(var k in row){
+    var nk=k;
+    if(table==="services"){
+      if(k==="priceShareholder")nk="price_shareholder";
+      else if(k==="isRent")nk="is_rent";
+      else if(k==="rentDays")nk="rent_days";
+    }else if(table==="appointments"){
+      if(k==="unitPrice")nk="unitprice";
+      else if(k==="serviceCost")nk="servicecost";
+      else if(k==="rentDays")nk="rent_days";
+      else if(k==="rentedAt")nk="rented_at";
+      else if(k==="dueDate")nk="due_date";
+      else if(k==="returnedAt")nk="returned_at";
+    }else if(table==="consumptions"){
+      if(k==="apptId")nk="apptid";
+    }
+    o[nk]=row[k];
+  }
+  return o;
+}
 function cloudUpsert(table,rows,conflictCol){
   if(!rows||!rows.length)return Promise.resolve();
   return tokenReady().then(function(ok){
     if(!ok)throw new Error("请先登录");
-    // 传 conflictCol 时走 upsert（可覆盖既有行）；不传时走纯 insert（普通用户新增预约）
     var url="/rest/v1/"+table+(conflictCol?("?on_conflict="+conflictCol):"");
-    return sFetch(url,{method:"POST",body:rows,headers:{"Prefer":"resolution=merge-duplicates,return=minimal"}})
+    var normalizedRows=rows.map(function(r){return normalizeCloudRow(table,r);});
+    return sFetch(url,{method:"POST",body:normalizedRows,headers:{"Prefer":"resolution=merge-duplicates,return=minimal"}})
       .then(function(r){if(!r.ok)throw new Error(errMsg(r)||"写入云端失败");});
   });
 }
@@ -3405,7 +3436,7 @@ function cloudPullAll(){
   // 拉取前记录本地已有预约ID集合，用于检测新增
   var localApptIds={};
   DB.appointments.forEach(function(a){if(a&&a.id)localApptIds[a.id]=1;});
-  return Promise.all([cloudSelect("members"),cloudSelect("services"),cloudSelect("appointments"),cloudSelect("schedule"),cloudSelect("customers")])
+  return Promise.all([cloudSelect("members"),cloudSelect("services"),cloudSelect("appointments"),cloudSelect("schedule"),cloudSelect("customers"),cloudSelect("consumptions")])
     .then(function(res){
       retryDeleted("members",res[0]);
       retryDeleted("services",res[1]);
@@ -3496,6 +3527,7 @@ function cloudPullAll(){
         if(c.wx==null)c.wx="";
         return c;
       }),DB.customers);
+      DB.consumptions=mergeRows((res[5]||[]).filter(function(r){return !isDeletedLocal("consumptions",r.id);}).map(stripRow),DB.consumptions||[]);
       cloudConnected=true;
       renderAll();
       updateCloudUI();
@@ -3580,6 +3612,11 @@ function pushAll(){
       o.updated_at=now;return o;
     }),"id"));
     jobs.push(cloudUpsert("schedule",[{id:"s",start:DB.schedule.start||"09:00",end:DB.schedule.end||"20:00",updated_at:now}],"id"));
+    jobs.push(cloudUpsert("consumptions",DB.consumptions.map(function(o){
+      var r={};
+      ["id","date","customer_id","customer","item","amount","method","note","apptId","kind"].forEach(function(k){r[k]=(o[k]!==undefined)?o[k]:null;});
+      r.updated_at=now;return r;
+    }),"id"));
   }else{
     // 普通用户：只可新增预约，仅上推【云端尚不存在】的本地预约（纯 insert，禁止覆盖他人预约）
     var known={};
@@ -3649,10 +3686,12 @@ function defaultData(){
       {id:"c4",name:"何佳怡",phone:"13700001004",type:"normal",referrer:"c3",account_email:"",note:"刘雨桐二级客户",color:"#16a34a"},
       {id:"c5",name:"散客示例",phone:"13700001005",type:"normal",referrer:"",account_email:"",note:"未登记散客",color:"#6b7280"}
     ],
-    appointments:[]
+    appointments:[],
+    withdrawals:[],
+    consumptions:[]
   };
 }
-var DB={members:[],services:[],schedule:{start:"09:00",end:"20:00"},customers:[],appointments:[],withdrawals:[]};
+var DB={members:[],services:[],schedule:{start:"09:00",end:"20:00"},customers:[],appointments:[],withdrawals:[],consumptions:[]};
 var storageOK=false;
 
 function loadDB(){
@@ -3692,6 +3731,7 @@ function loadDB(){
       if(a.customer_id==null)a.customer_id="";
     });
     if(!DB.withdrawals)DB.withdrawals=[];
+    if(!DB.consumptions)DB.consumptions=[];
     return;
   }
   DB=defaultData();
@@ -3787,19 +3827,20 @@ function renderNav(){
   $("ngCash").classList.toggle("hidden",locked||shareMode);
   document.querySelectorAll("[data-admin]").forEach(function(el){el.style.display=(locked||shareMode)?"none":"";});
   if(shareMode)currentView="share";
-  else if(locked&&["customers","members","config","data","report","buy"].indexOf(currentView)>=0)currentView="dashboard";
-  var titles={dashboard:"工作台",calendar:"预约日历",list:"预约列表",buy:"直接购买",customers:"客户档案",members:"成员档案",config:"项目与时段",data:"备份与恢复",report:"统计报表",share:"我的共享板块"};
+  else if(locked&&["customers","members","config","data","report","buy","consumption"].indexOf(currentView)>=0)currentView="dashboard";
+  var titles={dashboard:"工作台",calendar:"预约日历",list:"预约列表",buy:"直接购买",consumption:"总消费记录",customers:"客户档案",members:"成员档案",config:"项目与时段",data:"备份与恢复",report:"统计报表",share:"我的共享板块"};
   $("pageTitle").textContent=titles[currentView]||"";
-  ["dashboard","calendar","list","buy","customers","members","config","data","report","share"].forEach(function(v){
+  ["dashboard","calendar","list","buy","consumption","customers","members","config","data","report","share"].forEach(function(v){
     $("page-"+v).classList.toggle("active",v===currentView);
   });
   if(currentView==="share")renderShareBoard();
   if(currentView==="report")renderReports();
   if(currentView==="config")renderSchedule();
+  if(currentView==="consumption")renderConsumption();
 }
 function switchView(v){
   if(shareSess&&v!=="share"){toast("共享股东仅可查看自己的共享板块","err");return;}
-  if(!isAdmin()&&["customers","members","config","data","report","buy"].indexOf(v)>=0){toast("普通用户仅可查看与新建预约","err");return;}
+  if(!isAdmin()&&["customers","members","config","data","report","buy","consumption"].indexOf(v)>=0){toast("普通用户仅可查看与新建预约","err");return;}
   currentView=v;
   renderNav();
 }
@@ -3859,16 +3900,14 @@ function viewLv1Customers(cid){
   if(!lv1.length){
     body='<div class="empty"><div class="big">👤</div><h3>暂无一级客户</h3><p>其他客户建档时选择「'+esc(c.name)+'」作为介绍人后，会显示在这里（一级客户=直接介绍人）。</p></div>';
   }else{
-    body="<table><tr><th>客户</th><th>身份</th><th>联系电话</th><th>已消费</th><th>已拿佣金</th><th style=\"text-align:right\">预约次数</th></tr>"+
+    body="<table><tr><th style=\"text-align:left\">客户</th><th>身份</th><th style=\"text-align:left\">归属介绍人</th></tr>"+
       lv1.map(function(x){
         var cnt=DB.appointments.filter(function(a){return (a.customer_id&&a.customer_id===x.id)||((!a.customer_id)&&a.client===x.name);}).length;
         var spentX=DB.appointments.reduce(function(s,a){return s+((a.customer_id&&a.customer_id===x.id&&isPaidAppt(a))?(+a.amount||0):0);},0);
         var ctag=x.type==="shareholder"?'<span class="tag tag-warn">共享股东</span>':'<span class="tag tag-blue">客户</span>';
         return '<tr><td><div class="member-cell"><span class="avatar" style="background:'+esc(x.color||"#6b7280")+'">'+esc((x.name||"?")[0])+"</span>"+
-          '<div class="info"><div class="name">'+esc(x.name)+" "+ctag+"</div></div></div></td>"+
-          "<td>"+custTypeTag(x)+"</td><td>"+(esc(x.phone)||'<span class="hint">-</span>')+"</td>"+
-          "<td>"+fmtMoney(spentX)+"</td><td>"+fmtMoney(commissionTotal(x.id))+"</td>"+
-          '<td style="text-align:right"><span class="tag tag-blue">'+cnt+"</span></td></tr>";
+          '<div class="info"><div class="name" style="cursor:pointer;color:var(--primary);text-decoration:underline" onclick="viewCustomerDetailForShare(\''+x.id+'\')" title="点击查看消费详情">'+esc(x.name)+" "+ctag+'</div><div class="role">'+(esc(x.phone)||'-')+'</div></div></div></td>'+
+          "<td>"+custTypeTag(x)+"</td><td>"+(x.referrer?esc((customerById(x.referrer)||{}).name||'-'):'<span class="hint">-</span>')+"</td></tr>";
       }).join("")+"</table>";
   }
   // 二级客户明细：当前客户的一级客户再介绍的客户（路径：客户→一级→二级）
@@ -3877,16 +3916,14 @@ function viewLv1Customers(cid){
   var lv2List=(DB.customers||[]).filter(function(x){return x.referrer&&lv1Ids[x.referrer];});
   if(lv2List.length){
     body+='<div style="margin-top:14px;font-size:13px;font-weight:700;color:var(--text-1)">二级客户（'+lv2List.length+" 人）</div>"+
-      "<table style=\"margin-top:6px\"><tr><th>客户</th><th>归属一级客户</th><th>联系电话</th><th>已消费</th><th>已拿佣金</th><th style=\"text-align:right\">预约次数</th></tr>"+
+      "<table style=\"margin-top:6px\"><tr><th style=\"text-align:left\">客户</th><th style=\"text-align:left\">归属一级</th></tr>"+
       lv2List.map(function(x){
         var ref=customerById(x.referrer);
         var cnt=DB.appointments.filter(function(a){return (a.customer_id&&a.customer_id===x.id)||((!a.customer_id)&&a.client===x.name);}).length;
         var spentX=DB.appointments.reduce(function(s,a){return s+((a.customer_id&&a.customer_id===x.id&&isPaidAppt(a))?(+a.amount||0):0);},0);
         return '<tr><td><div class="member-cell"><span class="avatar" style="background:'+esc(x.color||"#6b7280")+';width:22px;height:22px;font-size:11px">'+esc((x.name||"?")[0])+"</span>"+
-          '<div class="info"><div class="name">'+esc(x.name)+"</div></div></div></td>"+
-          "<td>"+(ref?esc(ref.name):'<span class="hint">-</span>')+"</td><td>"+(esc(x.phone)||'<span class="hint">-</span>')+"</td>"+
-          "<td>"+fmtMoney(spentX)+"</td><td>"+fmtMoney(commissionTotal(x.id))+"</td>"+
-          '<td style="text-align:right"><span class="tag tag-blue">'+cnt+"</span></td></tr>";
+          '<div class="info"><div class="name" style="cursor:pointer;color:var(--primary);text-decoration:underline" onclick="viewCustomerDetailForShare(\''+x.id+'\')" title="点击查看消费详情">'+esc(x.name)+'</div><div class="role">'+(esc(x.phone)||'-')+'</div></div></div></td>'+
+          "<td>"+(ref?esc(ref.name):'<span class="hint">-</span>')+"</td></tr>";
       }).join("")+"</table>";
   }
   $("custLv1Body").innerHTML=head+body;
@@ -3919,17 +3956,13 @@ function viewShareholderDetail(cid){
     html+='<div class="empty"><div class="big">👤</div><h3>暂无一级客户</h3></div>';
   }else{
     html+='<div style="font-size:14px;font-weight:700;color:var(--text-1);margin-bottom:8px">一级客户（'+lv1.length+' 人）</div>'+
-      '<table><tr><th>客户</th><th>电话</th><th>预约次数</th><th>已消费</th><th>已拿佣金</th><th style="text-align:right">操作</th></tr>';
+      '<table><tr><th style="text-align:left">客户</th><th style="text-align:right">操作</th></tr>';
     lv1.forEach(function(x){
       var apps=DB.appointments.filter(function(a){return a.customer_id===x.id&&a.status!=="cancelled";});
       var spent=apps.reduce(function(s,a){return s+(((a.status==="done"||(a.kind==="rent"&&a.status==="returned"))?(+a.amount||0):0));},0);
       var tag=x.type==="shareholder"?'<span class="tag tag-warn">共享股东</span>':'<span class="tag tag-blue">客户</span>';
       html+='<tr><td><div class="member-cell"><span class="avatar" style="background:'+esc(x.color||"#6b7280")+'">'+esc((x.name||"?")[0])+'</span>'+
-        '<div class="info"><div class="name">'+esc(x.name)+' '+tag+'</div></div></div></td>'+
-        '<td>'+(esc(x.phone)||'<span class="hint">-</span>')+'</td>'+
-        '<td><span class="tag tag-blue">'+apps.length+'</span></td>'+
-        '<td>'+fmtMoney(spent)+'</td>'+
-        '<td>'+fmtMoney(commissionTotal(x.id))+'</td>'+
+        '<div class="info"><div class="name" style="cursor:pointer;color:var(--primary);text-decoration:underline" onclick="viewCustomerDetailForShare(\''+x.id+'\')" title="点击查看消费详情">'+esc(x.name)+' '+tag+'</div><div class="role">'+(esc(x.phone)||'-')+'</div></div></div></td>'+
         '<td style="text-align:right"><button class="btn btn-ghost btn-xs" type="button" onclick="closeModal(\'shareholderDetailMask\');viewLv1Customers(\''+c.id+'\')">👥 查看层级</button></td></tr>';
     });
     html+='</table>';
@@ -3943,16 +3976,13 @@ function viewShareholderDetail(cid){
       return s+apps;
     },0);
     html+='<div style="margin-top:16px;font-size:14px;font-weight:700;color:var(--text-1);margin-bottom:8px">二级客户（'+lv2.length+' 人 · 已消费 '+fmtMoney(lv2Total)+'）</div>'+
-      '<table><tr><th>客户</th><th>归属一级</th><th>电话</th><th>预约次数</th><th>已消费</th></tr>';
+      '<table><tr><th style="text-align:left">客户</th><th style="text-align:left">归属一级</th></tr>';
     lv2.forEach(function(x){
       var ref=customerById(x.referrer);
       var apps=DB.appointments.filter(function(a){return a.customer_id===x.id&&a.status!=="cancelled";});
       var spent=apps.reduce(function(s,a){return s+(((a.status==="done"||(a.kind==="rent"&&a.status==="returned"))?(+a.amount||0):0));},0);
-      html+='<tr><td><div class="member-cell"><span class="avatar" style="background:'+esc(x.color||"#6b7280")+'">'+esc((x.name||"?")[0])+'</span><div class="info"><div class="name">'+esc(x.name)+'</div></div></div></td>'+
-        '<td>'+(ref?esc(ref.name):'<span class="hint">-</span>')+'</td>'+
-        '<td>'+(esc(x.phone)||'<span class="hint">-</span>')+'</td>'+
-        '<td><span class="tag tag-blue">'+apps.length+'</span></td>'+
-        '<td>'+fmtMoney(spent)+'</td></tr>';
+      html+='<tr><td><div class="member-cell"><span class="avatar" style="background:'+esc(x.color||"#6b7280")+'">'+esc((x.name||"?")[0])+'</span><div class="info"><div class="name" style="cursor:pointer;color:var(--primary);text-decoration:underline" onclick="viewCustomerDetailForShare(\''+x.id+'\')" title="点击查看消费详情">'+esc(x.name)+'</div><div class="role">'+(esc(x.phone)||'-')+'</div></div></div></td>'+
+        '<td>'+(ref?esc(ref.name):'<span class="hint">-</span>')+'</td></tr>';
     });
     html+='</table>';
   }
@@ -3978,21 +4008,37 @@ function viewShareholderDetail(cid){
 function viewCustomerDetailForShare(cid){
   var c=customerById(cid);
   if(!c){toast("未找到该客户","err");return;}
-  $("customerDetailForShareTitle").textContent=esc(c.name)+" 消费详情";
+  $("customerDetailForShareTitle").textContent=esc(c.name)+" 客户详情";
   var ref=c.referrer?customerById(c.referrer):null;
   var apps=DB.appointments.filter(function(a){return a.customer_id===c.id&&a.status!=="cancelled";}).sort(function(x,y){return x.date<y.date?-1:1;});
   var totalSpent=apps.reduce(function(s,a){return s+(((a.status==="done"||(a.kind==="rent"&&a.status==="returned"))?(+a.amount||0):0));},0);
+  // 预约项目聚合
+  var proj={};
+  apps.forEach(function(a){
+    var sv=a.serviceId?serviceById(a.serviceId):null;
+    var nm=sv?sv.name:(a.serviceName||(a.kind==="rent"?"苗衣出租":"未指定项目"));
+    proj[nm]=(proj[nm]||0)+1;
+  });
+  var projHtml=Object.keys(proj).map(function(k){return esc(k)+" "+proj[k]+" 次";}).join("、")||'<span class="hint">-</span>';
+  // 二级客户统计
+  var lv1IdsC={};(DB.customers||[]).forEach(function(y){if(y.referrer===c.id)lv1IdsC[y.id]=1;});
+  var lv2Cnt=(DB.customers||[]).filter(function(x){return x.referrer&&lv1IdsC[x.referrer];}).length;
   var html='<div style="margin-bottom:16px">'+
     '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">'+
     '<span class="avatar" style="background:'+esc(c.color||"#6b7280")+';width:40px;height:40px;font-size:16px">'+esc((c.name||"?")[0])+'</span>'+
     '<div><div style="font-size:16px;font-weight:700">'+esc(c.name)+(c.type==="shareholder"?' <span class="tag tag-warn">共享股东</span>':' <span class="tag tag-blue">客户</span>')+'</div>'+
     '<div class="hint">电话：'+(esc(c.phone)||"-")+(ref?"　归属："+esc(ref.name):"")+'</div></div></div>'+
     '<div style="display:flex;gap:12px;flex-wrap:wrap">'+
-    '<div style="flex:1;min-width:120px;background:var(--bg-1);border-radius:10px;padding:12px;text-align:center">'+
+    '<div style="flex:1;min-width:100px;background:var(--bg-1);border-radius:10px;padding:12px;text-align:center">'+
     '<div style="font-size:22px;font-weight:800;color:var(--primary)">'+apps.length+'</div><div class="hint">预约次数</div></div>'+
-    '<div style="flex:1;min-width:120px;background:var(--bg-1);border-radius:10px;padding:12px;text-align:center">'+
+    '<div style="flex:1;min-width:100px;background:var(--bg-1);border-radius:10px;padding:12px;text-align:center">'+
     '<div style="font-size:22px;font-weight:800;color:#16a34a">'+fmtMoney(totalSpent)+'</div><div class="hint">已消费</div></div>'+
-    '</div></div>';
+    '<div style="flex:1;min-width:100px;background:var(--bg-1);border-radius:10px;padding:12px;text-align:center">'+
+    '<div style="font-size:22px;font-weight:800;color:var(--primary)">'+lv2Cnt+'</div><div class="hint">二级客户</div></div>'+
+    (c.type==="shareholder"?'<div style="flex:1;min-width:100px;background:var(--bg-1);border-radius:10px;padding:12px;text-align:center">'+
+    '<div style="font-size:22px;font-weight:800;color:#d97706">'+fmtMoney(commissionTotal(c.id))+'</div><div class="hint">已拿佣金</div></div>':'')+
+    '</div>'+
+    '<div class="hint" style="margin-top:8px">📋 预约项目：'+projHtml+'</div></div>';
   if(!apps.length){
     html+='<div class="empty"><div class="big">📅</div><h3>暂无预约记录</h3></div>';
   }else{
@@ -4056,6 +4102,7 @@ function renderShareBoard(){
     '<div style="flex:1;min-width:240px;font-size:12px;color:var(--text-2);line-height:2">'+
     "取两种方式中较高的档位：<b>① 当月流水：</b>低于 3000 元 30% / 3000-6000 元 40% / 满 6000 元 50%；<b>② 本人历史累计消费：</b>满 3000 元 40% / 满 6000 元 50%。<br>佣金仅作查看与核对，打款结算请与门店管理员线下确认。</div></div>";
   // 4) 名下客户预约与消费（原「快捷操作」模块已移除；支持搜索过滤）
+  var ym0=curYm(); // 当前年月：名下客户消费与业绩卡片均按本月统计，次月自动清零
   var lv1Ids=lv1IdsOf(me.id);
   var lv1List=(DB.customers||[]).filter(function(c){return lv1Ids[c.id];});
   if($("shareLv1Q")){
@@ -4069,28 +4116,26 @@ function renderShareBoard(){
       :'<div class="empty"><div class="big">👤</div><h3>名下暂无客户</h3><p>客户建档时选择您作为介绍人后，这里会展示他们的预约与消费。</p></div>';
   }
   else{
-    lv1Html="<table><tr><th>客户</th><th>预约次数</th><th>已消费</th><th>预约项目</th><th style=\"text-align:right\">操作</th></tr>";
+    lv1Html="<table><tr><th style=\"text-align:left\">客户</th><th style=\"text-align:right\">操作</th></tr>";
     lv1List.forEach(function(c){
-      var apps=DB.appointments.filter(function(a){return a.customer_id===c.id&&a.status!=="cancelled";});
-      var spent=apps.reduce(function(s,a){return s+(((a.status==="done"||(a.kind==="rent"&&a.status==="returned")))?(+a.amount||0):0);},0);
-      // 预约项目：聚合该客户所有未取消预约的项目名×次数（免费/收费合并计数）
-      var proj={};
-      apps.forEach(function(a){
-        var sv=a.serviceId?serviceById(a.serviceId):null;
-        var nm=sv?sv.name:(a.serviceName||(a.kind==="rent"?"苗衣出租":"未指定项目"));
-        proj[nm]=(proj[nm]||0)+1;
-      });
-      var projHtml=Object.keys(proj).map(function(k){return esc(k)+" "+proj[k]+" 次";}).join("、");
       var tag=c.type==="shareholder"?'<span class="tag tag-warn">共享股东</span>':'<span class="tag tag-blue">普通客户</span>';
       lv1Html+='<tr><td><div class="member-cell"><span class="avatar" style="background:'+esc(c.color||"#6b7280")+'">'+esc((c.name||"?")[0])+"</span>"+
-        '<div class="info"><div class="name" style="cursor:pointer;color:var(--primary);text-decoration:underline" onclick="viewCustomerDetailForShare(\''+c.id+'\')" title="点击查看该客户全部消费详情">'+esc(c.name)+" "+tag+"</div><div class=\"role\">"+esc(c.phone||"-")+"</div></div></div></td>"+
-        '<td><span class="tag tag-blue">'+apps.length+"</span></td><td>"+fmtMoney(spent)+'</td>'+
-        '<td style="font-size:12px;line-height:1.7">'+(projHtml||'<span class="hint">-</span>')+"</td>"+
+        '<div class="info"><div class="name" style="cursor:pointer;color:var(--primary);text-decoration:underline" onclick="viewCustomerDetailForShare(\''+c.id+'\')" title="点击查看该客户全部消费详情">'+esc(c.name)+" "+tag+'</div><div class="role">'+esc(c.phone||"-")+"</div></div></div></td>"+
         '<td style="text-align:right"><button class="btn btn-primary btn-xs" type="button" onclick="openShareBook(\''+c.id+'\')">＋ 为其预约</button></td></tr>';
     });
     lv1Html+="</table>";
   }
-  $("shareLv1").innerHTML=lv1Html;
+  // 名下客户本月总消费卡片（不受搜索过滤影响，按全量名下客户汇总）
+  var mTotal=0;
+  var allLv1=lv1IdsOf(me.id);
+  (DB.customers||[]).forEach(function(c){if(allLv1[c.id])mTotal+=monthSpentOf(c.id,ym0);});
+  mTotal=Math.round(mTotal*100)/100;
+  $("shareLv1MonthTotal").textContent=fmtMoney(mTotal);
+  var monthCard='<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid var(--border);background:var(--bg-1)">'
+    +'<div style="font-size:13px;color:var(--text-2)">📅 本月（'+ym0+'）名下客户业绩</div>'
+    +'<div style="font-size:22px;font-weight:800;color:#16a34a">'+fmtMoney(mTotal)+'</div>'
+    +'<div class="hint">仅统计本月消费，次月自动清零重新累计；点击客户姓名可查看消费详情</div></div>';
+  $("shareLv1").innerHTML=monthCard+lv1Html;
   // 6) 下级客户：已成交预约（状态=完成 或 出租已归还）——先逐条明细，再按服务项目分类汇总
   var lv2=lv2CustomersOf(me.id);
   var lv2Html="";
@@ -5114,7 +5159,7 @@ function renderCustomers(){
     el.innerHTML='<div class="empty"><div class="big">👤</div><h3>没有匹配的客户</h3><p>点击右上角「新增客户」建立客户档案，或在新建预约时登记客户并绑定介绍人</p></div>';
     return;
   }
-  var html="<table><tr><th class=\"tip\" title=\"点姓名快捷建预约\">客户</th><th>身份</th><th>归属介绍人</th><th>联系电话</th><th>预约次数</th><th>已消费</th><th>二级客户</th><th style=\"text-align:right\">操作</th></tr>";
+  var html="<table><tr><th class=\"tip\" title=\"点击查看客户详情\">客户</th><th>身份</th><th>归属介绍人</th><th>联系电话</th><th style=\"text-align:right\">操作</th></tr>";
   list.forEach(function(c){
     var cnt=DB.appointments.filter(function(a){return (a.customer_id&&a.customer_id===c.id)||((!a.customer_id)&&a.client===c.name);}).length;
     var spentC=DB.appointments.reduce(function(s,a){return s+((a.customer_id&&a.customer_id===c.id&&isPaidAppt(a))?(+a.amount||0):0);},0);
@@ -5127,17 +5172,12 @@ function renderCustomers(){
        '<button class="btn btn-ghost-danger btn-xs" type="button" onclick="delCustomer(\''+c.id+'\')">删除</button>'):"";
     if(c.type==="shareholder"&&canEdit())acts='<button class="btn btn-ghost btn-xs" type="button" title="查看该股东佣金并办理提现" onclick="openWithdrawModal(\''+c.id+'\')">💰 提现</button>'+acts;
     acts='<button class="btn btn-ghost btn-xs" type="button" title="查看其名下的一级客户与二级客户" onclick="viewLv1Customers(\''+c.id+'\')">👥 '+lv1Cnt+'</button>'+acts;
-    var nameClick=c.type==="shareholder"&&canEdit()?
-      'onclick="viewShareholderDetail(\''+c.id+'\')" style="cursor:pointer;color:var(--primary);text-decoration:underline" title="点击查看股东详情（名下客户、消费记录）"':
-      'onclick="quickBookFor(\''+c.id+'\')" style="cursor:pointer" title="点击为此客户快捷新建预约"';
+    var nameClick='onclick="viewCustomerDetailForShare(\''+c.id+'\')" style="cursor:pointer;color:var(--primary);text-decoration:underline" title="点击查看客户详情（预约记录、消费、二级客户）"';
     html+='<tr><td><div class="member-cell"><span class="avatar" style="background:'+esc(c.color||"#6b7280")+'">'+esc((c.name||"?")[0])+"</span>"+
       '<div class="info"><div class="name" '+nameClick+'>'+esc(c.name)+' <span class="tag tag-green" title="已拿佣金：历史累计，仅共享股东按名下客户已成交消费计提">💰 已拿 '+fmtMoney(commissionTotal(c.id))+'</span> '+(c.type==="shareholder"?'':'<span class="tag tag-blue" style="cursor:pointer">＋预约</span>')+'</div>'+(c.note?'<div class="role">'+esc(c.note)+"</div>":"")+"</div></div></td>"+
       "<td>"+custTypeTag(c)+(c.login_enabled?' <span class="tag tag-blue" title="已开通登录账号">🔐 可登录</span>':"")+"</td>"+
       "<td>"+custChainHtml(c)+"</td>"+
       "<td>"+(esc(c.phone)||'<span class="hint">-</span>')+"</td>"+
-      '<td><span class="tag tag-blue">'+cnt+"</span></td>"+
-      "<td>"+fmtMoney(spentC)+"</td>"+
-      '<td><span class="tag tag-blue">'+lv2Cnt+"</span></td>"+
       '<td><div class="row-actions">'+acts+"</div></td></tr>";
   });
   el.innerHTML=html+"</table>";
@@ -5624,6 +5664,7 @@ function saveCheckout(){
   saveDB();
   closeModal("checkoutMask");
   toast(amt>0?("已收款 "+fmtMoney(amt)+"（"+(PAY_METHODS[method]||method)+"）"):"已结账（金额为 0）");
+  upsertConsumptionFromAppt(a,"checkout");
   openReceipt(checkoutApptId);
 }
 
@@ -5752,9 +5793,136 @@ function saveDirectBuy(){
   saveDB();
   closeModal("checkoutMask");
   toast("已收款 "+fmtMoney(total)+"（"+(PAY_METHODS[method]||method)+"）");
+  upsertConsumptionFromAppt(rec,"buy");
   resetBuy();
   openReceipt(rec.id);
 }
+
+/* ================= 总消费记录（历史消费台账） ================= */
+var conEditId=null;
+function curYm(){var d=new Date();return d.getFullYear()+"-"+(d.getMonth()<9?"0":"")+(d.getMonth()+1);}
+function monthSpentOf(cid,ym){
+  ym=ym||curYm();
+  var s=0,keyed={};
+  (DB.consumptions||[]).forEach(function(c){
+    var custId=c.customer_id||c.customerId||"";
+    if(custId===cid&&(c.date||"").indexOf(ym)===0){s+=(+c.amount||0);if(c.apptId)keyed[c.apptId]=1;}
+  });
+  DB.appointments.forEach(function(a){
+    if(a.customer_id===cid&&(a.date||"").indexOf(ym)===0&&!keyed[a.id]&&(a.status==="done"||(a.kind==="rent"&&a.status==="returned")))s+=(+a.amount||0);
+  });
+  return Math.round(s*100)/100;
+}
+/* 结账 / 直接购买后自动登记消费记录（同预约重复结账只更新，不新增） */
+function upsertConsumptionFromAppt(a,kind){
+  if(!DB.consumptions)DB.consumptions=[];
+  var found=DB.consumptions.find(function(c){return c.apptId===a.id;});
+  var itemName=a.serviceId?(function(){var sv=serviceById(a.serviceId);return sv?sv.name:(a.serviceName||"预约项目");})():(a.serviceName||(kind==="buy"?"直接购买":"预约"));
+  var amt=Math.round((+a.amount||0)*100)/100;
+  if(found){
+    found.date=a.date;found.customer_id=a.customer_id||"";found.customer=a.client||"";
+    found.item=itemName;found.amount=amt;found.method=a.payMethod||"";found.kind=kind;
+    found.note=(kind==="buy"?"直接购买":"预约结账")+(a.note?(" · "+a.note):"");
+  }else{
+    DB.consumptions.push({
+      id:uid(),date:a.date,customer_id:a.customer_id||"",customer:a.client||"",
+      item:itemName,amount:amt,method:a.payMethod||"",kind:kind,
+      note:(kind==="buy"?"直接购买":"预约结账")+(a.note?(" · "+a.note):""),
+      apptId:a.id
+    });
+  }
+  saveDB();
+}
+function renderConsumption(){
+  var wrap=$("consumptionBody");
+  if(!wrap)return;
+  var rows=DB.consumptions||[];
+  rows=rows.slice().sort(function(x,y){return (x.date<y.date)?1:(x.date>y.date?-1:(x.id<y.id?1:-1));});
+  var total=rows.reduce(function(s,r){return s+(+r.amount||0);},0);
+  var d=curYm();
+  var mtotal=rows.reduce(function(s,r){return s+(((r.date||"").indexOf(d)===0)?(+r.amount||0):0);},0);
+  if(!rows.length){
+    wrap.innerHTML='<div class="empty"><div class="big">💰</div><h3>暂无消费记录</h3><p>预约结账、直接购买会自动登记在这里，也可手动新增。删除记录会同步删除其关联预约。</p></div>';
+    return;
+  }
+  var h='<div style="display:flex;gap:12px;flex-wrap:wrap;padding:14px 16px;border-bottom:1px solid var(--border)">'+
+  '<div style="background:var(--bg-1);border-radius:10px;padding:10px 16px;text-align:center"><div style="font-size:22px;font-weight:800;color:var(--primary)">'+fmtMoney(total)+'</div><div class="hint">历史总消费（'+rows.length+' 笔）</div></div>'+
+  '<div style="background:var(--bg-1);border-radius:10px;padding:10px 16px;text-align:center"><div style="font-size:22px;font-weight:800;color:#16a34a">'+fmtMoney(mtotal)+'</div><div class="hint">本月消费（'+d+'）</div></div></div>';
+  h+='<table><tr><th>日期</th><th>客户</th><th>项目</th><th style="text-align:right">金额</th><th>收款方式</th><th>备注</th><th style="text-align:right">操作</th></tr>';
+  rows.forEach(function(r){
+    var custName=r.customer||(r.customer_id?((function(){var c=customerById(r.customer_id);return c?c.name:"";})()):"")||"散客";
+    var tag=r.kind==="buy"?'<span class="tag tag-blue">购买</span>':(r.kind==="checkout"?'<span class="tag tag-green">结账</span>':'<span class="tag tag-gray">手动</span>');
+    h+="<tr><td>"+r.date+"</td><td>"+esc(custName)+" "+tag+"</td><td>"+esc(r.item||"-")+"</td>"+
+      '<td style="text-align:right"><b>'+fmtMoney(r.amount||0)+"</b></td>"+
+      "<td>"+esc((PAY_METHODS[r.method]||r.method||"-"))+"</td><td style=\"font-size:12px\">"+esc(r.note||"")+"</td>"+
+      '<td style="text-align:right"><button class="btn btn-ghost btn-xs" type="button" data-id="'+r.id+'" onclick="openConById(this)">编辑</button> '+
+      '<button class="btn btn-danger btn-xs" type="button" data-id="'+r.id+'" onclick="delConById(this)">删除</button></td></tr>';
+  });
+  h+='<tr><td colspan="7" style="font-size:12px;color:var(--text-3);padding:8px 14px">删除某条消费记录时，其关联的预约会同步删除（股东「我预约的项目」中相应记录同时消失）。</td></tr>';
+  h+="</table>";
+  wrap.innerHTML=h;
+}
+function openConById(btn){var id=btn.getAttribute("data-id");if(id)openConsumptionModal(id);}
+function delConById(btn){var id=btn.getAttribute("data-id");if(id)delConsumption(id);}
+function fillConCustOpts(sel){
+  var v=sel.value;
+  sel.innerHTML='<option value="">（散客 / 未登记客户）</option>'+(DB.customers||[]).map(function(c){
+    return '<option value="'+c.id+'">'+esc(c.name)+(c.phone?(" · "+esc(c.phone)):"")+"</option>";
+  }).join("");
+  sel.value=v;
+}
+function openConsumptionModal(id){
+  if(!canEdit()){toast("仅管理员可新增或编辑消费记录","err");return;}
+  conEditId=id||null;
+  var r=conEditId?(DB.consumptions||[]).find(function(x){return x.id===conEditId;}):null;
+  $("consumptionModalTitle").textContent=r?"编辑消费记录":"新增消费记录";
+  $("conDate").value=r?r.date:todayStr();
+  fillConCustOpts($("conCust"));
+  if(r&&r.customer_id)$("conCust").value=r.customer_id;
+  $("conItem").value=r?r.item:"";
+  $("conAmount").value=r?(r.amount||0):"";
+  $("conMethod").value=r&&r.method?r.method:"cash";
+  $("conNote").value=r?r.note:"";
+  showModal("consumptionMask");
+}
+function saveConsumption(){
+  if(!canEdit()){toast("仅管理员可保存消费记录","err");return;}
+  var date=$("conDate").value;
+  if(!date){toast("请选择日期","err");return;}
+  var custId=$("conCust").value;
+  var custName=custId?(function(){var c=customerById(custId);return c?c.name:"";})():"";
+  var item=$("conItem").value.trim()||(custName?"消费":"散客消费");
+  var amt=Math.max(0,parseFloat($("conAmount").value)||0);
+  var method=$("conMethod").value;
+  var note=$("conNote").value.trim()||"";
+  if(conEditId){
+    var r=(DB.consumptions||[]).find(function(x){return x.id===conEditId;});
+    if(r){r.date=date;r.customer_id=custId;r.customer=custName;r.item=item;r.amount=Math.round(amt*100)/100;r.method=method;r.note=note;}
+  }else{
+    if(!DB.consumptions)DB.consumptions=[];
+    DB.consumptions.push({id:uid(),date:date,customer_id:custId,customer:custName,item:item,amount:Math.round(amt*100)/100,method:method,note:note,kind:"manual",apptId:""});
+  }
+  saveDB();
+  closeModal("consumptionMask");
+  toast("消费记录已保存");
+}
+function delConsumption(id){
+  if(!canEdit()){toast("仅管理员可删除消费记录","err");return;}
+  var r=(DB.consumptions||[]).find(function(x){return x.id===id;});
+  if(!r)return;
+  var msg="确定删除 "+r.date+" "+(r.customer||"散客")+" 的消费记录（"+fmtMoney(r.amount||0)+"）？";
+  if(r.apptId)msg+="\n\n该记录关联一次预约，删除后股东「我预约的项目」中对应预约也会同步删除。";
+  if(!confirm(msg))return;
+  DB.consumptions=DB.consumptions.filter(function(x){return x.id!==id;});
+  if(r.apptId){
+    DB.appointments=DB.appointments.filter(function(x){return x.id!==r.apptId;});
+    if(cloudMode&&sess){markDeleted("appointments",r.apptId);cloudDeleteRows("appointments",[r.apptId]).catch(function(e){toast("云端删除预约失败："+(e&&e.message?e.message:e),"err");});}
+  }
+  if(cloudMode&&sess){markDeleted("consumptions",id);cloudDeleteRows("consumptions",[id]).catch(function(e){toast("云端删除记录失败："+(e&&e.message?e.message:e),"err");});}
+  saveDB();
+  toast("消费记录已删除"+(r.apptId?"（关联预约已同步删除）":""));
+}
+
 
 /* ================= 苗衣出租（登记 / 归还） ================= */
 var rentCustId="",rentSvid="";
@@ -6011,6 +6179,7 @@ function importData(input){
       if(!confirm("导入将用备份数据覆盖当前全部数据，确定继续？")){input.value="";return;}
       DB=data;
       if(!DB.appointments)DB.appointments=[];
+      if(!DB.consumptions)DB.consumptions=[];
       saveDB();
       toast("数据已从备份恢复");
       switchView("dashboard");
@@ -6182,5 +6351,29 @@ if(cloudCfg&&cloudCfg.url&&cloudCfg.anonKey){
 initSectionFolds();
 renderSchedule();
 </script>
+<!-- 模态框：总消费记录 -->
+<div class="mask" id="consumptionMask">
+  <div class="modal">
+    <div class="modal-head"><h3 id="consumptionModalTitle">新增消费记录</h3><button class="modal-x" type="button" onclick="closeModal('consumptionMask')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-item"><label>日期 <span class="req">*</span></label><input type="date" id="conDate"></div>
+        <div class="form-item"><label>客户 <span class="req">*</span></label>
+          <select id="conCust"><option value="">选择客户</option></select>
+        </div>
+        <div class="form-item"><label>消费项目</label><input id="conItem" placeholder="如：面部清洁、苗衣出租"></div>
+        <div class="form-item"><label>金额 <span class="req">*</span></label><input type="number" id="conAmount" placeholder="0.00" step="0.01"></div>
+        <div class="form-item"><label>收款方式</label>
+          <select id="conMethod">
+            <option value="cash">现金</option><option value="wechat">微信</option><option value="alipay">支付宝</option>
+            <option value="card">银行卡</option><option value="other">其他</option>
+          </select>
+        </div>
+        <div class="form-item full"><label>备注</label><textarea id="conNote" placeholder="选填"></textarea></div>
+      </div>
+    </div>
+    <div class="modal-foot"><button class="btn btn-ghost" type="button" onclick="closeModal('consumptionMask')">取消</button><button class="btn btn-primary" type="button" onclick="saveConsumption()">保存</button></div>
+  </div>
+</div>
 </body>
 </html>
