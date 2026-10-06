@@ -924,7 +924,7 @@ tr:hover td{background:#fafbfc}
       <div id="lgShareBox">
         <div class="login-tip">共享股东请使用<b>手机号 + 密码</b>登录，登录后可查看自己名下的预约、消费与佣金。</div>
         <div id="lgSharePwdBox">
-          <div class="form-item" style="margin-top:14px"><label>手机号（登录账号）</label><input id="lgShareMob" type="tel" placeholder="管理员分配的手机号"></div>
+          <div class="form-item" style="margin-top:14px"><label>手机号（登录账号）</label><input id="lgShareMob" type="tel" autocomplete="username" placeholder="管理员分配的手机号"></div>
           <div class="form-item" style="margin-top:10px"><label>密码</label><input id="lgSharePwd" type="password" autocomplete="current-password" placeholder="请输入密码"></div>
           <div id="lgShareErr" style="margin-top:10px;color:var(--danger);font-size:13px;display:none"></div>
           <button class="btn btn-primary" type="button" style="width:100%;margin-top:14px" onclick="shareLogin()">登录</button>
@@ -933,7 +933,7 @@ tr:hover td{background:#fafbfc}
       </div>
       <div id="lgAdminBox" style="display:none">
         <div class="login-tip" id="loginTip"></div>
-        <div class="form-item" style="margin-top:14px"><label>邮箱</label><input id="lgEmail" type="email" placeholder="you@example.com"></div>
+        <div class="form-item" style="margin-top:14px"><label>邮箱</label><input id="lgEmail" type="email" autocomplete="email" placeholder="you@example.com"></div>
         <div class="form-item" style="margin-top:10px"><label>密码</label><input id="lgPass" type="password" autocomplete="current-password" placeholder="至少 6 位"></div>
         <div class="form-item" style="margin-top:10px;display:none" id="lgPass2Wrap"><label>确认密码</label><input id="lgPass2" type="password" autocomplete="new-password" placeholder="再次输入密码"></div>
         <div id="lgErr" style="margin-top:10px;color:var(--danger);font-size:13px;display:none"></div>
@@ -3628,6 +3628,10 @@ if(r.returned_at!=null){r.returnedAt=r.returned_at;delete r.returned_at;}
           pending.push(a);seen[a.id]=1;
         }
       });
+      // 云端确认过但现在已不存在（其他设备删除）→ 本地跟随删除（墓碑防复活，避免手机/其他设备残留旧预约）
+      DB.appointments.forEach(function(a){
+        if(a&&a.id&&!cloudIds[a.id]&&cloudSelectedApptIds.indexOf(a.id)>=0)markDeleted("appointments",a.id);
+      });
       DB.appointments=pending;
       sweepGhostMemberIds(); // 清除已删除成员残留引用（含云端拉回的墓碑 member_id）
       // 检测云端新增预约（其他设备/股东创建）并提醒管理员
@@ -3658,6 +3662,10 @@ var sched=res[3]&&res[3][0];
         if(r.pkgbuy!=null){r.pkgBuy=!!r.pkgbuy;delete r.pkgbuy;}
         return stripRow(r);
       }),DB.consumptions||[]);
+      // 预约已在本地删除（墓碑）→ 关联台账一并删除，保证统计报表/消费详情不残留
+      DB.consumptions=(DB.consumptions||[]).filter(function(o){
+        return !(o&&o.apptId&&isDeletedLocal("appointments",o.apptId));
+      });
       // 套餐定义 / 套餐购买卡 / 退款 / 提现（云端列名全小写，合并时转回本地字段）
       DB.packages=mergeRows((res[6]||[]).filter(function(r){return !(r&&r.name&&String(r.name).indexOf("__DEL__")===0);}).map(stripRow).map(function(p){
         if(p.priceshareholder!=null){p.priceShareholder=p.priceshareholder;delete p.priceshareholder;}
@@ -3774,7 +3782,7 @@ function pushAll(){
       });
       o.updated_at=now;return o;
     }),"id"));
-    jobs.push(cloudUpsert("appointments",DB.appointments.map(function(a){return apptToCloudRow(a,now);}),"id"));
+    jobs.push(cloudUpsert("appointments",DB.appointments.filter(function(a){return !isDeletedLocal("appointments",a.id);}).map(function(a){return apptToCloudRow(a,now);}),"id"));
     jobs.push(cloudUpsert("customers",DB.customers.filter(function(c){return !isDeletedLocal("customers",c.id)&&!(c.name&&String(c.name).indexOf("__DEL__")===0);}).map(function(c){
       var o={};
 ["id","name","phone","type","referrer","account_email","note","wx","login_enabled","login_pwd","login_pwd_plain"].forEach(function(k){
@@ -4897,7 +4905,20 @@ if(a.due_date!=null){a.dueDate=a.due_date;delete a.due_date;}
   var byId={};
   DB.appointments.forEach(function(x){if(x&&x.id)byId[x.id]=x;});
   appt.forEach(function(x){if(x&&x.id)byId[x.id]=x;});
-  DB.appointments=Object.keys(byId).map(function(k){return byId[k];});
+  // 股东端删除同步：上次拉取确认过、本次云端已不存在的预约 → 本地跟随删除（防手机残留已删预约/消费）
+  var SHARE_CONF_KEY="bkgbook_share_conf_v1",shareConf=[];
+  try{shareConf=JSON.parse(localStorage.getItem(SHARE_CONF_KEY)||"[]");}catch(e){shareConf=[];}
+  var cloudApptIds={};
+  appt.forEach(function(x){if(x&&x.id)cloudApptIds[x.id]=1;});
+  (DB.appointments||[]).forEach(function(x){
+    if(x&&x.id&&!cloudApptIds[x.id]&&shareConf.indexOf(x.id)>=0)markDeleted("appointments",x.id);
+  });
+  // 预约墓碑 → 关联台账本地删
+  if(DB.consumptions)DB.consumptions=DB.consumptions.filter(function(o){
+    return !(o&&o.apptId&&isDeletedLocal("appointments",o.apptId));
+  });
+  DB.appointments=Object.keys(byId).map(function(k){return byId[k];}).filter(function(a){return !isDeletedLocal("appointments",a.id);});
+  try{localStorage.setItem(SHARE_CONF_KEY,JSON.stringify(appt.map(function(x){return x.id;})));}catch(e){}
   sweepGhostMemberIds(); // 清除已删除成员残留引用
   repairPkgFlags(); // 云端拉回的直购套餐单同样自愈
   cloudSelectedApptIds=appt.map(function(x){return x.id;});
@@ -5117,6 +5138,7 @@ function submitLogin(){
 }
 function afterLogin(){
   closeModal("loginMask");
+  if(typeof clearShareSess==="function")clearShareSess(); // 管理员登录成功：清除可能残留的股东会话，确保以管理员身份操作（否则清空/删除等管理功能被判定为无权限）
   fetchMyProfile().catch(function(){myRole="user";}).then(function(){
     cloudPullAll().then(function(ok){
       if(!ok)toast("云端数据拉取失败，当前显示本地缓存","err");
@@ -5128,7 +5150,8 @@ function afterLogin(){
 function doLogout(){
   if(!confirm("确定退出登录？退出后需要重新登录才能使用云端数据。"))return;
   cloudSignOut().then(function(){
-    clearSess();renderAll();updateCloudUI();startCloudSync();
+    clearSess();if(typeof clearShareSess==="function")clearShareSess();
+    renderAll();updateCloudUI();startCloudSync();
     openLogin();
     toast("已退出登录");
   });
