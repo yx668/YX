@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>银绣智享管理系统 v26</title>
+<title>银绣智享管理系统 v27</title>
 <style>
 :root{
   --bg:#f3f5f9; --panel:#ffffff; --border:#e5e7eb;
@@ -185,10 +185,6 @@ tr:hover td{background:#fafbfc}
 .co-summary{background:var(--bg-2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:14px}
 .co-line{display:flex;justify-content:space-between;gap:12px;padding:3px 0;font-size:13.5px}
 .co-line span{color:var(--text-2)}
-.trend{display:grid;align-items:end;gap:4px;height:170px;overflow-x:auto;padding-top:8px}
-.trend-item{display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:4px;height:100%;min-width:0}
-.trend-bar{width:100%;border-radius:4px 4px 0 0;transition:height .3s}
-.trend-day{font-size:11px;color:var(--text-3);white-space:nowrap}
 .arrival{display:flex;flex-direction:column;gap:14px}
 .a-row .a-head{display:flex;align-items:center;gap:8px;font-size:13.5px;margin-bottom:6px}
 .a-row .dot{width:10px;height:10px;border-radius:50%;display:inline-block;flex:0 0 auto}
@@ -320,7 +316,6 @@ tr:hover td{background:#fafbfc}
       <button class="nav-item" data-view="list" type="button"><span class="ic">📋</span><span>预约列表</span></button>
       <div class="nav-group" id="ngCash">前台收银</div>
       <button class="nav-item" data-view="buy" data-admin="1" type="button"><span class="ic">🛒</span><span>直接购买</span></button>
-      <button class="nav-item" data-view="consumption" data-admin="1" type="button"><span class="ic">💰</span><span>总消费记录</span></button>
       <div class="nav-group" id="ngStat">经营分析</div>
       <button class="nav-item" data-view="report" data-admin="1" type="button"><span class="ic">📈</span><span>统计报表</span></button>
       <div class="nav-group" id="ngBase">基础档案</div>
@@ -349,7 +344,7 @@ tr:hover td{background:#fafbfc}
       <!-- 共享股东板块 -->
       <section class="page" id="page-share">
         <div class="section">
-          <div class="section-head"><div><h2>我的信息</h2><div class="desc">共享股东身份卡片，仅展示与您相关的数据</div></div></div>
+          <div class="section-head"><div><h2>我的信息</h2><div class="desc">共享股东身份卡片，仅展示与您相关的数据</div></div><button class="btn btn-ghost btn-sm" type="button" onclick="sharePull(true)" style="flex-shrink:0">刷新数据</button></div>
           <div class="section-body" id="shareInfo"></div>
         </div>
         <div class="section">
@@ -357,15 +352,18 @@ tr:hover td{background:#fafbfc}
           <div class="section-body" id="shareCommission"></div>
         </div>
         <div class="section">
-          <div class="section-head"><div><h2>我预约的项目 <span class="tag tag-blue" id="shareSelfCnt"></span></h2><div class="desc">我作为客户的预约与消费记录（含管理员或他人代登记、苗衣出租）</div></div></div>
-          <div class="section-body no-pad" id="shareSelf"></div>
-        </div>
-        <div class="section">
           <div class="section-head">
             <div><h2>名下客户预约与消费</h2><div class="desc">您直接介绍的客户的预约与消费，消费仅统计本月（次月清零）· 本月总消费 <b id="shareLv1MonthTotal" style="color:#16a34a">¥0</b></div></div>
-            <input id="shareLv1Q" class="input" style="width:200px;flex-shrink:0" placeholder="🔍 搜索客户…" oninput="renderShareBoard()">
           </div>
           <div class="section-body no-pad" id="shareLv1"></div>
+        </div>
+        <div class="section">
+          <div class="section-head"><div><h2>我购买的套餐</h2><div class="desc">您购买的套餐卡及剩余次数（到店核销，用一次扣一次）</div></div></div>
+          <div class="section-body" id="shareMyPkgs"></div>
+        </div>
+        <div class="section">
+          <div class="section-head"><div><h2>我预约的项目 <span class="tag tag-blue" id="shareSelfCnt"></span></h2><div class="desc">我作为客户的预约与消费记录（含管理员或他人代登记、苗衣出租）</div></div></div>
+          <div class="section-body no-pad" id="shareSelf"></div>
         </div>
         <div class="section">
           <div class="section-head"><div><h2>下级客户预约统计</h2><div class="desc">您名下客户再介绍客户的已成交预约（完成/已归还），按服务项目分类汇总，免费与收费分列</div></div></div>
@@ -437,6 +435,7 @@ tr:hover td{background:#fafbfc}
             <button class="btn btn-ghost btn-sm" type="button" onclick="clearListFilters()">重置</button>
           </div>
           <div class="section-body no-pad" id="listBody"></div>
+          <div id="todaySettledCard" style="padding:0"></div>
         </div>
       </section>
 
@@ -452,6 +451,8 @@ tr:hover td{background:#fafbfc}
             </div>
             <div class="section-head" style="margin-top:18px"><div><h3>选购项目（可多选）</h3><div class="desc color-hint" id="buyPriceNote"></div></div></div>
             <div id="buyProjects" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px"></div>
+            <div class="section-head" style="margin-top:18px"><div><h3>选购套餐（预存卡）</h3><div class="desc" id="buyPkgNote">预存款项目，购买后生成套餐卡（服务按次数、苗衣出租按天数核销）</div></div></div>
+            <div id="buyPackages" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px"></div>
             <div class="set-row" style="align-items:center;border-top:1px solid var(--border);padding-top:14px">
               <div class="k"><b>应收合计</b><p id="buyTotalNote">按所购项目与客户身份计价</p></div>
               <div style="font-size:26px;font-weight:800;color:var(--primary)" id="buyTotal">￥0.00</div>
@@ -512,16 +513,20 @@ tr:hover td{background:#fafbfc}
           <div class="stats" id="rpIncome"></div>
         </div>
         <div class="section">
-          <div class="section-head"><div><h2>本月每日收入 / 利润趋势</h2><div class="desc">蓝色柱=收入，绿色柱=利润；金额为 0 的免费服务不计</div></div></div>
-          <div class="section-body" id="rpTrend"></div>
-        </div>
-        <div class="section">
           <div class="section-head"><div><h2>成员工作量</h2><div class="desc">统计周期内的接待与收入（取消的预约不计）</div></div></div>
           <div class="section-body no-pad" id="rpMembers"></div>
         </div>
         <div class="section">
           <div class="section-head"><div><h2>到店情况</h2><div class="desc">已到店 / 待接待 / 爽约（预约日已过且未到未取消）/ 已取消</div></div></div>
           <div class="section-body" id="rpArrival"></div>
+        </div>
+        <div class="section">
+          <div class="section-head"><div><h2>直接购买记录</h2><div class="desc">直接购买 / 套餐购买 / 套餐核销记录（与上方统计同一时间范围联动），只读查看</div></div></div>
+          <div class="section-body no-pad" id="rpDirectBody"></div>
+        </div>
+        <div class="section">
+          <div class="section-head"><div><h2>消费明细 · 总消费记录</h2><div class="desc">当前统计周期内的消费记录台账（预约结账 + 手动登记；直接购买记录已在上方「直接购买记录」单独展示），可编辑可删除</div></div></div>
+          <div class="section-body no-pad" id="rpConsumptionBody"></div>
         </div>
       </section>
 
@@ -564,6 +569,13 @@ tr:hover td{background:#fafbfc}
             <button class="btn btn-primary btn-sm" type="button" onclick="openServiceModal()" data-admin="1">＋ 新增项目</button>
           </div>
           <div class="section-body no-pad" id="serviceList"></div>
+        </div>
+        <div class="section">
+          <div class="section-head">
+            <div><h2>套餐项目</h2><div class="desc">预存套餐：到店直接购买，服务按次数、苗衣出租按天数；支持市价 / 共享股东价 / 总成本</div></div>
+            <button class="btn btn-primary btn-sm" type="button" onclick="openPkgModal()" data-admin="1">＋ 新增套餐</button>
+          </div>
+          <div class="section-body no-pad" id="pkgList"></div>
         </div>
         <div class="section">
           <div class="section-head"><div><h2>营业时段</h2><div class="desc">每日可预约的时间范围，日视图时间轴按此展示</div></div></div>
@@ -633,17 +645,12 @@ tr:hover td{background:#fafbfc}
               <tr><td><b>导入备份</b><br><span class="hint">从 JSON 备份文件恢复数据（会覆盖当前数据，请先导出）</span></td><td style="text-align:right"><button class="btn btn-ghost" type="button" onclick="document.getElementById('importFile').click()">⬆ 选择文件导入</button><input type="file" id="importFile" accept=".json,application/json" style="display:none" onchange="importData(this)"></td></tr>
               <tr><td><b>载入示例数据</b><br><span class="hint">生成一份示例成员、项目与预约，方便快速体验功能</span></td><td style="text-align:right"><button class="btn btn-ghost" type="button" onclick="confirmLoadSample()">载入示例数据</button></td></tr>
               <tr><td><b>清空全部数据</b><br><span class="hint">删除本机保存的所有数据，操作不可恢复</span></td><td style="text-align:right"><button class="btn btn-ghost-danger" type="button" onclick="confirmClear()">清空数据</button></td></tr>
+              <tr><td><b>清空预约与统计</b><br><span class="hint">清空预约/直购/出租、消费台账、套餐卡、退款记录、提现记录；保留客户档案、股东账号、服务项目与套餐定义</span></td><td style="text-align:right"><button class="btn btn-ghost-danger" type="button" onclick="clearTestData()">清空预约与统计</button></td></tr>
             </table>
           </div>
         </div>
       </section>
-      <!-- 总消费记录 -->
-      <section class="page" id="page-consumption">
-        <div class="section">
-          <div class="section-head"><div><h2>总消费记录</h2><div class="desc">所有客户的历史消费记录，可编辑可删除</div></div><button class="btn btn-primary" type="button" onclick="openConsumptionModal()">＋ 新增消费记录</button></div>
-          <div class="section-body no-pad" id="consumptionBody"></div>
-        </div>
-      </section>
+      <!-- 总消费记录已并入统计报表页（消费明细区块），本板块移除 -->
     </div>
   </main>
 </div>
@@ -669,7 +676,7 @@ tr:hover td{background:#fafbfc}
           <label>🔐 共享股东登录绑定</label>
           <div style="background:var(--bg-1);border-radius:8px;padding:10px 12px;margin-top:4px">
             <div class="hint" style="margin-bottom:6px">登录账号 = 联系电话（修改电话即修改登录账号）。开通后该共享股东用「手机号 + 密码」登录查看自己的预约、消费与佣金。</div>
-            <div class="form-item"><label>登录密码</label><input id="cLoginPwd" type="text" placeholder="留空使用统一初始密码（可在设置中修改）"></div>
+            <div class="form-item"><label>登录密码 <span class="tag tag-blue" style="margin-left:4px">管理员可查看/重置，防止股东忘记</span></label><input id="cLoginPwd" type="text" placeholder="当前密码已显示，可直接修改；留空则保持不变"></div>
             <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
               <input type="checkbox" id="cLoginEnable" style="width:auto"> 启用该登录账号
             </label>
@@ -703,6 +710,22 @@ tr:hover td{background:#fafbfc}
       <div class="form-item"><label>备注（选填）</label><input id="withdrawNote" placeholder="如：微信转账 / 现金"></div>
     </div>
     <div class="modal-foot"><button class="btn btn-ghost" type="button" onclick="closeModal('withdrawMask')">取消</button><button class="btn btn-primary" type="button" onclick="doWithdraw()">确认提现</button></div>
+  </div>
+</div>
+
+<!-- 模态框：共享股东修改登录账号/密码（股东自助） -->
+<div class="mask" id="sharePwdMask">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-head"><h3>🔑 修改登录账号 / 密码</h3><button class="modal-x" type="button" onclick="closeModal('sharePwdMask')">✕</button></div>
+    <div class="modal-body">
+      <div class="hint" style="line-height:1.7">修改后请用<b>新账号（手机号）+ 新密码</b>登录；门店管理员在「客户档案」中也能看到您的最新密码，忘记时可向管理员查询。</div>
+      <div class="form-item"><label>登录账号（手机号）</label><input id="spPhone" type="tel" placeholder="当前账号"></div>
+      <div class="form-item"><label>旧密码 <span class="req">*</span></label><input id="spOldPwd" type="password" placeholder="当前登录密码"></div>
+      <div class="form-item"><label>新密码 <span class="req">*</span></label><input id="spNewPwd" type="password" placeholder="至少 6 位"></div>
+      <div class="form-item"><label>确认新密码 <span class="req">*</span></label><input id="spNewPwd2" type="password" placeholder="再次输入新密码"></div>
+      <div id="spErr" style="margin-top:8px;color:var(--danger);font-size:13px;display:none"></div>
+    </div>
+    <div class="modal-foot"><button class="btn btn-ghost" type="button" onclick="closeModal('sharePwdMask')">取消</button><button class="btn btn-primary" type="button" onclick="saveSharePwd()">确认修改</button></div>
   </div>
 </div>
 
@@ -755,6 +778,29 @@ tr:hover td{background:#fafbfc}
   </div>
 </div>
 
+<!-- 模态框：套餐 -->
+<div class="mask" id="pkgMask">
+  <div class="modal">
+    <div class="modal-head"><h3 id="pkgModalTitle">新增套餐</h3><button class="modal-x" type="button" onclick="closeModal('pkgMask')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-item full"><label>套餐名称 <span class="req">*</span></label><input id="pkgName" placeholder="如：面部清洁 10 次卡 / 胯部塑形 5 次疗程卡"></div>
+        <div class="form-item full">
+          <label>包含项目（服务=次数，苗衣出租=天数）</label>
+          <div id="pkgItems" style="display:flex;flex-direction:column;gap:8px"></div>
+          <button class="btn btn-ghost btn-xs" type="button" style="margin-top:8px" onclick="addPkgItemRow()">＋ 添加项目</button>
+        </div>
+        <div class="form-item"><label>市价（元）</label><input id="pkgPrice" type="number" min="0" step="0.01" value="" placeholder="普通客户购买价"></div>
+        <div class="form-item"><label>共享股东价（元）</label><input id="pkgPriceSH" type="number" min="0" step="0.01" value="" placeholder="留空则股东按市价"></div>
+        <div class="form-item"><label>总成本（元）</label><input id="pkgCost" type="number" min="0" step="0.01" value="" placeholder="套餐总成本，用于利润核算"></div>
+        <div class="form-item full"><label>备注（选填）</label><input id="pkgNote" placeholder="如：有效期 3 个月"></div>
+      </div>
+      <div class="hint" id="pkgHint" style="margin-top:8px;line-height:1.7">市价 = 普通客户购买价；共享股东价 = 共享股东购买价（留空则按市价）；总成本用于核算利润与佣金。套餐为预存款项目，到店「直接购买」中选购收款。</div>
+    </div>
+    <div class="modal-foot"><button class="btn btn-ghost" type="button" onclick="closeModal('pkgMask')">取消</button><button class="btn btn-primary" type="button" onclick="savePkg()">保存</button></div>
+  </div>
+</div>
+
 <!-- 模态框：预约 -->
 <div class="mask" id="apptMask">
   <div class="modal wide">
@@ -762,7 +808,7 @@ tr:hover td{background:#fafbfc}
     <div class="modal-body">
       <div class="form-grid">
         <div class="form-item"><label>日期 <span class="req">*</span></label><input id="aDate" type="date"></div>
-        <div class="form-item"><label>开始时间 <span class="req">*</span></label><input id="aTime" type="time" step="300"></div>
+        <div class="form-item"><label>开始时间 <span class="req">*</span></label><select id="aTime"></select></div>
         <div class="form-item"><label>预约项目</label>
           <select id="aService"><option value="">（不指定）</option></select>
         </div>
@@ -793,12 +839,24 @@ tr:hover td{background:#fafbfc}
   </div>
 </div>
 
+<!-- 模态框：数据诊断（排查虚高消费/重复单） -->
+<div class="mask" id="diagMask">
+  <div class="modal" style="max-width:780px">
+    <div class="modal-head"><h3>🔍 数据诊断</h3><button class="modal-x" type="button" onclick="closeModal('diagMask')">✕</button></div>
+    <div class="modal-body" id="diagBody" style="max-height:70vh;overflow:auto"></div>
+  </div>
+</div>
+
 <!-- 模态框：结账 -->
 <div class="mask" id="checkoutMask">
   <div class="modal" style="max-width:460px">
     <div class="modal-head"><h3>结账收款</h3><button class="modal-x" type="button" onclick="closeModal('checkoutMask')">✕</button></div>
     <div class="modal-body">
       <div class="co-summary" id="coSummary"></div>
+      <div id="coPkgBox" style="display:none;margin-top:10px;border:1px dashed var(--border);border-radius:10px;padding:10px 12px;background:var(--bg-1)">
+        <div style="font-size:13px;font-weight:600;margin-bottom:6px">🎫 套餐卡抵扣（预存款核销，不收款）</div>
+        <div id="coPkgCards" style="display:flex;flex-direction:column;gap:6px"></div>
+      </div>
       <div class="form-grid">
         <div class="form-item"><label>应收金额（元）<span class="req">*</span></label><input id="coAmount" type="number" min="0" step="0.01"></div>
         <div class="form-item"><label>收款方式 <span class="req">*</span></label>
@@ -912,6 +970,44 @@ tr:hover td{background:#fafbfc}
   </div>
 </div>
 
+
+<!-- 统一客户消费管理中心（查看当前客户+名下所有下级消费，支持编辑删除） -->
+<div class="mask" id="customerConsumptionMask">
+  <div class="modal" style="max-width:860px;max-height:90vh;display:flex;flex-direction:column">
+    <div class="modal-head">
+      <h3 id="customerConsumptionTitle">客户消费管理</h3>
+      <button class="modal-x" type="button" onclick="closeModal('customerConsumptionMask')">✕</button>
+    </div>
+    <div class="modal-body" id="customerConsumptionBody" style="overflow:auto;flex:1;padding:0"></div>
+    <div class="modal-foot" id="customerConsumptionFoot">
+      <button class="btn btn-ghost" type="button" onclick="closeModal('customerConsumptionMask')">关闭</button>
+    </div>
+  </div>
+</div>
+<!-- 套餐卡退结算弹窗 -->
+<div class="mask" id="refundMask">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-head"><h3>套餐卡退结算</h3><button class="modal-x" type="button" onclick="closeModal('refundMask')">✕</button></div>
+    <div class="modal-body" id="refundBody" style="overflow:auto;max-height:70vh"></div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" type="button" onclick="closeModal('refundMask')">取消</button>
+      <button class="btn btn-danger" type="button" onclick="confirmRefundPkg()">确认退款</button>
+    </div>
+  </div>
+</div>
+<!-- 股东详情：个人/团队消费记录查看弹窗 -->
+<div class="mask" id="shareConsumptionMask">
+  <div class="modal" style="max-width:900px;max-height:90vh;display:flex;flex-direction:column">
+    <div class="modal-head">
+      <h3 id="shareConsumptionTitle">消费记录</h3>
+      <button class="modal-x" type="button" onclick="closeModal('shareConsumptionMask')">✕</button>
+    </div>
+    <div class="modal-body" id="shareConsumptionBody" style="overflow:auto;flex:1;padding:0"></div>
+    <div class="modal-foot" id="shareConsumptionFoot">
+      <button class="btn btn-ghost" type="button" onclick="closeModal('shareConsumptionMask')">关闭</button>
+    </div>
+  </div>
+</div>
 <div id="toasts"></div>
 
 <!-- 新预约持久提醒弹窗 -->
@@ -3240,7 +3336,8 @@ function toYMD(d){return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDa
 function parseYMD(s){var p=s.split("-");return new Date(+p[0],+p[1]-1,+p[2]);}
 function todayStr(){return toYMD(new Date());}
 function addDays(s,n){var d=parseYMD(s);d.setDate(d.getDate()+n);return toYMD(d);}
-function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,9);}
+function uid(){return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,function(c){var r=Math.random()*16|0,v=c=="x"?r:(r&0x3|0x8);return v.toString(16);});}
+function isValidUUID(v){return typeof v==="string"&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);}
 function minOf(hm){if(!hm)return 0;var p=hm.split(":");return (+p[0])*60+(+p[1]);}
 function fmtMin(m){return pad(Math.floor(m/60))+":"+pad(m%60);}
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];});}
@@ -3285,10 +3382,10 @@ function retryDeleted(table,cloudRows){
   });
 }
 
-var DEFAULT_CLOUD=null;
+var DEFAULT_CLOUD=null; // 公网版不内置密钥：新设备须先「扫码自动配置」或「手动填密钥」才能连接云端登录
 function loadCloudCfg(){
   try{var v=localStorage.getItem(CFG_KEY);if(v)cloudCfg=JSON.parse(v);}catch(e){cloudCfg=null;}
-  if(!(cloudCfg&&cloudCfg.url&&cloudCfg.anonKey))cloudCfg=null;
+  if(!(cloudCfg&&cloudCfg.url&&cloudCfg.anonKey))cloudCfg=DEFAULT_CLOUD;
 }
 function saveCloudCfg2(cfg){try{localStorage.setItem(CFG_KEY,JSON.stringify(cfg));cloudCfg=cfg;}catch(e){toast("无法保存在本机","err");}}
 function loadSess(){
@@ -3366,6 +3463,12 @@ function normalizeCloudRow(table,row){
       else if(k==="rentedAt")nk="rented_at";
       else if(k==="dueDate")nk="due_date";
       else if(k==="returnedAt")nk="returned_at";
+else if(k==="serviceId")nk="service_id";
+      else if(k==="memberId")nk="member_id";
+      else if(k==="payMethod")nk="pay_method";
+      else if(k==="paidAt")nk="paid_at";
+      // 云端历史列 referral → 本地统一 referrer（上推/拉取均以 referrer 为主列）
+      else if(k==="referral")nk="referrer";
     }else if(table==="consumptions"){
       if(k==="apptId")nk="apptid";
     }
@@ -3417,6 +3520,12 @@ function uiLocked(){return !!cloudMode&&!sess&&!shareSess;}
 
 /* ---------- 数据拉取 / 推送（全量同步，简单可靠） ---------- */
 function stripRow(r){if(!r)return r;var o={};for(var k in r){if(k!=="updated_at")o[k]=r[k];}return o;}
+/* items(jsonb) 可能以 JSON 字符串返回云端，统一安全归一化为数组（渲染/计算防御） */
+function normalizeItems(v){
+  if(Array.isArray(v))return v;
+  if(typeof v==="string"){try{var p=JSON.parse(v);return Array.isArray(p)?p:[];}catch(e){return [];}}
+  return [];
+}
 var cloudSelectedApptIds=[]; // 本机视图已确认存在于云端的预约 id（普通用户据此判断哪些预约需要上推）
 /* 云端∪本地合并：缺省以云端为权威（同 id 云端覆盖本地），但本地存在而云端
    缺少的行必须保留——防止“拉取旧数据覆盖刚新增/离线修改”导致客户/成员/服务
@@ -3436,7 +3545,7 @@ function cloudPullAll(){
   // 拉取前记录本地已有预约ID集合，用于检测新增
   var localApptIds={};
   DB.appointments.forEach(function(a){if(a&&a.id)localApptIds[a.id]=1;});
-  return Promise.all([cloudSelect("members"),cloudSelect("services"),cloudSelect("appointments"),cloudSelect("schedule"),cloudSelect("customers"),cloudSelect("consumptions")])
+  return Promise.all([cloudSelect("members"),cloudSelect("services"),cloudSelect("appointments"),cloudSelect("schedule"),cloudSelect("customers"),cloudSelect("consumptions"),cloudSelect("packages"),cloudSelect("packagebuys"),cloudSelect("refunds"),cloudSelect("withdrawals")])
     .then(function(res){
       retryDeleted("members",res[0]);
       retryDeleted("services",res[1]);
@@ -3476,6 +3585,7 @@ function cloudPullAll(){
         }
       }catch(e){DB.services=mergeRows(svcCloud,DB.services);}
       var cloudRows=(res[2]||[]).map(stripRow).map(function(r){
+        if(r.items!=null)r.items=normalizeItems(r.items);
         if(r.unitprice!=null){r.unitPrice=r.unitprice;delete r.unitprice;}
         else delete r.unitPrice;
         if(r.servicecost!=null){r.serviceCost=r.servicecost;delete r.servicecost;}
@@ -3486,8 +3596,23 @@ function cloudPullAll(){
         else delete r.rentedAt;
         if(r.due_date!=null){r.dueDate=r.due_date;delete r.due_date;}
         else delete r.dueDate;
-        if(r.returned_at!=null){r.returnedAt=r.returned_at;delete r.returned_at;}
+if(r.returned_at!=null){r.returnedAt=r.returned_at;delete r.returned_at;}
         else delete r.returnedAt;
+        if(r.redeemvalue!=null){r.redeemValue=+r.redeemvalue;delete r.redeemvalue;}
+        if(r.commearned!=null){r.commEarned=+r.commearned;delete r.commearned;}
+        if(r.chargedays!=null){r.chargeDays=+r.chargedays;delete r.chargedays;}
+        if(r.service_id!=null){r.serviceId=r.service_id;delete r.service_id;}
+        else delete r.serviceId;
+        if(r.member_id!=null){r.memberId=r.member_id;delete r.member_id;}
+        else delete r.memberId;
+        if(r.pay_method!=null){r.payMethod=r.pay_method;delete r.pay_method;}
+        else delete r.payMethod;
+        if(r.paid_at!=null){r.paidAt=r.paid_at;delete r.paid_at;}
+        else delete r.paidAt;
+        // 历史 referral 列 → referrer（referrer 优先，referral 兜底）
+        if(r.referral!=null&&r.referrer==null){r.referrer=r.referral;}
+        delete r.referral;
+        if(r.customer_id!=null&&!isValidUUID(r.customer_id))delete r.customer_id;
         return r;
       }).filter(function(r){return !isDeletedLocal("appointments",r.id);});
       retryDeleted("appointments",res[2]);
@@ -3504,6 +3629,7 @@ function cloudPullAll(){
         }
       });
       DB.appointments=pending;
+      sweepGhostMemberIds(); // 清除已删除成员残留引用（含云端拉回的墓碑 member_id）
       // 检测云端新增预约（其他设备/股东创建）并提醒管理员
       var newAppts=cloudRows.filter(function(r){return r&&r.id&&!localApptIds[r.id];});
       if(newAppts.length&&isAdmin()){
@@ -3521,13 +3647,55 @@ function cloudPullAll(){
         });
       }
       cloudSelectedApptIds=cloudRows.map(function(r){return r.id;});
-      var sched=res[3]&&res[3][0];
-      DB.schedule=sched?{start:sched.start||"09:00",end:sched.end||"20:00"}:DB.schedule||{start:"09:00",end:"20:00"};
+var sched=res[3]&&res[3][0];
+      DB.schedule=sched?{id:sched.id||"00000000-0000-0000-0000-000000000001",date:sched.date||"",shift:sched.shift||"morning",start:sched.start||"09:00",end:sched.end||"20:00"}:DB.schedule||{id:"00000000-0000-0000-0000-000000000001",date:"",shift:"morning",start:"09:00",end:"20:00"};
       DB.customers=mergeRows((res[4]||[]).filter(function(r){return !isDeletedLocal("customers",r.id);}).map(stripRow).map(function(c){
         if(c.wx==null)c.wx="";
         return c;
       }),DB.customers);
-      DB.consumptions=mergeRows((res[5]||[]).filter(function(r){return !isDeletedLocal("consumptions",r.id);}).map(stripRow),DB.consumptions||[]);
+      DB.consumptions=mergeRows((res[5]||[]).filter(function(r){return !isDeletedLocal("consumptions",r.id);}).map(function(r){
+        if(r.apptid!=null){r.apptId=r.apptid;delete r.apptid;}
+        if(r.pkgbuy!=null){r.pkgBuy=!!r.pkgbuy;delete r.pkgbuy;}
+        return stripRow(r);
+      }),DB.consumptions||[]);
+      // 套餐定义 / 套餐购买卡 / 退款 / 提现（云端列名全小写，合并时转回本地字段）
+      DB.packages=mergeRows((res[6]||[]).filter(function(r){return !(r&&r.name&&String(r.name).indexOf("__DEL__")===0);}).map(stripRow).map(function(p){
+        if(p.priceshareholder!=null){p.priceShareholder=p.priceshareholder;delete p.priceshareholder;}
+        if(p.isrent!=null){p.isRent=!!p.isrent;delete p.isrent;}
+        if(p.priceShareholder==null)p.priceShareholder=p.price;
+        if(p.cost==null)p.cost=0;
+        return p;
+      }),DB.packages||[]);
+      // 拉取前快照本地已退款卡，merge 后强制恢复（防云端旧值 refunded=false 覆盖本地刚执行的退款标记 → 卡/预拿佣金复活）
+      var _localRefunded={};(DB.packageBuys||[]).forEach(function(_b){if(_b&&_b.refunded)_localRefunded[_b.id]=1;});
+      DB.packageBuys=mergeRows((res[7]||[]).map(stripRow).map(function(b){
+        if(b.customerid!=null){b.customerId=b.customerid;delete b.customerid;}
+        if(b.pkgid!=null){b.pkgId=b.pkgid;delete b.pkgid;}
+        if(b.isshare!=null){b.isShare=!!b.isshare;delete b.isshare;}
+        if(b.commeach!=null){b.commEach=+b.commeach;delete b.commeach;}
+        if(b.commtotal!=null){b.commTotal=+b.commtotal;delete b.commtotal;}
+        if(b.commused!=null){b.commUsed=+b.commused;delete b.commused;}
+        if(b.pkg_name!=null){b.name=b.pkg_name;delete b.pkg_name;}
+        if(b.customer_name!=null){b.client=b.customer_name;delete b.customer_name;}
+        if(b.cost!=null){b.pkgCost=+b.cost;delete b.cost;}
+        if(b.refunded!=null)b.refunded=!!b.refunded;
+        return b;
+      }),DB.packageBuys||[]);
+      (DB.packageBuys||[]).forEach(function(_b){if(_b&&_localRefunded[_b.id])_b.refunded=true;});
+      DB.refunds=mergeRows((res[8]||[]).map(stripRow).map(function(r){
+        if(r.cardid!=null){r.cardId=r.cardid;delete r.cardid;}
+        if(r.customerid!=null){r.customerId=r.customerid;delete r.customerid;}
+        if(r.cardname!=null){r.cardName=r.cardname;delete r.cardname;}
+        if(r.usedamount!=null){r.usedAmount=+r.usedamount;delete r.usedamount;}
+        if(r.customer_name!=null){r.customer=r.customer_name;delete r.customer_name;}
+        return r;
+      }),DB.refunds||[]);
+      DB.withdrawals=mergeRows((res[9]||[]).map(stripRow).map(function(w){
+        if(w.customerid!=null){w.shareId=w.customerid;delete w.customerid;}
+        if(w.customer_name!=null){w.name=w.customer_name;delete w.customer_name;}
+        return w;
+      }),DB.withdrawals||[]);
+      repairPkgFlags(); // 云端拉回的直购套餐单同样自愈
       cloudConnected=true;
       renderAll();
       updateCloudUI();
@@ -3553,11 +3721,11 @@ function cloudPullAll(){
 function queuePush(){
   if(!cloudMode||!sess)return;
   if(pushTimer)clearTimeout(pushTimer);
-  pushTimer=setTimeout(pushAll,400);
+  pushTimer=setTimeout(pushAll,100); // 写操作后立即上推云端（仅合并同一瞬间的多次操作，几乎无延迟）
 }
 /* appointments 上推行：固定云端列白名单构造，保证批内每行键集合完全一致，
    缺失值补 null；顺带免疫历史遗留的多余字段（如 createdAt）。 */
-var APPT_COLS=["id","date","time","duration","serviceId","memberId","client","phone","note","status","amount","payMethod","paidAt","customer_id","kind","referrer","items","unitprice","servicecost","rent_days","rented_at","due_date","returned_at"];
+var APPT_COLS=["id","date","time","duration","serviceId","memberId","client","phone","note","status","amount","payMethod","paidAt","customer_id","kind","referrer","items","unitprice","servicecost","rent_days","rented_at","due_date","returned_at","redeemvalue","commearned","chargedays"];
 function apptToCloudRow(a,now){
   var o={};
   for(var i=0;i<APPT_COLS.length;i++){
@@ -3568,9 +3736,14 @@ function apptToCloudRow(a,now){
     else if(k==="rented_at"){o.rented_at=(a.rented_at!=null)?a.rented_at:(a.rentedAt!=null?a.rentedAt:null);}
     else if(k==="due_date"){o.due_date=(a.due_date!=null)?a.due_date:(a.dueDate!=null?a.dueDate:null);}
     else if(k==="returned_at"){o.returned_at=(a.returned_at!=null)?a.returned_at:(a.returnedAt!=null?a.returnedAt:null);}
+    else if(k==="redeemvalue"){o.redeemvalue=(a.redeemValue!=null)?+a.redeemValue:0;}
+    else if(k==="commearned"){o.commearned=(a.commEarned!=null)?+a.commEarned:0;}
+    else if(k==="chargedays"){o.chargedays=(a.chargeDays!=null)?+a.chargeDays:0;}
     else{o[k]=(a[k]!==undefined)?a[k]:null;}
     if(o[k]==="")o[k]=null; // 空串会导致 timestamptz 列 22007，统一转 null
   }
+  // customer_id 必须是合法 UUID，否则数据库会拒绝
+  if(o.customer_id!=null&&!isValidUUID(o.customer_id))o.customer_id=null;
   o.updated_at=now;
   return o;
 }
@@ -3579,7 +3752,7 @@ function pushAll(){
   if(syncBusy){
     // 云端拉取进行中：稍后重试，不静默丢弃
     if(pushTimer)clearTimeout(pushTimer);
-    pushTimer=setTimeout(pushAll,600);
+    pushTimer=setTimeout(pushAll,200);
     return Promise.resolve();
   }
   var now=new Date().toISOString();
@@ -3604,51 +3777,97 @@ function pushAll(){
     jobs.push(cloudUpsert("appointments",DB.appointments.map(function(a){return apptToCloudRow(a,now);}),"id"));
     jobs.push(cloudUpsert("customers",DB.customers.filter(function(c){return !isDeletedLocal("customers",c.id)&&!(c.name&&String(c.name).indexOf("__DEL__")===0);}).map(function(c){
       var o={};
-["id","name","phone","type","referrer","account_email","note","wx","login_enabled","login_pwd"].forEach(function(k){
+["id","name","phone","type","referrer","account_email","note","wx","login_enabled","login_pwd","login_pwd_plain"].forEach(function(k){
         if(k==="login_enabled")o.login_enabled=(c.login_enabled===undefined||c.login_enabled==null)?false:!!c.login_enabled;
         else if(k==="login_pwd")o.login_pwd=(c.login_pwd===undefined||c.login_pwd==null)?"":c.login_pwd;
+        else if(k==="login_pwd_plain")o.login_pwd_plain=(c.login_pwd_plain===undefined||c.login_pwd_plain==null)?"":c.login_pwd_plain;
         else o[k]=(c[k]!==undefined)?c[k]:null;
       });
       o.updated_at=now;return o;
     }),"id"));
-    jobs.push(cloudUpsert("schedule",[{id:"s",start:DB.schedule.start||"09:00",end:DB.schedule.end||"20:00",updated_at:now}],"id"));
-    jobs.push(cloudUpsert("consumptions",DB.consumptions.map(function(o){
-      var r={};
-      ["id","date","customer_id","customer","item","amount","method","note","apptId","kind"].forEach(function(k){r[k]=(o[k]!==undefined)?o[k]:null;});
-      r.updated_at=now;return r;
-    }),"id"));
-  }else{
-    // 普通用户：只可新增预约，仅上推【云端尚不存在】的本地预约（纯 insert，禁止覆盖他人预约）
-    var known={};
-    cloudSelectedApptIds.forEach(function(i){known[i]=1;});
-    var fresh=DB.appointments.filter(function(a){return !known[a.id];})
-      .map(function(a){return apptToCloudRow(a,now);});
-    if(fresh.length){
-      jobs.push(cloudUpsert("appointments",fresh).then(function(){
-        fresh.forEach(function(a){if(cloudSelectedApptIds.indexOf(a.id)<0)cloudSelectedApptIds.push(a.id);});
-      }));
+      jobs.push(cloudUpsert("schedule",[{id:(DB.schedule.id&&isValidUUID(DB.schedule.id))?DB.schedule.id:"00000000-0000-0000-0000-000000000001",date:DB.schedule.date||todayStr(),shift:DB.schedule.shift||"morning",start:DB.schedule.start||"09:00",end:DB.schedule.end||"20:00",updated_at:now}],"id"));
+      // 套餐定义 / 套餐购买卡 / 退款 / 提现（云端表名全小写 packagebuys）
+      jobs.push(cloudUpsert("packages",DB.packages.filter(function(p){return !(p&&p.name&&String(p.name).indexOf("__DEL__")===0);}).map(function(p){
+        var o={};
+        ["id","name","items","price","priceshareholder","cost","isrent","status"].forEach(function(k){
+          if(k==="priceshareholder")o.priceshareholder=(p.priceShareholder!=null)?p.priceShareholder:(p.price!=null?p.price:null);
+          else if(k==="isrent")o.isrent=p.isRent?true:false;
+          else o[k]=(p[k]!==undefined)?p[k]:null;
+        });
+        o.updated_at=now;return o;
+      }),"id"));
+      jobs.push(cloudUpsert("packagebuys",(DB.packageBuys||[]).map(function(b){
+        var o={id:b.id,customerid:b.customerId||null,customer_name:b.client||null,pkgid:b.pkgId||null,pkg_name:b.name||null,
+          price:(b.price!=null)?+b.price:0,cost:(b.pkgCost!=null)?+b.pkgCost:0,date:b.date||null,time:b.time||null,
+          isshare:!!b.isShare,remaining:b.remaining||{},totals:b.totals||{},refunded:!!b.refunded,
+          commeach:(b.commEach!=null)?+b.commEach:0,commtotal:(b.commTotal!=null)?+b.commTotal:0,commused:(b.commUsed!=null)?+b.commUsed:0};
+        o.updated_at=now;return o;
+      }),"id"));
+      jobs.push(cloudUpsert("refunds",(DB.refunds||[]).map(function(r){
+        var o={id:r.id,cardid:r.cardId||null,customerid:r.customerId||null,customer_name:r.customer||null,
+          cardname:r.cardName||null,date:r.date||null,time:r.time||null,
+          amount:(r.amount!=null)?+r.amount:0,usedamount:(r.usedAmount!=null)?+r.usedAmount:0,
+          price:(r.price!=null)?+r.price:0,note:r.note||null};
+        o.updated_at=now;return o;
+      }),"id"));
+      jobs.push(cloudUpsert("withdrawals",(DB.withdrawals||[]).map(function(w){
+        var o={id:w.id,customerid:w.shareId||null,customer_name:w.name||null,date:w.time||null,
+          amount:(w.amount!=null)?+w.amount:0,note:w.note||null,by:w.by||null};
+        o.updated_at=now;return o;
+      }),"id"));
+    }else{
+      // 普通用户：只可新增预约，仅上推【云端尚不存在】的本地预约（纯 insert，禁止覆盖他人预约）
+      var known={};
+      cloudSelectedApptIds.forEach(function(i){known[i]=1;});
+      var fresh=DB.appointments.filter(function(a){return !known[a.id];})
+        .map(function(a){return apptToCloudRow(a,now);});
+      if(fresh.length){
+        jobs.push(cloudUpsert("appointments",fresh).then(function(){
+          fresh.forEach(function(a){if(cloudSelectedApptIds.indexOf(a.id)<0)cloudSelectedApptIds.push(a.id);});
+        }));
+      }
     }
-  }
-  if(!jobs.length)return Promise.resolve();
-  return Promise.all(jobs).then(function(){
-    cloudConnected=true;updateCloudUI();
-  }).catch(function(e){
-    cloudConnected=false;updateCloudUI();
-    toast("云端同步失败："+(e&&e.message?e.message:e),"err");
-  });
+    if(!jobs.length)return Promise.resolve();
+    return Promise.all(jobs).then(function(){
+      cloudConnected=true;updateCloudUI();
+      // consumptions 依赖 appointments.id 外键，必须等基础表全部成功后再串行推送
+      if(isAdmin()){
+        var apptIds={};(DB.appointments||[]).forEach(function(a){if(a&&a.id)apptIds[a.id]=true;});
+        var cRows=DB.consumptions.filter(function(o){return !o.apptId||(!isDeletedLocal("appointments",o.apptId)&&apptIds[o.apptId]);}).map(function(o){
+          var r={};
+          ["id","date","customer_id","customer","item","amount","method","note","kind"].forEach(function(k){r[k]=(o[k]!==undefined)?o[k]:null;});
+          r.apptid=(o.apptId!==undefined)?o.apptId:null;
+          r.pkgbuy=!!o.pkgBuy;
+          if(r.customer_id!=null&&!isValidUUID(r.customer_id))r.customer_id=null;
+          r.updated_at=now;return r;
+        });
+        if(cRows.length)return cloudUpsert("consumptions",cRows,"id");
+      }
+    }).catch(function(e){
+      cloudConnected=false;updateCloudUI();
+      toast("云端同步失败："+(e&&e.message?e.message:e),"err");
+    });
 }
 function startCloudSync(){
   if(cloudTimer)clearInterval(cloudTimer);
-  if(cloudMode&&sess)cloudTimer=setInterval(function(){
-    if(navigator.onLine)cloudPullAll();
-  },15000);
+  // 管理员（sess）走全量双向同步；共享股东（shareSess）走股东数据拉取；拉取周期 30 秒
+  if(cloudMode&&(sess||shareSess))cloudTimer=setInterval(function(){
+    if(!navigator.onLine)return;
+    if(sess)cloudPullAll();
+    if(shareSess)sharePull();
+  },30000);
 }
 window.addEventListener("online",function(){
-  if(cloudMode&&sess){
+  if(cloudMode&&(sess||shareSess)){
     toast("网络已恢复，正在同步云端数据...","ok");
-    cloudPullAll().then(function(ok){
-      if(ok)pushAll().then(function(){toast("云端同步完成","ok");});
-    });
+    if(shareSess){
+      sharePull().then(function(ok){if(ok)toast("云端同步完成","ok");});
+    }
+    if(sess){
+      cloudPullAll().then(function(ok){
+        if(ok)pushAll().then(function(){toast("云端同步完成","ok");});
+      });
+    }
   }
 });
 window.addEventListener("offline",function(){
@@ -3658,7 +3877,10 @@ window.addEventListener("offline",function(){
   }
 });
 document.addEventListener("visibilitychange",function(){
-  if(!document.hidden&&cloudMode&&sess)cloudPullAll();
+  if(!document.hidden&&cloudMode){
+    if(shareSess)sharePull();
+    if(sess)cloudPullAll();
+  }
 });
 
 /* ================= 数据层 ================= */
@@ -3691,9 +3913,275 @@ function defaultData(){
     consumptions:[]
   };
 }
-var DB={members:[],services:[],schedule:{start:"09:00",end:"20:00"},customers:[],appointments:[],withdrawals:[],consumptions:[]};
+var DB={members:[],services:[],schedule:{start:"09:00",end:"20:00"},customers:[],appointments:[],withdrawals:[],consumptions:[],packages:[],packageBuys:[]};
 var storageOK=false;
 
+// 短 ID→UUID 本地迁移：老版本/示例数据使用 m1/s1/c1 等短 ID，云端主键是 UUID（22P02 拒绝）。
+// 每次数据进入 DB 时把所有短 ID 换成合法 UUID，并同步更新所有引用字段。
+function migrateShortIds(){
+  var changed=false,map={};
+  function isUuid(v){return typeof v==="string"&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);}
+  function toUuid(v){
+    if(!v||isUuid(v))return v;
+    if(map[v])return map[v];
+    map[v]=uid();changed=true;return map[v];
+  }
+  ["members","services","customers","appointments","consumptions","withdrawals","packages","packageBuys"].forEach(function(t){
+    (DB[t]||[]).forEach(function(r){if(r&&r.id)r.id=toUuid(r.id);});
+  });
+  (DB.packages||[]).forEach(function(p){if(p&&p.items)p.items.forEach(function(it){if(it&&it.serviceId)it.serviceId=toUuid(it.serviceId);});});
+  (DB.packageBuys||[]).forEach(function(b){
+    if(b.pkgId)b.pkgId=toUuid(b.pkgId);
+    if(b.customerId&&!isUuid(b.customerId))b.customerId=toUuid(b.customerId);
+    if(b.remaining){var nr={};for(var k in b.remaining)nr[toUuid(k)]=b.remaining[k];b.remaining=nr;}
+  });
+  (DB.appointments||[]).forEach(function(a){
+    if(a.serviceId)a.serviceId=toUuid(a.serviceId);
+    if(a.memberId){
+      // 已删除成员残留（_DEL_/__DEL__ 墓碑 id）直接清空，避免界面显示原始英文串
+      if(String(a.memberId).indexOf("_DEL_")>=0)a.memberId="";
+      else a.memberId=toUuid(a.memberId);
+    }
+    if(a.customer_id&&!isUuid(a.customer_id))a.customer_id=toUuid(a.customer_id);
+  });
+  (DB.customers||[]).forEach(function(c){if(c.referrer)c.referrer=toUuid(c.referrer);});
+  (DB.withdrawals||[]).forEach(function(w){if(w.shareId)w.shareId=toUuid(w.shareId);});
+  (DB.consumptions||[]).forEach(function(o){
+    if(o.apptId&&!isUuid(o.apptId))o.apptId=toUuid(o.apptId);
+    if(o.customer_id&&!isUuid(o.customer_id))o.customer_id=toUuid(o.customer_id);
+  });
+  if(changed){
+    try{localStorage.setItem(DB_KEY,JSON.stringify(DB));}catch(e){}
+  }
+}
+/* 数据诊断：列出直购单/重复单/名下客户消费构成，用于排查虚高 */
+function openDataDiag(){
+  var h="";
+  // 1) 数据概览
+  var appts=DB.appointments||[];
+  var directs=appts.filter(function(a){return a.kind==="direct";});
+  var dDupe={};
+  var seen={};
+  directs.forEach(function(a){
+    if(a.pkgBuyOnly&&(+a.amount||0)>0&&a.commEarned==null){
+      var pkgKey=(a.items||[]).map(function(i){return i.pkgId||i.name||"";}).join(",")||a.serviceId||"none";
+      var key=a.customer_id+"|"+a.date+"|"+pkgKey+"|"+a.amount;
+      if(seen[key])dDupe[a.id]=true;else seen[key]=1;
+    }
+  });
+  h+='<div style="background:var(--bg-1);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:13px;line-height:1.9">'+
+     "预约总数：<b>"+appts.length+"</b>　·　直购单：<b>"+directs.length+"</b>　·　其中疑似重复套餐单：<b style='color:var(--danger)'>"+Object.keys(dDupe).length+"</b><br>"+
+     "云端：<b>"+(cloudMode?"已连接":"未开启")+"</b>　·　数据加载：<b>"+localStorage.getItem("bkgbook_v1").length+"</b> 字符</div>";
+  // 2) 直购单明细
+  if(!directs.length){h+="<p class='hint'>无直购单</p>";}
+  else{
+    h+='<div style="font-size:13px;font-weight:700;margin:6px 0 8px">📋 直购单明细（共 '+directs.length+' 笔）</div><table style="font-size:12px">'+
+      "<tr><th>日期</th><th>客户</th><th style='text-align:right'>金额</th><th>套餐/项目</th><th>标记</th></tr>";
+    directs.forEach(function(a){
+      var its=(a.items||[]).map(function(i){return i.kind==="pkg"?(i.name||"套餐"):(i.name||i.serviceId||"项目");}).join("、")||(a.serviceId?function(){var s=serviceById(a.serviceId);return s?s.name:"项目";}():(a.serviceName||"-"));
+      var mark=[];
+      if(a.pkgBuyOnly)mark.push('<span class="tag tag-blue" style="font-size:11px">套餐购买</span>');
+      if(dDupe[a.id])mark.push('<span class="tag" style="font-size:11px;background:var(--danger);color:#fff">重复</span>');
+      if(a.commEarned!=null)mark.push('<span class="tag tag-warn" style="font-size:11px">已核销</span>');
+      h+="<tr><td>"+esc(a.date||"-")+"</td><td>"+esc(a.client||"-")+"</td><td style='text-align:right'><b>"+fmtMoney(a.amount||0)+"</b></td><td>"+esc(its)+"</td><td>"+(mark.join(" ")||"-")+"</td></tr>";
+    });
+    h+="</table>";
+  }
+  // 3) 名下客户本月消费构成
+  var meId=(shareSess&&shareSess.cid)?shareSess.cid:((sess&&isAdmin())?"":"");
+  if(!meId&&isAdmin()&&sess&&sess.user&&sess.user.email){
+    var adm=DB.customers.find(function(c){return c.login_enabled&&c.account_email===sess.user.email;});
+    meId=adm?adm.id:"";
+  }
+  if(meId){
+    var ym0=curYm();
+    var lv1Ids=lv1IdsOf(meId);
+    h+='<div style="font-size:13px;font-weight:700;margin:14px 0 8px">👥 名下客户本月消费构成（'+ym0+'）</div>';
+    (DB.customers||[]).forEach(function(c){
+      if(!lv1Ids[c.id])return;
+      var spent=monthSpentOf(c.id,ym0);
+      var itemHtml="";
+      (DB.consumptions||[]).forEach(function(cc){
+        if(!cc)return;
+        var custId=cc.customer_id||cc.customerId||"";
+        if(custId===c.id&&(cc.date||"").indexOf(ym0)===0&&!cc.pkgBuy&&cc.kind!=="buy"){
+          itemHtml+='<div style="padding:2px 0">'+esc(cc.date)+" "+esc(cc.item||"消费")+" <b>"+fmtMoney(cc.amount||0)+"</b> <span class='tag tag-gray' style='font-size:10px'>台账</span></div>";
+        }
+      });
+      itemHtml+=appts.filter(function(a){return a.customer_id===c.id&&(a.date||"").indexOf(ym0)===0&&(a.status==="done"||(a.kind==="rent"&&a.status==="returned"));}).map(function(a){
+        var nm=a.serviceId?(function(){var s=serviceById(a.serviceId);return s?s.name:"项目";})():(a.serviceName||(a.items&&a.items[0]?(a.items[0].name||"套餐"):"预约"));
+        return '<div style="padding:2px 0">'+esc(a.date)+" "+esc(nm)+" <b>"+fmtMoney((+a.amount||0)+(+a.redeemValue||0))+"</b>"+(a.pkgBuyOnly?' <span class="tag tag-blue" style="font-size:10px">套餐</span>':"")+(a.kind==="direct"?' <span class="tag tag-gray" style="font-size:10px">直购</span>':"")+"</div>";
+      }).join("");
+      h+='<div style="background:var(--bg-1);border-radius:8px;padding:8px 10px;margin-bottom:8px"><b>'+esc(c.name)+'</b>（本月 <b style="color:#16a34a">'+fmtMoney(spent)+"</b>）"+(itemHtml?itemHtml:"<div style='color:var(--text-3)'>本月无已成交消费</div>")+"</div>";
+    });
+  }else{
+    h+="<p class='hint'>未识别当前股东身份（请以股东账号登录共享板块查看）。</p>";
+  }
+  $("diagBody").innerHTML=h;
+  $("diagMask").classList.add("show");
+}
+
+/* 云端核查：读取云端预约数据，对比本地，标出残留直购单并可一键清理。
+   股东模式用 load_share_data RPC（手机号+密码）只读核查；管理员模式全量核查+可清理 */
+var diagCloudOrphans=[];
+function openCloudDiag(){
+  if(!cloudMode){toast("未开启云同步，请先配置云端","err");return;}
+  $("diagBody").innerHTML='<p class="hint">正在读取云端数据…</p>';
+  $("diagMask").classList.add("show");
+  var task=null;
+  if(shareSess&&shareSess.phone&&shareSess.pwdHash){
+    task=fetchShareData(shareSess.phone,shareSess.pwdHash).then(function(d){return (d&&d.appointments)||[];});
+  }else{
+    task=cloudSelect("appointments");
+  }
+  task.then(function(rows){
+    var localIds={};
+    (DB.appointments||[]).forEach(function(a){if(a&&a.id)localIds[a.id]=1;});
+    var h='<div style="font-size:13px;font-weight:700;margin:4px 0 8px">☁️ 云端预约数据（共 '+(rows||[]).length+' 条，与本地对比）</div>';
+    h+='<div style="background:var(--bg-1);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:10px;font-size:12px;line-height:1.9">'+
+       '绿色「本地已有」=正常同步数据；红色「本地已无·残留」=你本地已删除/未同步回来的云端旧数据。'+
+       (shareSess?'<br><b>当前为股东身份：只能查看，清理残留请退出后用管理员账号登录再操作。</b>':'（若残留为直购单可直接清理；若为普通预约，可能是其他设备创建的新预约，请先确认再处理）')+'</div>';
+    if(!rows||!rows.length){h+='<p class="hint">云端无预约数据</p>';}
+    else{
+      h+='<table style="font-size:12px"><tr><th>日期</th><th>客户</th><th style="text-align:right">金额</th><th>套餐/项目</th><th>类型</th><th>状态</th></tr>';
+      diagCloudOrphans=[];
+      rows.forEach(function(r){
+        if(!r)return;
+        var rIts=normalizeItems(r.items)||[];
+        var its=rIts.map(function(i){return i.name||i.kind||i.serviceId||"";}).join("、")||(r.service_name||"-");
+        var isDirect=r.kind==="direct"||rIts.some(function(i){return i.kind==="pkg";});
+        var isLocal=!!localIds[r.id];
+        if(!isLocal&&isDirect)diagCloudOrphans.push(r.id);
+        h+="<tr><td>"+esc(r.date||"-")+"</td><td>"+esc(r.client||"-")+"</td><td style='text-align:right'><b>"+fmtMoney(r.amount||0)+"</b></td><td>"+esc(its)+"</td>"+
+          "<td>"+(isDirect?'<span class="tag tag-blue" style="font-size:10px">直购</span>':"")+"</td>"+
+          "<td>"+(isLocal?'<span class="tag tag-green" style="font-size:10px">本地已有</span>':'<span class="tag" style="font-size:10px;background:var(--danger);color:#fff">本地已无·残留</span>')+"</td></tr>";
+      });
+      h+="</table>";
+    }
+    h+='<div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+
+       (!shareSess&&diagCloudOrphans.length?'<button class="btn btn-danger btn-sm" type="button" onclick="cloudCleanOrphans()">🗑 清理 '+diagCloudOrphans.length+' 条云端直购残留</button>':'')+
+       (shareSess?'':'<span class="tag tag-green">'+(diagCloudOrphans.length?diagCloudOrphans.length+' 条直购残留待清理':'云端无直购残留')+'</span>')+
+       '<button class="btn btn-ghost btn-sm" type="button" onclick="openCloudDiag()">↻ 刷新</button></div>';
+    $("diagBody").innerHTML=h;
+  }).catch(function(e){
+    $("diagBody").innerHTML='<p class="hint">读取云端失败：'+(e&&e.message||e)+"</p>";
+  });
+}
+function cloudCleanOrphans(){
+  if(!diagCloudOrphans.length)return;
+  var ids=diagCloudOrphans.slice();
+  cloudDeleteRows("appointments",ids).then(function(){
+    toast("已清理云端 "+ids.length+" 条直购残留");
+    openCloudDiag();
+    renderAll();
+  }).catch(function(e){
+    toast("清理失败："+(e&&e.message||e),"err");
+  });
+}
+
+/* 数据自愈：直购套餐单自动补「套餐购买（预存款）」标记 + 重复套餐单去重，
+   避免被重复计入消费与佣金。判定：kind=direct 且未核销（无 commEarned）且（items 含套餐 或 无 serviceId）且有金额 → 套餐购买 */
+/* 清除预约里已删除成员（_DEL_/__DEL__ 墓碑 id）的残留引用，防止界面显示原始英文串 */
+function sweepGhostMemberIds(){
+  var fixed=0;
+  (DB.appointments||[]).forEach(function(a){
+    if(a&&a.memberId&&String(a.memberId).indexOf("_DEL_")>=0){a.memberId="";fixed++;}
+  });
+  return fixed;
+}
+function repairPkgFlags(){
+  var fixed=0;
+  (DB.appointments||[]).forEach(function(a){
+    if(a.kind==="direct"&&!a.pkgBuyOnly&&a.commEarned==null&&(+a.amount||0)>0&&
+       ((a.items||[]).some(function(i){return i.kind==="pkg";})||!a.serviceId)){
+      a.pkgBuyOnly=true;fixed++;
+    }
+  });
+  // 套餐核销单未收款：金额强制 0（核销价值在 redeemValue），避免旧数据把核销单金额计入消费
+  (DB.appointments||[]).forEach(function(a){
+    if((+a.redeemValue||0)>0&&a.status==="done"&&(+a.amount||0)>0){a.amount=0;fixed++;}
+  });
+  // 重复直购套餐单去重：同客户+同日+同套餐名+同金额只保留第一条（测试/重复录入产生的重复单）
+  var seen={};
+  var dupDel=[];
+  (DB.appointments||[]).forEach(function(a){
+    if(a.kind==="direct"&&a.pkgBuyOnly&&(+a.amount||0)>0&&a.commEarned==null){
+      var pkgKey=(a.items||[]).map(function(i){return i.name||i.pkgId||"";}).join(",")||a.serviceName||a.serviceId||"none";
+      var key=a.customer_id+"|"+a.date+"|"+pkgKey+"|"+a.amount;
+      if(seen[key])dupDel.push(a.id);
+      else seen[key]=1;
+    }
+  });
+  if(dupDel.length){
+    DB.appointments=DB.appointments.filter(function(a){return dupDel.indexOf(a.id)<0;});
+    fixed+=dupDel.length;
+  }
+  // 消费台账自愈：①直购购买记录补「套餐购买」标记（不再计入客户消费）；②同客户+同日+同金额+同项目的重复记录去重（保留第一条）；③无对应预约的台账记录若与预约重复则以预约为准删除
+  if(DB.consumptions){
+    var apptDoneIndex={};
+    (DB.appointments||[]).forEach(function(a){
+      if(!a)return;
+      if(a.status==="done"||(a.kind==="rent"&&a.status==="returned")){
+        var nm=a.serviceId?(function(){var s=serviceById(a.serviceId);return s?s.name:"项目";})():(a.serviceName||"");
+        var k=(a.customer_id||"")+"|"+(a.date||"")+"|"+(+a.amount||0)+"|"+nm;
+        if(apptDoneIndex[k]===undefined)apptDoneIndex[k]=a.id;
+      }
+    });
+    var cDup={};
+    var dupCons=[];
+    DB.consumptions.forEach(function(c){
+      if(!c)return;
+      var custId=c.customer_id||c.customerId||"";
+      var apptOf=c.apptId?(DB.appointments||[]).find(function(a){return a.id===c.apptId;}):null;
+      if(!c.pkgBuy&&(c.kind==="buy"||(apptOf&&apptOf.pkgBuyOnly))){c.pkgBuy=true;fixed++;}
+      if(!c.pkgBuy&&c.kind!=="buy"){
+        var k=custId+"|"+(c.date||"")+"|"+(+c.amount||0)+"|"+(c.item||"");
+        if(!apptOf&&apptDoneIndex[k]!==undefined){ // 手动台账无对应预约，但预约中已有同客户同日同金额同项目 → 以预约为准，删手动重复
+          dupCons.push(c.id);
+        }else if(!c.apptId&&cDup[k])dupCons.push(c.id); // 预约/出租台账带 apptId=真实结算（不同时间点/天数都要保留），仅无 apptId 的手动台账做重复去重
+        else if(!c.apptId)cDup[k]=1;
+      }
+    });
+    // buy 台账同单去重：同客户+同日+同金额+同项目保留 1 条（历史 apptid 上推丢失导致的重复台账）
+    var buyIdx={};
+    DB.consumptions.forEach(function(c){
+      if(!c||c.kind!=="buy")return;
+      var custId=c.customer_id||c.customerId||"";
+      var k=custId+"|"+(c.date||"")+"|"+(+c.amount||0)+"|"+(c.item||"");
+      if(buyIdx[k])dupCons.push(c.id);else buyIdx[k]=1;
+    });
+    if(dupCons.length){
+      DB.consumptions=DB.consumptions.filter(function(c){return dupCons.indexOf(c.id)<0;});
+      fixed+=dupCons.length;
+      // 云端同步删除重复/核销台账，避免下次拉回死循环
+      if(cloudMode&&sess&&typeof cloudDeleteRows==="function")cloudDeleteRows("consumptions",dupCons);
+    }
+  }
+  // 核销/混合台账金额修正：等于对应预约实收（纯套餐核销 0 元收款 → 台账金额归 0；旧数据曾按核销价值写）
+  (DB.consumptions||[]).forEach(function(c){
+    if(c&&c.apptId){
+      var ap2=(DB.appointments||[]).find(function(a){return a&&a.id===c.apptId;});
+      if(ap2&&(+ap2.redeemValue||0)>0){
+        var newAmt=Math.round((+ap2.amount||0)*100)/100;
+        if(Math.round((+c.amount||0)*100)!==newAmt){c.amount=newAmt;fixed++;}
+      }
+    }
+  });
+  // 孤儿卡清理：套餐卡对应的直购单（同客户+同日+同时刻）已不存在 → 卡一并取消（本地+云端），未核销预拿佣金随之清 0；退款卡保留统计记录
+  var oriCards=[];
+  (DB.packageBuys||[]).forEach(function(b){
+    if(b.refunded)return;
+    var has=(DB.appointments||[]).some(function(a){return a&&a.id&&a.kind==="direct"&&a.customer_id===b.customerId&&a.date===b.date&&a.time===b.time;});
+    if(!has)oriCards.push(b.id);
+  });
+  if(oriCards.length){
+    DB.packageBuys=(DB.packageBuys||[]).filter(function(b){return oriCards.indexOf(b.id)<0;});
+    fixed+=oriCards.length;
+    if(cloudMode&&sess&&typeof cloudDeleteRows==="function")cloudDeleteRows("packagebuys",oriCards);
+  }
+  if(fixed>0)saveDB();
+  return fixed;
+}
 function loadDB(){
   var raw=null;
   try{
@@ -3708,6 +4196,12 @@ function loadDB(){
     DB=raw;
     if(!DB.appointments)DB.appointments=[];
     if(!DB.customers)DB.customers=[];
+    if(!DB.packages)DB.packages=[];
+    if(!DB.packageBuys)DB.packageBuys=[];
+    // 数据自愈：直购套餐单（含套餐项目且未核销）自动补套餐购买标记，避免被误计入消费与佣金
+    (DB.appointments||[]).forEach(function(a){
+      if(a.kind==="direct"&&!a.pkgBuyOnly&&a.commEarned==null&&(a.items||[]).some(function(i){return i.kind==="pkg";}))a.pkgBuyOnly=true;
+    });
     DB.customers.forEach(function(c){
       if(c.type==null)c.type="normal";
       if(c.referrer==null)c.referrer="";
@@ -3717,6 +4211,7 @@ function loadDB(){
       if(c.wx==null)c.wx="";
       if(c.login_enabled==null)c.login_enabled=false;
       if(c.login_pwd==null)c.login_pwd="";
+      if(c.login_pwd_plain==null)c.login_pwd_plain="";
     });
     DB.services.forEach(function(s){
       if(s.price==null)s.price=0;
@@ -3730,11 +4225,17 @@ function loadDB(){
       if(!a.kind)a.kind="appt";
       if(a.customer_id==null)a.customer_id="";
     });
-    if(!DB.withdrawals)DB.withdrawals=[];
+if(!DB.withdrawals)DB.withdrawals=[];
     if(!DB.consumptions)DB.consumptions=[];
+    migrateShortIds();
+    // 清理历史残留的已删除成员墓碑（__DEL__ 开头）与预约里的墓碑成员引用
+    DB.members=(DB.members||[]).filter(function(m){return String(m.name||"").indexOf("__DEL__")!==0;});
+    sweepGhostMemberIds();
+    repairPkgFlags(); // 自愈直购套餐单标记
     return;
   }
   DB=defaultData();
+  migrateShortIds();
 }
 function saveDB(opts){
   opts=opts||{};
@@ -3794,6 +4295,7 @@ function renderAll(){
   renderCustomers();
   renderMembers();
   renderServices();
+  renderPackages();
   renderDataPage();
   renderReports();
   renderBuy();
@@ -3827,20 +4329,19 @@ function renderNav(){
   $("ngCash").classList.toggle("hidden",locked||shareMode);
   document.querySelectorAll("[data-admin]").forEach(function(el){el.style.display=(locked||shareMode)?"none":"";});
   if(shareMode)currentView="share";
-  else if(locked&&["customers","members","config","data","report","buy","consumption"].indexOf(currentView)>=0)currentView="dashboard";
-  var titles={dashboard:"工作台",calendar:"预约日历",list:"预约列表",buy:"直接购买",consumption:"总消费记录",customers:"客户档案",members:"成员档案",config:"项目与时段",data:"备份与恢复",report:"统计报表",share:"我的共享板块"};
+  else if(locked&&["customers","members","config","data","report","buy"].indexOf(currentView)>=0)currentView="dashboard";
+  var titles={dashboard:"工作台",calendar:"预约日历",list:"预约列表",buy:"直接购买",customers:"客户档案",members:"成员档案",config:"项目与时段",data:"备份与恢复",report:"统计报表",share:"我的共享板块"};
   $("pageTitle").textContent=titles[currentView]||"";
-  ["dashboard","calendar","list","buy","consumption","customers","members","config","data","report","share"].forEach(function(v){
+  ["dashboard","calendar","list","buy","customers","members","config","data","report","share"].forEach(function(v){
     $("page-"+v).classList.toggle("active",v===currentView);
   });
   if(currentView==="share")renderShareBoard();
   if(currentView==="report")renderReports();
   if(currentView==="config")renderSchedule();
-  if(currentView==="consumption")renderConsumption();
 }
 function switchView(v){
   if(shareSess&&v!=="share"){toast("共享股东仅可查看自己的共享板块","err");return;}
-  if(!isAdmin()&&["customers","members","config","data","report","buy","consumption"].indexOf(v)>=0){toast("普通用户仅可查看与新建预约","err");return;}
+  if(!isAdmin()&&["customers","members","config","data","report","buy"].indexOf(v)>=0){toast("普通用户仅可查看与新建预约","err");return;}
   currentView=v;
   renderNav();
 }
@@ -3987,7 +4488,7 @@ function viewShareholderDetail(cid){
     html+='</table>';
   }
   // 4) 本人预约记录
-  var selfApps=DB.appointments.filter(function(a){return a.customer_id===c.id&&a.status!=="cancelled";});
+  var selfApps=DB.appointments.filter(function(a){return a.customer_id===c.id&&a.status!=="cancelled"&&a.kind!=="direct";});
   if(selfApps.length){
     html+='<div style="margin-top:16px;font-size:14px;font-weight:700;color:var(--text-1);margin-bottom:8px">本人预约记录（'+selfApps.length+' 条）</div>'+
       '<table><tr><th>日期</th><th>时间</th><th>项目</th><th>状态</th><th style="text-align:right">金额</th></tr>';
@@ -4004,63 +4505,24 @@ function viewShareholderDetail(cid){
   showModal("shareholderDetailMask");
 }
 
-/* 股东端：查看名下客户消费详情 */
+/* 统一入口：打开客户消费管理中心 */
 function viewCustomerDetailForShare(cid){
-  var c=customerById(cid);
-  if(!c){toast("未找到该客户","err");return;}
-  $("customerDetailForShareTitle").textContent=esc(c.name)+" 客户详情";
-  var ref=c.referrer?customerById(c.referrer):null;
-  var apps=DB.appointments.filter(function(a){return a.customer_id===c.id&&a.status!=="cancelled";}).sort(function(x,y){return x.date<y.date?-1:1;});
-  var totalSpent=apps.reduce(function(s,a){return s+(((a.status==="done"||(a.kind==="rent"&&a.status==="returned"))?(+a.amount||0):0));},0);
-  // 预约项目聚合
-  var proj={};
-  apps.forEach(function(a){
-    var sv=a.serviceId?serviceById(a.serviceId):null;
-    var nm=sv?sv.name:(a.serviceName||(a.kind==="rent"?"苗衣出租":"未指定项目"));
-    proj[nm]=(proj[nm]||0)+1;
-  });
-  var projHtml=Object.keys(proj).map(function(k){return esc(k)+" "+proj[k]+" 次";}).join("、")||'<span class="hint">-</span>';
-  // 二级客户统计
-  var lv1IdsC={};(DB.customers||[]).forEach(function(y){if(y.referrer===c.id)lv1IdsC[y.id]=1;});
-  var lv2Cnt=(DB.customers||[]).filter(function(x){return x.referrer&&lv1IdsC[x.referrer];}).length;
-  var html='<div style="margin-bottom:16px">'+
-    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">'+
-    '<span class="avatar" style="background:'+esc(c.color||"#6b7280")+';width:40px;height:40px;font-size:16px">'+esc((c.name||"?")[0])+'</span>'+
-    '<div><div style="font-size:16px;font-weight:700">'+esc(c.name)+(c.type==="shareholder"?' <span class="tag tag-warn">共享股东</span>':' <span class="tag tag-blue">客户</span>')+'</div>'+
-    '<div class="hint">电话：'+(esc(c.phone)||"-")+(ref?"　归属："+esc(ref.name):"")+'</div></div></div>'+
-    '<div style="display:flex;gap:12px;flex-wrap:wrap">'+
-    '<div style="flex:1;min-width:100px;background:var(--bg-1);border-radius:10px;padding:12px;text-align:center">'+
-    '<div style="font-size:22px;font-weight:800;color:var(--primary)">'+apps.length+'</div><div class="hint">预约次数</div></div>'+
-    '<div style="flex:1;min-width:100px;background:var(--bg-1);border-radius:10px;padding:12px;text-align:center">'+
-    '<div style="font-size:22px;font-weight:800;color:#16a34a">'+fmtMoney(totalSpent)+'</div><div class="hint">已消费</div></div>'+
-    '<div style="flex:1;min-width:100px;background:var(--bg-1);border-radius:10px;padding:12px;text-align:center">'+
-    '<div style="font-size:22px;font-weight:800;color:var(--primary)">'+lv2Cnt+'</div><div class="hint">二级客户</div></div>'+
-    (c.type==="shareholder"?'<div style="flex:1;min-width:100px;background:var(--bg-1);border-radius:10px;padding:12px;text-align:center">'+
-    '<div style="font-size:22px;font-weight:800;color:#d97706">'+fmtMoney(commissionTotal(c.id))+'</div><div class="hint">已拿佣金</div></div>':'')+
-    '</div>'+
-    '<div class="hint" style="margin-top:8px">📋 预约项目：'+projHtml+'</div></div>';
-  if(!apps.length){
-    html+='<div class="empty"><div class="big">📅</div><h3>暂无预约记录</h3></div>';
-  }else{
-    html+='<table><tr><th>日期</th><th>时间</th><th>项目</th><th>状态</th><th style="text-align:right">金额</th></tr>';
-    apps.forEach(function(a){
-      var sv=a.serviceId?serviceById(a.serviceId):null;
-      var stm=statusMap[a.status]||["未知","tag-gray"];
-      var payTag=((a.status==="done"||(a.kind==="rent"&&a.status==="returned"))&&(+a.amount||0)>0)?' <span class="tag tag-green">已收款</span>':"";
-      html+='<tr><td>'+a.date+'</td><td>'+esc(a.time)+'</td><td>'+esc(sv?sv.name:(a.kind==="rent"?"苗衣出租":"预约"))+'</td>'+
-        '<td><span class="tag '+stm[1]+'">'+stm[0]+'</span></td>'+
-        '<td style="text-align:right"><b>'+fmtMoney(a.amount||0)+'</b>'+payTag+'</td></tr>';
-    });
-    html+='</table>';
-  }
-  $("customerDetailForShareBody").innerHTML=html;
-  showModal("customerDetailForShareMask");
+  openCustomerConsumptionManager(cid);
 }
 
 function renderShareBoard(){
   if(!shareSess)return;
   var me=customerById(shareSess.cid);
   if(!me){$("shareInfo").innerHTML='<div class="hint">未找到您的客户档案，请联系管理员。</div>';return;}
+  if(String(me.name||"").indexOf("__DEL__")===0){
+    // 档案已被删除（软删除墓碑）：提示并引导退出重新登录，避免显示乱码
+    $("shareInfo").innerHTML='<div class="hint">您的股东账号已被删除或停用，请联系门店管理员确认；或点击左下角「退出」后重新登录有效账号。</div>';
+    $("shareSelfCnt").textContent="共 0 条";
+    $("shareSelf").innerHTML="";
+    $("shareLv1").innerHTML="";
+    $("shareLv2").innerHTML="";
+    return;
+  }
   var ym=genShareYm();
   // 1) 个人信息卡 + 佣金提现三数
   var ref=me.referrer?customerById(me.referrer):null;
@@ -4073,9 +4535,31 @@ function renderShareBoard(){
     '<div style="flex:1;min-width:120px;background:var(--bg-1);border-radius:10px;padding:12px 14px;text-align:center"><div style="font-size:26px;font-weight:800;color:var(--text-1);line-height:1.2">'+fmtMoney(cs.withdrawn)+'</div><div class="hint" style="margin-top:4px">已提现</div></div>'+
     '<div style="flex:1;min-width:120px;background:var(--bg-1);border-radius:10px;padding:12px 14px;text-align:center"><div style="font-size:26px;font-weight:800;color:#16a34a;line-height:1.2">'+fmtMoney(cs.pending)+'</div><div class="hint" style="margin-top:4px">待提现</div></div>'+
     '</div>'+
+    '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:12px;background:linear-gradient(135deg,#fff7ed,#ffedd5);border:1px solid #fed7aa;border-radius:10px;padding:10px 14px">'+
+    '<div style="font-size:22px;line-height:1">🎫</div>'+
+    '<div style="flex:1;min-width:180px"><div style="font-size:12px;font-weight:700;color:#b45309">可预拿佣金</div><div style="font-size:22px;font-weight:800;color:#d97706;line-height:1.2">'+fmtMoney(pkgPendingCommOf(me.id))+'</div><div class="hint" style="margin-top:2px">名下套餐卡未核销佣金，核销一次到账一次</div></div>'+
+    '</div>'+
     '<div class="hint" style="margin-top:8px">提现需联系门店管理员线下办理，您本人不可自行提现。</div>';
-  // 2) 我预约的项目（本人作为客户的记录，管理员/他人可代登记；含苗衣出租）
-  var selfApps=DB.appointments.filter(function(a){return a.customer_id===me.id&&a.status!=="cancelled";})
+  // 3) 我购买的套餐（套餐卡与剩余次数；已退款不显示）
+  var myPkgs=(DB.packageBuys||[]).filter(function(b){return b.customerId===me.id&&!b.refunded;});
+  var pkgBox2=$("shareMyPkgs");
+  if(pkgBox2){
+    if(!myPkgs.length){
+      pkgBox2.innerHTML='<div class="empty"><div class="big">🎫</div><h3>暂无套餐卡</h3><p>您购买的套餐卡会显示在这里，可到店直接核销使用（用一次扣一次）。</p></div>';
+    }else{
+      pkgBox2.innerHTML='<table><tr><th>套餐</th><th>购于</th><th>剩余</th></tr>'+
+        myPkgs.map(function(b){
+          var arr=[];
+          for(var k in b.remaining){var svp=serviceById(k);if(b.remaining[k]>0)arr.push((svp?svp.name:"?")+"×"+b.remaining[k]+(svp&&svp.isRent?"天":"次"));}
+          var rem=arr.join("、")||"已用完";
+          return '<tr><td><b style="color:var(--primary)">🎫 '+esc(b.name)+'</b></td>'+
+            '<td>'+esc(b.date)+'</td>'+
+            '<td>'+(rem==="已用完"?'<span class="tag tag-gray" style="font-size:11px">已用完</span>':'<span class="tag tag-blue" style="font-size:11px">剩余 '+esc(rem)+'</span>')+'</td></tr>';
+        }).join("")+'</table>';
+    }
+  }
+  // 4) 我预约的项目（本人作为客户的记录，管理员/他人可代登记；含苗衣出租）
+  var selfApps=DB.appointments.filter(function(a){return a.customer_id===me.id&&a.status!=="cancelled"&&a.kind!=="direct";})
     .sort(function(x,y){return x.date<y.date?-1:1;});
   if($("shareSelfCnt"))$("shareSelfCnt").textContent="共 "+selfApps.length+" 条";
   if(!selfApps.length){
@@ -4096,31 +4580,39 @@ function renderShareBoard(){
   }
   // 3) 我的佣金等级（仅显示比例数字）
   var com=commissionOf(me.id,ym);
+  // 本人历史累计消费 & 距第二级（40%）缺口：本人累计消费满 3000 元升级 40%
+  var selfSpend=com?com.selfSpend:0;
+  var nextTier=com&&com.ratio>=0.4;
   $("shareCommission").innerHTML=
     '<div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">'+
     '<div style="text-align:center"><div style="font-size:46px;font-weight:800;color:var(--primary);line-height:1.1">'+(com?Math.round(com.ratio*100):0)+'%</div><div class="hint">当前佣金比例</div></div>'+
     '<div style="flex:1;min-width:240px;font-size:12px;color:var(--text-2);line-height:2">'+
+    (nextTier
+      ? '<div style="background:var(--bg-1);border-radius:8px;padding:8px 10px;margin-bottom:8px">✔ 您当前已达 <b>40% 及以上</b>佣金档，个人累计消费 <b style="color:#16a34a">'+fmtMoney(selfSpend)+'</b></div>'
+      : '<div style="background:var(--bg-1);border-radius:8px;padding:8px 10px;margin-bottom:8px">💰 个人累计消费：<b style="color:var(--primary)">'+fmtMoney(selfSpend)+'</b>，距第二级（40%）佣金还差 <b style="color:var(--danger)">'+fmtMoney(Math.max(0,3000-selfSpend))+'</b>（本人累计消费满 3000 元升级）</div>')+
     "取两种方式中较高的档位：<b>① 当月流水：</b>低于 3000 元 30% / 3000-6000 元 40% / 满 6000 元 50%；<b>② 本人历史累计消费：</b>满 3000 元 40% / 满 6000 元 50%。<br>佣金仅作查看与核对，打款结算请与门店管理员线下确认。</div></div>";
   // 4) 名下客户预约与消费（原「快捷操作」模块已移除；支持搜索过滤）
   var ym0=curYm(); // 当前年月：名下客户消费与业绩卡片均按本月统计，次月自动清零
   var lv1Ids=lv1IdsOf(me.id);
   var lv1List=(DB.customers||[]).filter(function(c){return lv1Ids[c.id];});
-  if($("shareLv1Q")){
-    var q=($("shareLv1Q").value||"").trim().toLowerCase();
-    if(q)lv1List=lv1List.filter(function(c){return (c.name+" "+c.phone+" "+(c.note||"")).toLowerCase().indexOf(q)>=0;});
-  }
+  var shareQVal=$("shareLv1Q")?($("shareLv1Q").value||""):"";
+  var q=shareQVal.trim().toLowerCase();
+  if(q)lv1List=lv1List.filter(function(c){return (c.name+" "+c.phone+" "+(c.note||"")).toLowerCase().indexOf(q)>=0;});
   var lv1Html="";
   if(!lv1List.length){
-    lv1Html=($("shareLv1Q")&&($("shareLv1Q").value||"").trim())
+    lv1Html=q
       ?'<div class="empty"><div class="big">🔍</div><h3>没有匹配的客户</h3><p>换一个关键词试试（姓名 / 电话 / 备注）。</p></div>'
       :'<div class="empty"><div class="big">👤</div><h3>名下暂无客户</h3><p>客户建档时选择您作为介绍人后，这里会展示他们的预约与消费。</p></div>';
   }
   else{
-    lv1Html="<table><tr><th style=\"text-align:left\">客户</th><th style=\"text-align:right\">操作</th></tr>";
+    // 搜索框位于「客户」表头文字后面，随列表重建；输入值渲染后恢复
+    lv1Html="<table><tr><th style=\"text-align:left\"><span style=\"display:inline-flex;align-items:center;gap:8px\">客户 <input id=\"shareLv1Q\" class=\"input\" style=\"width:150px;height:26px\" placeholder=\"🔍 搜索客户…\" oninput=\"renderShareBoard()\"></span></th><th style=\"text-align:right\">本月消费</th><th style=\"text-align:right\">操作</th></tr>";
     lv1List.forEach(function(c){
       var tag=c.type==="shareholder"?'<span class="tag tag-warn">共享股东</span>':'<span class="tag tag-blue">普通客户</span>';
+      var mSpent=monthSpentOf(c.id,ym0);
       lv1Html+='<tr><td><div class="member-cell"><span class="avatar" style="background:'+esc(c.color||"#6b7280")+'">'+esc((c.name||"?")[0])+"</span>"+
         '<div class="info"><div class="name" style="cursor:pointer;color:var(--primary);text-decoration:underline" onclick="viewCustomerDetailForShare(\''+c.id+'\')" title="点击查看该客户全部消费详情">'+esc(c.name)+" "+tag+'</div><div class="role">'+esc(c.phone||"-")+"</div></div></div></td>"+
+        '<td style="text-align:right"><b style="color:'+(mSpent>0?"#16a34a":"var(--text-2)")+'">'+fmtMoney(mSpent)+"</b></td>"+
         '<td style="text-align:right"><button class="btn btn-primary btn-xs" type="button" onclick="openShareBook(\''+c.id+'\')">＋ 为其预约</button></td></tr>';
     });
     lv1Html+="</table>";
@@ -4131,11 +4623,8 @@ function renderShareBoard(){
   (DB.customers||[]).forEach(function(c){if(allLv1[c.id])mTotal+=monthSpentOf(c.id,ym0);});
   mTotal=Math.round(mTotal*100)/100;
   $("shareLv1MonthTotal").textContent=fmtMoney(mTotal);
-  var monthCard='<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid var(--border);background:var(--bg-1)">'
-    +'<div style="font-size:13px;color:var(--text-2)">📅 本月（'+ym0+'）名下客户业绩</div>'
-    +'<div style="font-size:22px;font-weight:800;color:#16a34a">'+fmtMoney(mTotal)+'</div>'
-    +'<div class="hint">仅统计本月消费，次月自动清零重新累计；点击客户姓名可查看消费详情</div></div>';
-  $("shareLv1").innerHTML=monthCard+lv1Html;
+  $("shareLv1").innerHTML=lv1Html;
+  if($("shareLv1Q"))$("shareLv1Q").value=shareQVal;
   // 6) 下级客户：已成交预约（状态=完成 或 出租已归还）——先逐条明细，再按服务项目分类汇总
   var lv2=lv2CustomersOf(me.id);
   var lv2Html="";
@@ -4144,6 +4633,7 @@ function renderShareBoard(){
     // 已成交预约（仅统计口径内：普通预约=已完成，出租=已归还）
     var doneApps=DB.appointments.filter(function(a){
       if(a.status==="cancelled")return false;
+      if(a.kind==="direct")return false; // 直接购买不计入预约次数
       var done=(a.status==="done")||(a.kind==="rent"&&a.status==="returned");
       if(!done)return false;
       return lv2.some(function(c){return c.id===a.customer_id;});
@@ -4151,12 +4641,14 @@ function renderShareBoard(){
     if(!doneApps.length){lv2Html='<div class="hint">下级客户暂无已成交预约（预约「已完成」或出租「已归还」会计入统计）。</div>';}
     else{
       var order=["苗衣出租","面部清洁","面部修复","胯部塑形","其他"];
-      // —— 明细：客户 × 项目，次数聚合 ——
-      var det={}; // key=cid|base -> {cust, base, free, paid}
-      var grp={}; // 基础名 -> {free:N, paid:N}
-      function lump(baseName,isFree){
-        var g=grp[baseName]||{free:0,paid:0};
+      // —— 明细：客户 × 项目，次数聚合（苗衣出租按天累计：天数/次数） ——
+      var det={}; // key=cid|base -> {cust, base, free, paid, days, redeem}
+      var grp={}; // 基础名 -> {free:N, paid:N, days:N, redeem:N}
+      function lump(baseName,isFree,addDays,isRedeem){
+        var g=grp[baseName]||{free:0,paid:0,days:0,redeem:0};
         if(isFree)g.free++;else g.paid++;
+        g.days+=(+addDays||0);
+        if(isRedeem)g.redeem++;
         grp[baseName]=g;
       }
       doneApps.forEach(function(a){
@@ -4165,10 +4657,14 @@ function renderShareBoard(){
         var name=sv?sv.name:(a.serviceName||(a.kind==="rent"?"苗衣出租":"未指定项目"));
         var base=String(name).replace(/免费$/,""); // 面部清洁免费 → 面部清洁
         var isFree=(sv&&(+sv.price||0)===0)||(!sv&&String(name).indexOf("免费")>=0);
-        lump(base,isFree);
+        var addDays=a.kind==="rent"?(+a.rentDays||0):1; // 出租按结算天数累计，其余按 1 次
+        var isRedeem=(+a.redeemValue||0)>0; // 套餐卡核销标记
+        lump(base,isFree,addDays,isRedeem);
         var key=(a.customer_id||"")+"|"+base;
-        var d=det[key]||{cust:cust?cust.name:a.client,base:base,free:0,paid:0};
+        var d=det[key]||{cust:cust?cust.name:a.client,base:base,free:0,paid:0,days:0,redeem:0};
         if(isFree)d.free++;else d.paid++;
+        d.days+=addDays;
+        if(isRedeem)d.redeem++;
         det[key]=d;
       });
       var detKeys=Object.keys(det);
@@ -4178,15 +4674,17 @@ function renderShareBoard(){
         var ai=order.indexOf(a.base),bi=order.indexOf(b.base);
         return (ai<0?99:ai)-(bi<0?99:bi);
       });
-      var dh="<table><tr><th>下级客户</th><th>预约项目</th><th style=\"text-align:center\">次数</th></tr>";
+      var dh="<table><tr><th>下级客户</th><th>预约项目</th><th style=\"text-align:center\">次数（苗衣出租按天）</th></tr>";
       detKeys.forEach(function(k){
         var d=det[k],n=d.free+d.paid;
         var tag;
         if(d.free>0&&d.paid>0)tag='<span class="tag tag-blue">免费 '+d.free+'</span> <span class="tag tag-green">收费 '+d.paid+'</span>';
         else if(d.free>0)tag='<span class="tag tag-blue">免费 '+d.free+'</span>';
         else tag='<span class="tag tag-green">收费 '+d.paid+'</span>';
+        var cntTxt=(d.base==="苗衣出租"?(d.days+" 天 / ")+n+" 次":n+" 次");
+        var rdTag=d.redeem>0?' <span class="tag tag-warn">套餐核销 '+d.redeem+'</span>':"";
         dh+="<tr><td>"+esc(d.cust)+"</td><td>"+esc(d.base)+"</td>"+
-          '<td style="text-align:center"><b>'+n+" 次</b> "+tag+"</td></tr>";
+          '<td style="text-align:center"><b>'+cntTxt+"</b> "+tag+rdTag+"</td></tr>";
       });
       dh+="</table>";
       // —— 汇总：按服务项目 ——
@@ -4196,15 +4694,17 @@ function renderShareBoard(){
         if(xi<0)xi=99;if(yi<0)yi=99;
         return xi-yi;
       });
-      var sh="<table><tr><th>服务项目</th><th style=\"text-align:center\">次数</th><th style=\"text-align:right\">明细</th></tr>";
+      var sh="<table><tr><th>服务项目</th><th style=\"text-align:center\">次数（苗衣出租按天）</th><th style=\"text-align:right\">明细</th></tr>";
       baseNames.forEach(function(b){
         var g=grp[b],total=g.free+g.paid;
         var detail;
         if(g.free>0&&g.paid>0)detail='<span class="tag tag-blue">免费 '+g.free+'</span> <span class="tag tag-green">收费 '+g.paid+'</span>';
         else if(g.free>0)detail='<span class="tag tag-blue">免费 '+g.free+'</span>';
         else detail='<span class="tag tag-green">收费 '+g.paid+'</span>';
+        var cntTxt=(b==="苗衣出租"?(g.days+" 天 / ")+total+" 次":total+" 次");
+        var rdTag=g.redeem>0?' <span class="tag tag-warn">套餐核销 '+g.redeem+'</span>':"";
         sh+="<tr><td>"+esc(b)+"</td>"+
-          '<td style="text-align:center"><b>'+total+" 次</b></td>"+
+          '<td style="text-align:center"><b>'+cntTxt+"</b>"+rdTag+"</td>"+
           '<td style="text-align:right">'+detail+"</td></tr>";
       });
       sh+='<tr><td colspan="3" style="font-size:12px;color:var(--text-3);padding:8px 14px">统计范围：全部下级客户的已成交预约（普通预约=已完成，出租=已归还）。</td></tr>';
@@ -4268,41 +4768,97 @@ function switchLoginTab(t){
   $("loginTitle").textContent=t==="share"?"共享股东登录":"管理员 / 云端账号登录";
   $("lgErr").style.display="none";$("lgShareErr").style.display="none";
 }
+/* 拉取共享股东云端数据（登录与定时刷新共用）：优先 RPC load_share_data，缺失时 REST 直查回退 */
+function fetchShareData(mob,hp){
+  return sFetch("/rest/v1/rpc/load_share_data",{method:"POST",body:{phone_input:mob,pwd_hash:hp}}).then(function(r){
+    // RPC 返回的 me 是已删除墓碑账号时视为无效，继续走 REST 兜底（防旧版 SQL 命中墓碑）
+    if(r&&r.ok&&r.json&&r.json.me&&String(r.json.me.name||"").indexOf("__DEL__")!==0){
+      // RPC 成功后再补拉套餐定义与套餐卡（云端表 packagebuys 小写），保证股东能看到自己购买的套餐卡
+      return sFetch("/rest/v1/packages?select=*").then(function(rp){
+        return sFetch("/rest/v1/packagebuys?select=*").then(function(rb){
+          var d=r.json;
+          d.packages=(rp.ok&&rp.json)?rp.json:[];
+          d.packageBuys=(rb.ok&&rb.json)?rb.json:[];
+          return d;
+        });
+      });
+    }
+    // RPC 不存在（未建函数）或返回墓碑 → REST 直查 customers 表验证：login_enabled 且 login_pwd 匹配（排除已删除墓碑记录）
+    return sFetch("/rest/v1/customers?select=id,name,phone,type,login_enabled,login_pwd&phone=eq."+encodeURIComponent(mob)+"&limit=10").then(function(r2){
+      if(!r2.ok)throw new Error(errMsg(r2)||"云端验证失败");
+      var rows=r2.json||[];
+      var me=rows.find(function(x){return x.login_enabled&&x.login_pwd===hp&&String(x.name||"").indexOf("__DEL__")!==0;});
+      if(!me)throw new Error("账号或密码错误，或该账号未开通登录权限（请联系门店管理员在客户档案中开通）");
+      // 与 load_share_data 返回结构相同的全量共享数据
+      return Promise.all([
+        sFetch("/rest/v1/members?select=*"),
+        sFetch("/rest/v1/services?select=*"),
+        sFetch("/rest/v1/appointments?select=*"),
+        sFetch("/rest/v1/customers?select=*"),
+        sFetch("/rest/v1/schedule?select=*&limit=1"),
+        sFetch("/rest/v1/packages?select=*"),
+        sFetch("/rest/v1/packagebuys?select=*")
+      ]).then(function(rs){
+        rs.forEach(function(x){if(!x.ok)throw new Error(errMsg(x)||"读取共享数据失败");});
+        return {me:me,members:rs[0].json,services:rs[1].json,appointments:rs[2].json,customers:rs[3].json,schedule:rs[4].json,packages:rs[5].json,packageBuys:rs[6].json};
+      });
+    });
+  });
+}
+var shareSyncBusy=false;
+/* 共享股东增量同步：拉取云端最新数据并合并到本地（定时器 / 联网恢复 / 切回页面 / 手动刷新共用） */
+function sharePull(manual){
+  if(!cloudMode||!shareSess)return Promise.resolve(false);
+  if(!navigator.onLine){if(manual)toast("网络已断开，无法刷新","err");return Promise.resolve(false);}
+  var mob=shareSess.phone||"",hp=shareSess.pwdHash||"";
+  if(!mob||!hp)return Promise.resolve(false);
+  if(shareSyncBusy)return Promise.resolve(false);
+  shareSyncBusy=true;
+  if(manual)toast("正在刷新云端数据…","ok");
+  return fetchShareData(mob,hp).then(function(d){
+    applyShareCloudData(d);
+    cloudConnected=true;updateCloudUI();
+    if(manual)toast("已刷新：共享数据已更新","ok");
+    return true;
+  }).catch(function(e){
+    cloudConnected=false;updateCloudUI();
+    if(manual)toast("刷新失败："+((e&&e.message)||"请检查网络或云端配置"),"err");
+    return false;
+  }).then(function(r){shareSyncBusy=false;return r;});
+}
 function shareLogin(){
   var mob=($("lgShareMob").value||"").trim(),pwd=$("lgSharePwd").value||"";
   var err=$("lgShareErr");
   if(!mob||!pwd){err.textContent="请输入手机号和密码";err.style.display="";return;}
   var hp=hashPwd(pwd);
-  // 本地验证函数：优先查本地 DB（离线/在线均先尝试本地，减少网络依赖）
-  function tryLocal(){return (DB.customers||[]).find(function(x){return x.type==="shareholder"&&x.login_enabled&&x.phone===mob&&x.login_pwd===hp;});}
+  // 本地验证函数：优先查本地 DB（离线/在线均先尝试本地）；排除已删除（__DEL__ 墓碑）的记录
+  function tryLocal(){return (DB.customers||[]).find(function(x){return x.type==="shareholder"&&x.login_enabled&&x.phone===mob&&x.login_pwd===hp&&String(x.name||"").indexOf("__DEL__")!==0;});}
   // 离线模式：直接本地验证，不请求云端
   if(!navigator.onLine){
     var lc=tryLocal();
     if(lc){doShareEnter(lc);}else{err.textContent="当前处于离线模式，本机无该股东数据。请联网后由管理员同步一次，或检查账号密码。";err.style.display="";}
     return;
   }
-  // 云端模式且在线：优先走云端验证（SECURITY DEFINER RPC，无需管理员先登录）
+// 云端模式且在线：先走云端验证，失败再回退本地
   if(cloudCfg&&cloudCfg.url&&cloudCfg.anonKey){
     err.textContent="正在验证…";err.style.display="";
-    sFetch("/rest/v1/rpc/load_share_data",{method:"POST",body:{phone_input:mob,pwd_hash:hp}}).then(function(r){
-      if(r&&r.ok&&r.json&&r.json.me){
-        var m=r.json.me;
-        var c={id:m.id,name:m.name||mob,phone:mob,type:"shareholder",login_enabled:true,login_pwd:hp};
-        applyShareCloudData(r.json);
-        doShareEnter(c);
-      }else{
-        // 云端验证失败时回退到本地
-        var lc=tryLocal();
-        if(lc){doShareEnter(lc);}else{err.textContent="账号或密码错误，或该账号未开通登录权限（请联系门店管理员在客户档案中开通）";err.style.display="";}
-      }
+    fetchShareData(mob,hp).then(function(d){
+      var m=d.me;
+      var c={id:m.id,name:m.name||mob,phone:mob,type:"shareholder",login_enabled:true,login_pwd:hp};
+      applyShareCloudData(d);
+      doShareEnter(c,hp);
     }).catch(function(e){
-      // 网络异常时回退到本地
+      // 云端验证彻底失败时回退到本地（本机若已有该股东数据仍可登录）
       var lc=tryLocal();
-      if(lc){doShareEnter(lc);}else{err.textContent="网络异常，无法连接云端。本机无该股东数据，请检查网络或联系管理员。";err.style.display="";}
+      if(lc){doShareEnter(lc);}else{err.textContent=(e&&e.message)||"云端验证失败，请检查网络后重试";err.style.display="";}
     });
     return;
   }
-  // 本地模式（无云端配置）
+  // 在线但未配置云端（新设备）：引导先扫码/手动配置再登录
+  if(!cloudCfg||!cloudCfg.url||!cloudCfg.anonKey){
+    err.textContent="未配置云端：新设备请先让管理员生成配置二维码扫码（或手动填入云端地址与密钥），再登录";err.style.display="";return;
+  }
+  // 本地模式（无云端配置，但本机已有该股东数据）
   var c=tryLocal();
   if(!c){err.textContent="账号或密码错误，或该账号未开通登录权限（请联系门店管理员在客户档案中开通）";err.style.display="";return;}
   doShareEnter(c);
@@ -4310,7 +4866,7 @@ function shareLogin(){
 // 股东云端登录后：把 load_share_data RPC 返回的可见数据灌入本地 DB（与 cloudPullAll 同款列名转换）
 function applyShareCloudData(d){
   if(!d||!d.me)return;
-  var svc=(d.services||[]).map(function(s){
+  var svc=(d.services||[]).filter(function(s){return String(s.name||"").indexOf("__DEL__")!==0;}).map(function(s){
     if(s.price_shareholder!=null){s.priceShareholder=s.price_shareholder;delete s.price_shareholder;}
     if(s.priceShareholder==null)s.priceShareholder=s.price;
     if(s.cost==null)s.cost=0;
@@ -4320,39 +4876,132 @@ function applyShareCloudData(d){
   });
   DB.services=mergeRows(svc,DB.services);
   var appt=(d.appointments||[]).map(function(a){
+    if(a.items!=null)a.items=normalizeItems(a.items);
     if(a.unitprice!=null){a.unitPrice=a.unitprice;delete a.unitprice;}
     if(a.servicecost!=null){a.serviceCost=a.servicecost;delete a.servicecost;}
     if(a.rent_days!=null){a.rentDays=a.rent_days;delete a.rent_days;}
     if(a.rented_at!=null){a.rentedAt=a.rented_at;delete a.rented_at;}
-    if(a.due_date!=null){a.dueDate=a.due_date;delete a.due_date;}
+if(a.due_date!=null){a.dueDate=a.due_date;delete a.due_date;}
     if(a.returned_at!=null){a.returnedAt=a.returned_at;delete a.returned_at;}
+    if(a.redeemvalue!=null){a.redeemValue=+a.redeemvalue;delete a.redeemvalue;}
+    if(a.commearned!=null){a.commEarned=+a.commearned;delete a.commearned;}
+    if(a.chargedays!=null){a.chargeDays=+a.chargedays;delete a.chargedays;}
+    if(a.service_id!=null){a.serviceId=a.service_id;delete a.service_id;}
+    if(a.member_id!=null){a.memberId=a.member_id;delete a.member_id;}
+    if(a.pay_method!=null){a.payMethod=a.pay_method;delete a.pay_method;}
+    if(a.paid_at!=null){a.paidAt=a.paid_at;delete a.paid_at;}
+    if(a.referral!=null&&a.referrer==null){a.referrer=a.referral;}
+    delete a.referral;
     return a;
   });
   var byId={};
   DB.appointments.forEach(function(x){if(x&&x.id)byId[x.id]=x;});
   appt.forEach(function(x){if(x&&x.id)byId[x.id]=x;});
   DB.appointments=Object.keys(byId).map(function(k){return byId[k];});
+  sweepGhostMemberIds(); // 清除已删除成员残留引用
+  repairPkgFlags(); // 云端拉回的直购套餐单同样自愈
   cloudSelectedApptIds=appt.map(function(x){return x.id;});
   (d.customers||[]).forEach(function(c){
     if(c.wx==null)c.wx="";
   });
-  DB.customers=mergeRows(d.customers||[],DB.customers);
-  if(d.members&&d.members.length)DB.members=mergeRows(d.members,DB.members);
+  DB.customers=mergeRows((d.customers||[]).filter(function(c){return String(c.name||"").indexOf("__DEL__")!==0;}),DB.customers);
+  if(d.members&&d.members.length)DB.members=mergeRows(d.members.filter(function(m){return String(m.name||"").indexOf("__DEL__")!==0;}),DB.members);
   if(d.schedule&&d.schedule[0]){
     var sc=d.schedule[0];
     DB.schedule={start:sc.start||"09:00",end:sc.end||"20:00"};
+  }
+  // 套餐定义与套餐卡（云端列名全小写）合并到股东本地视图：我购买的套餐/剩余次数/预拿佣金
+  if(d.packages&&d.packages.length){
+    DB.packages=mergeRows(d.packages.map(function(p){
+      if(p.priceshareholder!=null){p.priceShareholder=p.priceshareholder;delete p.priceshareholder;}
+      if(p.isrent!=null){p.isRent=!!p.isrent;delete p.isrent;}
+      if(p.priceShareholder==null)p.priceShareholder=p.price;
+      if(p.cost==null)p.cost=0;
+      return p;
+    }),DB.packages||[]);
+  }
+  if(d.packageBuys&&d.packageBuys.length){
+    DB.packageBuys=mergeRows(d.packageBuys.map(function(b){
+      if(b.customerid!=null){b.customerId=b.customerid;delete b.customerid;}
+      if(b.pkgid!=null){b.pkgId=b.pkgid;delete b.pkgid;}
+      if(b.isshare!=null){b.isShare=!!b.isshare;delete b.isshare;}
+      if(b.commeach!=null){b.commEach=+b.commeach;delete b.commeach;}
+      if(b.commtotal!=null){b.commTotal=+b.commtotal;delete b.commtotal;}
+      if(b.commused!=null){b.commUsed=+b.commused;delete b.commused;}
+      if(b.pkg_name!=null){b.name=b.pkg_name;delete b.pkg_name;}
+      if(b.customer_name!=null){b.client=b.customer_name;delete b.customer_name;}
+      if(b.cost!=null){b.pkgCost=+b.cost;delete b.cost;}
+      if(b.refunded!=null)b.refunded=!!b.refunded;
+      return b;
+    }),DB.packageBuys||[]);
   }
   // 合并成功后把「本人」的完整档案写回本地（含头像色、介绍人等渲染字段）
   var meRow=customerById(d.me.id);
   if(meRow){try{localStorage.setItem("bkgbook_share_me_"+d.me.id,JSON.stringify(meRow));}catch(e){}}
   saveDB();
 }
-function doShareEnter(c){
-  saveShareSess({cid:c.id,name:c.name,phone:c.phone,ts:Date.now()});
+function doShareEnter(c,pwdHash){
+  var s={cid:c.id,name:c.name,phone:c.phone,ts:Date.now()};
+  if(pwdHash)s.pwdHash=pwdHash;
+  saveShareSess(s);
   closeModal("loginMask");
   currentView="share";
   renderAuthUI();renderAll();
+  startCloudSync();
   toast("欢迎，"+(c.name||"")+"（共享股东）");
+}
+/* ---------- 共享股东自助修改登录账号/密码 ---------- */
+function openSharePwdModal(){
+  if(!shareSess)return;
+  var me=customerById(shareSess.cid);
+  if(!me){toast("未找到您的客户档案，请联系管理员","err");return;}
+  $("spPhone").value=me.phone||"";
+  $("spOldPwd").value="";$("spNewPwd").value="";$("spNewPwd2").value="";
+  $("spErr").style.display="none";
+  showModal("sharePwdMask");
+}
+function saveSharePwd(){
+  if(!shareSess)return;
+  var me=customerById(shareSess.cid);
+  if(!me){toast("未找到您的客户档案","err");return;}
+  var err=$("spErr");
+  var newPhone=($("spPhone").value||"").trim();
+  var old=$("spOldPwd").value,np=$("spNewPwd").value,np2=$("spNewPwd2").value;
+  if(!newPhone){err.textContent="请填写登录账号（手机号）";err.style.display="";return;}
+  if(!old){err.textContent="请输入旧密码";err.style.display="";return;}
+  if(!np||np.length<6){err.textContent="新密码至少 6 位";err.style.display="";return;}
+  if(np!==np2){err.textContent="两次输入的新密码不一致";err.style.display="";return;}
+  if(!navigator.onLine){err.textContent="当前处于离线状态，无法修改账号密码，请联网后重试";err.style.display="";return;}
+  var oldH=hashPwd(old);
+  if(me.login_pwd!==oldH){err.textContent="旧密码错误";err.style.display="";return;}
+  if(newPhone!==(me.phone||"")&&(DB.customers||[]).some(function(x){return x.id!==me.id&&x.phone===newPhone&&String(x.name||"").indexOf("__DEL__")!==0;})){
+    err.textContent="该手机号已被其他客户使用";err.style.display="";return;
+  }
+  var newH=hashPwd(np);
+  err.style.display="none";
+  function applyLocal(){
+    me.phone=newPhone;me.login_pwd=newH;me.login_pwd_plain=np;
+    saveDB();
+    shareSess.phone=newPhone;saveShareSess(shareSess);
+    closeModal("sharePwdMask");
+    toast("修改成功，请用新账号 / 新密码登录");
+    renderShareBoard();renderAuthUI();
+  }
+  if(cloudMode&&cloudCfg&&cloudCfg.url&&cloudCfg.anonKey){
+    sFetch("/rest/v1/rpc/update_share_pwd",{method:"POST",body:{
+      phone_input:me.phone,old_pwd_hash:oldH,new_pwd_hash:newH,new_pwd_plain:np,new_phone:newPhone
+    }}).then(function(r){
+      if(r&&r.ok&&r.json&&r.json.ok){applyLocal();}
+      else{
+        var msg=(r&&r.json&&r.json.msg)||(r&&r.json&&r.json.message)||"云端改密失败（可能未在 Supabase 执行改密 SQL）";
+        err.textContent=String(msg)+"，本机未修改";err.style.display="";return;
+      }
+    }).catch(function(e){
+      err.textContent="云端改密失败："+((e&&e.message)||"请检查网络")+"，本机未修改";err.style.display="";
+    });
+  }else{
+    err.textContent="未配置云端，无法修改账号密码";err.style.display="";
+  }
 }
 function renderAuthUI(){
   var box=$("userBox");
@@ -4383,7 +5032,8 @@ function renderAuthUI(){
     box.innerHTML='<span class="acct-chip user" style="color:var(--primary)">共享股东</span>'+
       '<div style="margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">'+
       '<span style="max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(nm||"")+"</span>"+
-      '<button class="btn btn-ghost btn-xs" type="button" onclick="doShareLogout()">退出</button></div>';
+      '<button class="btn btn-ghost btn-xs" type="button" onclick="doShareLogout()">退出</button></div>'+
+      '<button class="btn btn-ghost btn-xs" type="button" style="width:100%;margin-top:8px" onclick="openSharePwdModal()">🔑 修改账号密码</button>';
     return;
   }
   if(!cloudMode){box.innerHTML='<span style="color:#6b7280">本地模式</span><button class="btn btn-ghost btn-xs" type="button" onclick="openLogin()" style="margin-top:6px">共享股东登录</button>';return;}
@@ -4402,6 +5052,7 @@ function doShareLogout(){
   clearShareSess();
   currentView="dashboard";
   renderAuthUI();renderAll();
+  startCloudSync();
   toast("已退出共享股东账号"+(nm?"（"+nm+"）":""));
 }
 function openLogin(){
@@ -4437,6 +5088,7 @@ function toggleLoginMode(){loginMode=loginMode==="signin"?"signup":"signin";rend
 function showLgErr(msg){var el=$("lgErr");el.textContent=msg;el.style.display="";}
 function submitLogin(){
   var email=($("lgEmail").value||"").trim(),p1=$("lgPass").value||"",p2=$("lgPass2").value||"";
+  if(!(cloudCfg&&cloudCfg.url&&cloudCfg.anonKey)){showLgErr("未配置云端：请先在「备份与恢复 → 云端多设备同步」扫码或手动填入云端地址与密钥，再登录");return;}
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){showLgErr("请输入有效邮箱");return;}
   if(p1.length<6){showLgErr("密码至少 6 位");return;}
   if(loginMode==="signup"&&p1!==p2){showLgErr("两次输入的密码不一致");return;}
@@ -4609,15 +5261,15 @@ function renderUserAdmin(){
   qs.style.display="";
   var list=$("userAdminList");
   list.innerHTML='<div class="hint" style="padding:16px">加载中…</div>';
-  cloudSelect("profiles?select=*&order=email").then(function(rows){
+  cloudSelect("profiles?select=*&order=phone").then(function(rows){
     if(!rows||!rows.length){
       list.innerHTML='<div class="hint" style="padding:16px">暂无已注册账号（第一个注册的账号自动成为管理员）</div>';
       return;
     }
-    var html="<table><tr><th>邮箱</th><th>角色</th><th style='text-align:right'>操作</th></tr>";
+    var html="<table><tr><th>账号</th><th>角色</th><th style='text-align:right'>操作</th></tr>";
     rows.forEach(function(p){
       var isSelf=sess&&p.user_id===sess.user.id;
-      html+="<tr><td>"+esc(p.email)+(isSelf?'<span class="hint" style="margin-left:6px">（本人）</span>':"")+"</td>"+
+      html+="<tr><td>"+esc(p.name||p.phone||p.user_id)+(isSelf?'<span class="hint" style="margin-left:6px">（本人）</span>':"")+"</td>"+
         '<td><span class="acct-chip '+(p.role==="admin"?"admin":"user")+'">'+(p.role==="admin"?"管理员":"普通用户")+"</span></td>"+
         "<td style='text-align:right'>"+
         (p.role==="admin"?"":('<button class="btn btn-ghost btn-xs" type="button" onclick="setUserRole(\''+esc(p.user_id)+'\',\'admin\')">设为管理员</button>'))+
@@ -4636,14 +5288,14 @@ function setUserRole(uid,role){
 
 function fillFilterSelects(){
   var opts='<option value="">全部成员</option>';
-  DB.members.forEach(function(m){opts+='<option value="'+esc(m.id)+'">'+esc(m.name)+"</option>";});
+  DB.members.filter(function(m){return String(m.name||"").indexOf("__DEL__")!==0;}).forEach(function(m){opts+='<option value="'+esc(m.id)+'">'+esc(m.name)+"</option>";});
   ["fMember","lfMember"].forEach(function(id){
     var el=$(id),cur=el.value;
     el.innerHTML=opts;
     el.value=cur;
   });
   var opt2='<option value="">全部项目</option>';
-  DB.services.forEach(function(s){opt2+='<option value="'+esc(s.id)+'">'+esc(s.name)+"</option>";});
+  DB.services.filter(function(s){return String(s.name||"").indexOf("__DEL__")!==0;}).forEach(function(s){opt2+='<option value="'+esc(s.id)+'">'+esc(s.name)+"</option>";});
   var se=$("fService"),cur2=se.value;
   se.innerHTML=opt2;se.value=cur2;
 }
@@ -4658,7 +5310,7 @@ function renderDashboard(){
   $("dashStats").innerHTML=
     '<div class="stat"><div class="label">今日预约</div><div class="value">'+appts.length+'</div><div class="sub">已完成 '+doneToday+"</div></div>"+
     '<div class="stat"><div class="label">本月预约</div><div class="value">'+monthAppts.length+'</div><div class="sub">全员累计</div></div>'+
-    '<div class="stat"><div class="label">团队成员</div><div class="value">'+DB.members.length+'</div><div class="sub">在职 '+DB.members.filter(function(m){return m.status==="active";}).length+" 人</div></div>"+
+    '<div class="stat"><div class="label">团队成员</div><div class="value">'+DB.members.filter(function(m){return String(m.name||"").indexOf("__DEL__")!==0;}).length+'</div><div class="sub">在职 '+DB.members.filter(function(m){return m.status==="active";}).length+" 人</div></div>"+
     '<div class="stat"><div class="label">预约项目</div><div class="value">'+DB.services.length+'</div><div class="sub">可自定义</div></div>';
 
   $("dashWelcome").innerHTML=DB.members.length===0&&DB.services.length===0&&DB.appointments.length===0?
@@ -4683,26 +5335,47 @@ function renderDashboard(){
 }
 
 /* 时间轴渲染 */
-function renderTimeline(container,date,compact){
+function renderTimeline(container,date,compact,srcAppts){
   var start=DB.schedule.start||"09:00",end=DB.schedule.end||"20:00";
   var s=minOf(start),e=minOf(end);
-  var appts=DB.appointments.filter(function(a){return a.date===date&&a.status!=="cancelled";});
-  var rows="";
-  for(var t=s;t<e;t+=60){
-    rows+='<div class="tl-row"><div class="tl-time">'+fmtMin(t)+'</div><div class="tl-track" style="height:52px;position:relative"></div></div>';
-  }
-  var blocks="";
+  var appts=(srcAppts||DB.appointments).filter(function(a){return a.date===date&&a.status!=="cancelled"&&a.kind!=="direct";});
+  var SLOT=10; // 10 分钟一格
+  // 每个时间槽 → 覆盖它的预约（同槽重叠正常被冲突校验禁止；异常时先到先显示）
+  var bySlot={};
   appts.forEach(function(a){
     var m=memberById(a.memberId),sv=serviceById(a.serviceId);
-    var st=minOf(a.time),du=a.duration||60,left=Math.max(st-s,0),top=left/60*52,height=du/60*52;
-    var color=(m&&m.color)||(sv&&sv.color)||"#6b7280";
-    var title=(sv?sv.name:"预约")+(m?" · "+m.name:"")+" · "+a.client;
-    blocks+='<div class="appt-block'+(a.status==="cancelled"?" cancelled":"")+'" style="top:'+top+'px;height:'+Math.max(height-3,18)+'px;background:'+color+'" title="'+esc(title)+'" onclick="openApptModal(\''+a.id+'\')">'+
-      '<div class="t">'+esc(a.time)+" "+(sv?esc(sv.name):"预约")+'</div><div class="c">'+(m?esc(m.name)+" · ":"")+esc(a.client)+"</div></div>";
+    var label=(sv?sv.name:"预约")+(m?"·"+m.name:"")+" "+a.client;
+    // 只点亮起始时刻那一格（9:00 预约只亮 9:00 格，不按项目时长扩展）
+    var st=Math.max(minOf(a.time),s);
+    if(st<e&&!bySlot[st])bySlot[st]={id:a.id,label:label,startT:st};
   });
-  container.innerHTML='<div class="day-timeline"><div class="tl-abs" style="position:relative">'+rows+'<div style="position:absolute;left:70px;right:0;top:0;bottom:0">'+blocks+"</div></div></div>";
-  if(!appts.length)container.innerHTML='<div class="empty-tip" style="padding:40px">当天暂无可显示的预约（已取消的预约不显示）</div>';
+  // 一个个正方形小格：每格显示时间（09:00 / 09:10 / … 直到晚上 8 点）；已约红色，空闲白色可点击
+  var html="";
+  for(var t=s;t<=e;t+=SLOT){
+    var info=bySlot[t],tm=fmtMin(t);
+    if(info){
+      var isStart=t===info.startT;
+      html+='<div style="width:62px;height:62px;background:#ef4444;color:#fff;border-radius:8px;cursor:pointer;position:relative;overflow:hidden;padding:5px 6px;box-sizing:border-box;box-shadow:var(--shadow)" onclick="openApptModal(\''+info.id+'\')" title="'+esc(info.label)+'">'+
+        '<div style="font-weight:800;font-size:12px;white-space:nowrap">'+tm+'</div>'+
+        (isStart?'<div style="font-size:10px;line-height:1.25;margin-top:2px;opacity:.95;word-break:break-all;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">'+esc(info.label)+'</div>':'<div style="font-size:16px;line-height:1;margin-top:6px;opacity:.9">…</div>')+
+        '</div>';
+    }else{
+      html+='<div style="width:62px;height:62px;border:1px solid var(--border);border-radius:8px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;background:#fff" onclick="quickNewSlot(\''+date+'\',\''+tm+'\')" title="点击预约 '+tm+'">'+
+        '<div style="font-size:13px;font-weight:800;color:var(--text-1)">'+tm+'</div>'+
+        '<div style="font-size:10px;color:var(--text-3)">可约</div></div>';
+    }
+  }
+  container.innerHTML='<div style="display:flex;flex-wrap:wrap;gap:8px;padding:14px;align-items:stretch">'+html+'</div>';
   void compact;
+}
+function quickNewSlot(date,time){
+  if(uiLocked()){toast("请先登录后再操作","err");return;}
+  openApptModal(null);
+  $("aDate").value=date;
+  var sel=$("aTime");
+  if(!sel.querySelector('option[value="'+time+'"]'))sel.insertAdjacentHTML("afterbegin",'<option value="'+time+'">'+time+"</option>");
+  sel.value=time;
+  checkConflict();
 }
 
 /* ================= 日历 ================= */
@@ -4721,6 +5394,7 @@ function renderCal(){
   var fm=$("fMember").value,fs=$("fService").value;
   var appts=DB.appointments.filter(function(a){
     if(a.status==="cancelled")return false;
+    if(a.kind==="direct")return false; // 直接购买（含套餐购买）不入预约日历，仅显示在直接购买记录
     if(fm&&a.memberId!==fm)return false;
     if(fs&&a.serviceId!==fs)return false;
     return true;
@@ -4736,10 +5410,11 @@ function renderCal(){
     body=renderWeek(week,appts);
   }else{
     title=fmtDateCn(calAnchor);
-    body='<div class="cal-head"><div></div><button class="btn btn-primary btn-sm" type="button" onclick="openApptModalFor(\''+calAnchor+'\')">在 '+calAnchor+' 新建预约</button></div>'+dayTimelineHTML(calAnchor,appts);
+    body='<div class="cal-head"><div></div><button class="btn btn-primary btn-sm" type="button" onclick="openApptModalFor(\''+calAnchor+'\')">在 '+calAnchor+' 新建预约</button></div><div id="calDayTimeline"></div>';
   }
   $("calTitle").textContent=title;
   $("calBody").innerHTML=body;
+  if(calMode==="day")renderTimeline($("calDayTimeline"),calAnchor,true,appts); // 日视图：与工作台今日预约一致的方格时间线
   var legend='<span><i style="background:#f59e0b"></i>项目颜色</span><span><i style="background:#2563eb"></i>成员颜色优先</span><span>点击预约卡片可查看或修改</span>';
   $("calLegend").innerHTML=legend;
 }
@@ -4826,6 +5501,9 @@ function renderList(){
   var d=$("lfDate").value,st=$("lfState").value,fm=$("lfMember").value,q=$("lfSearch").value.trim().toLowerCase();
   var list=DB.appointments.slice().sort(function(a,b){return (a.date+a.time).localeCompare(b.date+b.time);});
   list=list.filter(function(a){
+    if(a.kind==="direct")return false; // 直接购买不显示在预约列表
+    if(a.status==="done")return false; // 已结账自动清除（保留在统计报表）
+    if(a.kind==="rent"&&a.status==="returned")return false; // 出租已归还自动清除
     if(d&&a.date!==d)return false;
     if(st&&a.status!==st)return false;
     if(fm&&a.memberId!==fm)return false;
@@ -4857,6 +5535,44 @@ function renderList(){
       '<td><div class="row-actions">'+acts+"</div></td></tr>";
   });
   body.innerHTML=html+'</table><div style="padding:12px 16px;font-size:12px;color:var(--text-3)">共 '+list.length+" 条记录</div>";
+  renderTodaySettled();
+}
+/* 预约列表：今日已完成结算记录卡片（已结账单自动从上方列表清除，这里集中展示当天结账情况） */
+function renderTodaySettled(){
+  var box=$("todaySettledCard");
+  if(!box)return;
+  var today=todayStr();
+  var list=DB.appointments.filter(function(a){
+    if(a.kind==="direct")return false;
+    if(a.date!==today)return false;
+    if(a.status!=="done"&&!(a.kind==="rent"&&a.status==="returned"))return false;
+    return true;
+  }).sort(function(x,y){return x.time.localeCompare(y.time);});
+  var total=list.reduce(function(s,a){return s+((+a.amount||0)+(+a.redeemValue||0));},0);
+  var h='<div class="section" style="margin-top:12px"><div class="section-head"><div><h2>今日已完成结算</h2><div class="desc">'+today+' 已结账的预约 · 共 '+list.length+' 笔 · 合计 <b style="color:var(--primary)">'+fmtMoney(Math.round(total*100)/100)+'</b></div></div></div><div class="section-body no-pad">';
+  if(!list.length){
+    h+='<div class="empty"><div class="big">✅</div><h3>今日暂无已结算记录</h3><p>结账后的预约会自动移到这里，并保留在统计报表中。</p></div>';
+  }else{
+    h+='<table><tr><th>时间</th><th>客户</th><th>项目</th><th style="text-align:right">金额</th><th>收款</th><th>方式</th><th>成员</th><th style="text-align:right">操作</th></tr>';
+    list.forEach(function(a){
+      var sv=a.serviceId?serviceById(a.serviceId):null;
+      var m=a.memberId?memberById(a.memberId):null;
+      var paid=(+a.amount||0)>0||(+a.redeemValue||0)>0;
+      var isRent=a.kind==="rent";
+      h+='<tr><td>'+esc(a.time)+'</td><td><b>'+esc(a.client)+'</b>'+(isRent?' <span class="tag tag-warn" style="font-size:10px">出租</span>':'')+'</td>'+
+        '<td>'+(sv?esc(sv.name):'<span class="hint">-</span>')+'</td>'+
+        '<td style="text-align:right"><b>'+fmtMoney((+a.amount||0)+(+a.redeemValue||0))+'</b>'+(a.redeemValue>0?' <span class="tag tag-blue" style="font-size:10px">核销</span>':'')+'</td>'+
+        '<td>'+(paid?'<span class="tag tag-green">已收款</span>':'<span class="tag tag-gray">未收款</span>')+'</td>'+
+        '<td>'+(esc(a.payMethod?PAY_METHODS[a.payMethod]||a.payMethod:"-"))+'</td>'+
+        '<td>'+(m?'<div class="member-cell"><span class="avatar" style="background:'+esc(m.color)+'">'+esc(m.name[0])+"</span>"+esc(m.name)+"</div>":'<span class="hint">-</span>')+'</td>'+
+        '<td style="text-align:right"><div class="row-actions">'+
+        (canEdit()?'<button class="btn btn-ghost btn-xs" type="button" onclick="openApptModal(\''+a.id+'\')">查看</button><button class="btn btn-ghost-danger btn-xs" type="button" onclick="delAppt(\''+a.id+'\')">删除</button>':'<button class="btn btn-ghost btn-xs" type="button" onclick="openApptModal(\''+a.id+'\')">查看</button>')+
+        '</div></td></tr>';
+    });
+    h+='</table>';
+  }
+  h+='</div></div>';
+  box.innerHTML=h;
 }
 function clearListFilters(){
   $("lfDate").value="";$("lfState").value="";$("lfMember").value="";$("lfSearch").value="";
@@ -4904,43 +5620,18 @@ function renderReports(){
   var moProf=Math.round((moInc-moCost-calcCommission(moPaid))*100)/100;
   var pmd=prevMonthDays(),pmPrev=DB.appointments.filter(function(a){return a.date>=pmd.s&&a.date<=pmd.e;});
   var pmInc=pmPrev.reduce(function(s,a){return s+(isPaidAppt(a)?(+a.amount||0):0);},0);
-  var mc={};
-  paid.forEach(function(a){var k=PAY_METHODS[a.payMethod]||a.payMethod||"未记录";mc[k]=(mc[k]||0)+1;});
-  var methodHtml=Object.keys(mc).map(function(k){return k+" "+mc[k]+" 笔";}).join(" · ")||"-";
+  // ---- 套餐卡退款（统计内保留，退款明细入账） ----
+  var refunds=(DB.refunds||[]).filter(function(r){return r.date>=R.s&&r.date<=R.e;});
+  var refundTotal=refunds.reduce(function(s,r){return s+(+r.amount||0);},0);
   $("rpIncome").innerHTML=
     '<div class="stat"><div class="label">'+R.label+'总收入</div><div class="value" style="font-size:24px">'+fmtMoney(income)+'</div><div class="sub">已收款 '+paid.length+" 单</div></div>"+
     '<div class="stat"><div class="label">'+R.label+'总利润</div><div class="value" style="font-size:24px;color:var(--ok)">'+fmtMoney(profit)+'</div><div class="sub">营收 '+fmtMoney(income)+" · 成本 "+fmtMoney(cost)+" · 佣金 "+fmtMoney(commission)+"</div></div>"+
     '<div class="stat"><div class="label">当日营收额（今日已收款）</div><div class="value" style="font-size:24px">'+fmtMoney(todayInc)+'</div><div class="sub">截止当前时刻的今日收款合计</div></div>'+
     '<div class="stat"><div class="label">本月累计（截至今日）</div><div class="value" style="font-size:24px">'+fmtMoney(moInc)+'</div><div class="sub">本月利润 '+fmtMoney(moProf)+" · 上月 "+fmtMoney(pmInc)+"</div></div>"+
-    '<div class="stat"><div class="label">收款方式分布</div><div class="sub" style="font-size:13px;margin-top:10px;line-height:1.9">'+methodHtml+"</div></div>"+
-    '<div class="stat"><div class="label">'+R.label+'预约量</div><div class="value" style="font-size:24px">'+appts.length+' 单</div><div class="sub">未收款 '+appts.filter(function(a){return a.status!=="cancelled"&&!isPaidAppt(a);}).length+" 单</div></div>";
-  // ---- 本月每日收入趋势（蓝=收入，绿=利润） ----
-  var days=[],cursor=parseYMD(mStart),todayD=parseYMD(today);
-  while(cursor<=todayD){
-    var ds=toYMD(cursor);
-    var sum=0,psum=0,dpaid=[];
-    DB.appointments.forEach(function(a){
-      if(a.date===ds&&isPaidAppt(a)){dpaid.push(a);sum+=(+a.amount||0);}
-    });
-    var dcost=dpaid.reduce(function(s,a){return s+apptProfit(a).cost;},0);
-    psum=Math.round((sum-dcost-calcCommission(dpaid))*100)/100;
-    days.push({d:ds.slice(8),sum:sum,profit:psum});
-    cursor.setDate(cursor.getDate()+1);
-  }
-  var max=1;days.forEach(function(x){if(x.sum>max)max=x.sum;if(x.profit>max)max=x.profit;});
-  if(days.length){
-    var count=days.length;
-    $("rpTrend").innerHTML='<div class="trend" style="grid-template-columns:repeat('+count+',1fr)">'+days.map(function(x){
-      return '<div class="trend-item" title="'+x.d.slice(0,2)+' 日 · 收入 '+fmtMoney(x.sum)+' · 利润 '+fmtMoney(x.profit)+'"><div class="trend-bars" style="display:flex;align-items:flex-end;gap:2px;width:100%;height:100%">'+
-        '<div class="trend-bar" style="height:'+Math.max(3,Math.round(x.sum/max*100))+'%;background:'+(x.sum>0?"var(--primary)":"#e5e7eb")+'"></div>'+
-        '<div class="trend-bar" style="height:'+Math.max(3,Math.round(x.profit/max*100))+'%;background:'+(x.profit>0?"var(--ok)":"#e5e7eb")+'"></div>'+
-      '</div><div class="trend-day">'+x.d+"</div></div>";
-    }).join("")+"</div>";
-  }else{
-    $("rpTrend").innerHTML='<div class="hint">本月暂无数据</div>';
-  }
+    '<div class="stat"><div class="label">'+R.label+'预约量</div><div class="value" style="font-size:24px">'+appts.length+' 单</div><div class="sub">未收款 '+appts.filter(function(a){return a.status!=="cancelled"&&!isPaidAppt(a);}).length+" 单</div></div>"+
+    '<div class="stat"><div class="label">'+R.label+'套餐退款</div><div class="value" style="font-size:24px;color:var(--danger)">-'+fmtMoney(refundTotal)+'</div><div class="sub">退款 '+refunds.length+" 笔 · 净收入 "+fmtMoney(Math.max(0,income-refundTotal))+"</div></div>";
   // ---- 成员工作量（含利润） ----
-  var mrows=DB.members.map(function(m){
+  var mrows=DB.members.filter(function(m){return String(m.name||"").indexOf("__DEL__")!==0;}).map(function(m){
     var list=appts.filter(function(a){return a.memberId===m.id&&a.status!=="cancelled";});
     var done=list.filter(isPaidAppt);
     var inc=done.reduce(function(s,a){return s+(+a.amount||0);},0);
@@ -4973,6 +5664,10 @@ function renderReports(){
     bucket("爽约 / 逾期未到","#f59e0b",noShow,"已确认/待确认但预约日已过、既未完成也未取消")+
     bucket("已取消","#9ca3af",cancelled,"状态为「已取消」的预约")+
     "</div>";
+  // ---- 消费明细 · 总消费记录（跟随当前统计周期） ----
+  curRpR=R;
+  renderRpDirect(R);
+  renderRpConsumption(R);
 }
 
 /* ================= 佣金计算引擎 ================= */
@@ -4985,29 +5680,42 @@ function renderReports(){
    ⑤ 取两种方式中更大的比例：佣金 = 当月一级客户利润合计 × 比例（四舍五入到分）。 */
 /* 已结算口径：预约已完成已收款，或出租单已归还并收款 */
 function isPaidAppt(a){
-  if(!a||!(+a.amount||0)>0)return false;
+  if(!a||!((+a.amount||0)>0))return false;
   if(a.status==="done")return true;
   if(a.kind==="rent"&&a.status==="returned")return true;
   return false;
 }
 // 佣金核算：给定已收款记录列表，客户为某共享股东一级客户时按该股东当月佣金比例计提
 function calcCommission(list){
-  var c=0;
-  list.forEach(function(a){
+  var c=0,seen={};
+  function acc(a){
     var cid=a.customer_id;
-    if(!cid)return;
+    if(!cid||seen[a.id])return;
+    seen[a.id]=1;
     var cust=customerById(cid);
-    if(!cust||!cust.referrer)return;
-    var sh=customerById(cust.referrer);
+    if(!cust)return;
+    var shId2;
+    if(a.commEarned!=null){shId2=cust.referrer||"";} // 套餐核销单：佣金只归卡主的上级介绍人；正式股东（无介绍人）归公司，不记本人
+    else{shId2=cust.referrer||"";}
+    var sh=customerById(shId2);
     if(!sh||sh.type!=="shareholder")return;
+    if(a.commEarned!=null){c+=+a.commEarned||0;return;} // 套餐核销单：固定佣金
+    var p=apptProfit(a);
+    if(p.amount<=0)return;
     var com=commissionOf(sh.id,(a.date||"").slice(0,7));
-    if(com&&com.ratio>0)c+=Math.round(apptProfit(a).profit*com.ratio*100)/100;
+    if(com&&com.ratio>0)c+=Math.round(p.profit*com.ratio*100)/100;
+  }
+  list.forEach(acc);
+  // 套餐核销单（金额 0 但核销价值>0）：核销一次佣金到账一次
+  (DB.appointments||[]).forEach(function(a){
+    if(a.pkgBuyOnly)return;
+    if((+a.redeemValue||0)>0&&a.status==="done")acc(a);
   });
   return Math.round(c*100)/100;
 }
 function apptProfit(a){
-  if(!isPaidAppt(a))return {amount:0,cost:0,profit:0};
-  var amount=+a.amount||0;
+  if(!isPaidAppt(a)&&!((+a.redeemValue||0)>0))return {amount:0,cost:0,profit:0};
+  var amount=(+a.amount||0)+(+a.redeemValue||0);
   var cost=0;
   if(a.serviceCost!=null){cost=+a.serviceCost||0;}
   else{var sv=a.serviceId?serviceById(a.serviceId):null;cost=sv?(+sv.cost||0):0;}
@@ -5016,7 +5724,11 @@ function apptProfit(a){
 }
 function doneApptsInMonth(ym){
   return DB.appointments.filter(function(a){
-    return isPaidAppt(a)&&(a.date||"").indexOf(ym)===0;
+    if(a.pkgBuyOnly)return false; // 套餐购买为预存款，不计佣金流水
+    if(a.kind==="direct"&&!a.commEarned&&(a.items||[]).some(function(i){return i.kind==="pkg";}))return false; // 防御：直购套餐单必不计佣金（按核销到账）
+    if(isPaidAppt(a)&&(a.date||"").indexOf(ym)===0)return true;
+    if((+a.redeemValue||0)>0&&(a.status==="done"||(a.kind==="rent"&&a.status==="returned"))&&(a.date||"").indexOf(ym)===0)return true; // 套餐核销单（预约已完成 / 出租已归还）
+    return false;
   });
 }
 function tierRatio(flow){
@@ -5030,22 +5742,41 @@ function commissionOf(shareId,ym){
   if(!sh||sh.type!=="shareholder")return null;
   var lv1Ids={};
   (DB.customers||[]).forEach(function(c){if(c.referrer===shareId)lv1Ids[c.id]=1;});
-  var flow=0,profitSum=0,lv1Count=0;
+  // 档位流水=名下客户本月已收款消费合计（含套餐直购预存款；核销未收款不计）
+  var flow=0;
+  (DB.customers||[]).forEach(function(c){if(lv1Ids[c.id])flow+=monthSpentOf(c.id,ym);});
+  var profitSum=0,lv1Count=0,commFixed=0;
   doneApptsInMonth(ym).forEach(function(a){
     var cid=a.customer_id;
+    if(a.commEarned!=null){
+      // 套餐核销单：佣金只归卡主的上级介绍人；正式股东（无介绍人）归公司，不记本人
+      var custX=cid?customerById(cid):null;
+      var ownerX=custX?(custX.referrer||""):"";
+      if(ownerX===shareId){
+        commFixed+=+a.commEarned||0;
+        // 混合单（套餐免费+超出收费，如苗衣出租）：收费部分按预约佣金计入
+        if((+a.amount||0)>0&&(+a.chargeDays||0)>0){
+          var costPD=+(a.serviceCost||0); // 每天成本
+          var feeCost=Math.round(costPD*(+a.chargeDays||0)*100)/100;
+          profitSum+=Math.max(0,(+a.amount||0)-feeCost);
+        }
+      }
+      return;
+    }
     if(!cid||!lv1Ids[cid])return;
     var p=apptProfit(a);
-    flow+=p.amount;profitSum+=p.profit;lv1Count++;
+    profitSum+=p.profit;
+    lv1Count++;
   });
-  // 方式二：股东本人历史累计消费（不限当月，含出租归还租金）
-  var selfSpend=DB.appointments.reduce(function(s,a){
+  // 方式二：股东本人历史累计消费（不限当月，含出租归还租金；退款按已核销真实消费调整，退款后不足 3000 自动掉回 30%）
+  var selfSpend=Math.max(0,Math.round((DB.appointments.reduce(function(s,a){
     if(isPaidAppt(a)&&a.customer_id===shareId)return s+(+a.amount||0);
     return s;
-  },0);
+  },0)+refundAdjustOf(shareId))*100)/100);
   var r1=tierRatio(flow);
   var r2=selfSpend>=6000?0.5:(selfSpend>=3000?0.4:0);
   var ratio=Math.max(r1,r2);
-  var commission=Math.round(profitSum*ratio*100)/100;
+  var commission=Math.round((profitSum*ratio+commFixed)*100)/100;
   return {shareId:shareId,ym:ym,flow:Math.round(flow*100)/100,profitSum:Math.round(profitSum*100)/100,
     lv1Count:lv1Count,selfSpend:Math.round(selfSpend*100)/100,r1:r1,r2:r2,ratio:ratio,commission:commission};
 }
@@ -5055,7 +5786,9 @@ function commissionTotal(shareId){
   if(!sh||sh.type!=="shareholder")return 0;
   var months={};
   (DB.appointments||[]).forEach(function(a){
-    if(!isPaidAppt(a)||!a.customer_id)return;
+    if(a.pkgBuyOnly)return;
+    var paid=isPaidAppt(a)||((+a.redeemValue||0)>0&&(a.status==="done"||(a.kind==="rent"&&a.status==="returned")));
+    if(!paid||!a.customer_id)return;
     var cc=customerById(a.customer_id);
     if(cc&&cc.referrer===shareId)months[(a.date||"").slice(0,7)]=1;
   });
@@ -5104,7 +5837,7 @@ function doWithdraw(){
   var cs=commissionSummary(withdrawCid);
   if(amt>cs.pending+0.001){toast("提现金额不能超过待提现 "+fmtMoney(cs.pending),"err");return;}
   (DB.withdrawals=DB.withdrawals||[]).push({
-    id:uid(),shareId:withdrawCid,amount:amt,
+    id:uid(),shareId:withdrawCid,amount:amt,name:c.name,
     time:new Date().toISOString(),note:($("withdrawNote").value||"").trim(),
     by:sess&&sess.user?sess.user.name||(sess.user.email||""):"管理员"
   });
@@ -5171,10 +5904,10 @@ function renderCustomers(){
       ('<button class="btn btn-ghost btn-xs" type="button" onclick="openCustomerModal(\''+c.id+'\')">编辑</button>'+
        '<button class="btn btn-ghost-danger btn-xs" type="button" onclick="delCustomer(\''+c.id+'\')">删除</button>'):"";
     if(c.type==="shareholder"&&canEdit())acts='<button class="btn btn-ghost btn-xs" type="button" title="查看该股东佣金并办理提现" onclick="openWithdrawModal(\''+c.id+'\')">💰 提现</button>'+acts;
-    acts='<button class="btn btn-ghost btn-xs" type="button" title="查看其名下的一级客户与二级客户" onclick="viewLv1Customers(\''+c.id+'\')">👥 '+lv1Cnt+'</button>'+acts;
+    acts='<button class="btn btn-primary btn-xs" type="button" title="为该客户快速新建预约" onclick="quickBookFor(\''+c.id+'\')">预约</button>'+acts;
     var nameClick='onclick="viewCustomerDetailForShare(\''+c.id+'\')" style="cursor:pointer;color:var(--primary);text-decoration:underline" title="点击查看客户详情（预约记录、消费、二级客户）"';
     html+='<tr><td><div class="member-cell"><span class="avatar" style="background:'+esc(c.color||"#6b7280")+'">'+esc((c.name||"?")[0])+"</span>"+
-      '<div class="info"><div class="name" '+nameClick+'>'+esc(c.name)+' <span class="tag tag-green" title="已拿佣金：历史累计，仅共享股东按名下客户已成交消费计提">💰 已拿 '+fmtMoney(commissionTotal(c.id))+'</span> '+(c.type==="shareholder"?'':'<span class="tag tag-blue" style="cursor:pointer">＋预约</span>')+'</div>'+(c.note?'<div class="role">'+esc(c.note)+"</div>":"")+"</div></div></td>"+
+      '<div class="info"><div class="name" '+nameClick+'>'+esc(c.name)+' <span class="tag tag-green" title="已拿佣金：历史累计，仅共享股东按名下客户已成交消费计提">💰 已拿 '+fmtMoney(commissionTotal(c.id))+'</span></div>'+(c.note?'<div class="role">'+esc(c.note)+"</div>":"")+"</div></div></td>"+
       "<td>"+custTypeTag(c)+(c.login_enabled?' <span class="tag tag-blue" title="已开通登录账号">🔐 可登录</span>':"")+"</td>"+
       "<td>"+custChainHtml(c)+"</td>"+
       "<td>"+(esc(c.phone)||'<span class="hint">-</span>')+"</td>"+
@@ -5232,7 +5965,7 @@ function openCustomerModal(id,presetReferrer){
   var isSh=c?(c.type||"normal")==="shareholder":false;
   if(isSh){
     $("cLoginEnable").checked=c?!!c.login_enabled:false;
-    $("cLoginPwd").value=c&&c.login_enabled&&c.login_pwd?"（已设置，留空保持不变）":"";
+    $("cLoginPwd").value=c&&c.login_enabled&&c.login_pwd_plain?c.login_pwd_plain:"";
   }else{
     $("cLoginEnable").checked=false;
     $("cLoginPwd").value="";
@@ -5250,26 +5983,26 @@ function saveCustomer(){
   var note=$("cNote").value.trim();
   if(referrer&&referrer===editingCustomerId){toast("不能选择自己作为介绍人","err");return;}
   // 登录账号字段（仅共享股东）
-  var loginEnabled=false,loginPwdVal="";
+  var loginEnabled=false,loginPwdVal="",plainPwdVal="";
   if(type==="shareholder"){
     loginEnabled=$("cLoginEnable").checked;
     var pw=$("cLoginPwd").value.trim();
     if(loginEnabled&&!phone){toast("启用登录账号需要填写联系电话（作为登录账号）","err");return;}
     if(loginEnabled){
-      if(pw&&pw.indexOf("已设置")<0){loginPwdVal=hashPwd(pw);}
-      else if(editingCustomerId){var oc=customerById(editingCustomerId);loginPwdVal=(oc&&oc.login_pwd)?oc.login_pwd:hashPwd(initSharePwd());}
-      else{loginPwdVal=hashPwd(initSharePwd());}
+      if(pw){loginPwdVal=hashPwd(pw);plainPwdVal=pw;}
+      else if(editingCustomerId){var oc=customerById(editingCustomerId);loginPwdVal=(oc&&oc.login_pwd)?oc.login_pwd:hashPwd(initSharePwd());plainPwdVal=(oc&&oc.login_pwd_plain)?oc.login_pwd_plain:"";}
+      else{loginPwdVal=hashPwd(initSharePwd());plainPwdVal=initSharePwd();}
     }
   }
   if(editingCustomerId){
     var c=customerById(editingCustomerId);
     c.name=name;c.phone=phone;c.type=type;c.referrer=referrer;c.note=note;
-    c.login_enabled=loginEnabled;c.login_pwd=loginEnabled?loginPwdVal:"";
+    c.login_enabled=loginEnabled;c.login_pwd=loginEnabled?loginPwdVal:"";c.login_pwd_plain=loginEnabled?plainPwdVal:"";
     saveDB();toast("客户信息已更新");
   }else{
     DB.customers=DB.customers||[];
     DB.customers.push({id:uid(),name:name,phone:phone,type:type,referrer:referrer,account_email:"",note:note,color:"#6b7280",
-      login_enabled:loginEnabled,login_pwd:loginEnabled?loginPwdVal:""});
+      login_enabled:loginEnabled,login_pwd:loginEnabled?loginPwdVal:"",login_pwd_plain:loginEnabled?plainPwdVal:""});
     saveDB();toast("客户已添加");
   }
   closeModal("customerMask");
@@ -5307,7 +6040,7 @@ function renderMembers(){
     return;
   }
   var html="<table><tr><th>成员</th><th>角色</th><th>联系方式</th><th>状态</th><th>近 7 天预约</th><th style=\"text-align:right\">操作</th></tr>";
-  DB.members.forEach(function(m){
+  DB.members.filter(function(m){return String(m.name||"").indexOf("__DEL__")!==0;}).forEach(function(m){
     var sm=memberStatusMap[m.status]||["未知","tag-gray"];
     var cnt=DB.appointments.filter(function(a){return a.memberId===m.id&&a.status!=="cancelled"&&a.date>=addDays(todayStr(),-7)&&a.date<=todayStr();}).length;
     var acts=canEdit()?
@@ -5384,7 +6117,7 @@ function renderServices(){
     return;
   }
   var html="<table><tr><th>项目名称</th><th>类型</th><th>普通价</th><th>共享股东价</th><th>成本</th><th>颜色</th><th>预约/出租次数</th><th style=\"text-align:right\">操作</th></tr>";
-  DB.services.forEach(function(s){
+  DB.services.filter(function(s){return String(s.name||"").indexOf("__DEL__")!==0;}).forEach(function(s){
     var rent=!!s.isRent;
     var cnt=DB.appointments.filter(function(a){return a.serviceId===s.id&&a.status!=="cancelled";}).length;
     var acts=canEdit()?
@@ -5400,6 +6133,118 @@ function renderServices(){
       '<td><div class="row-actions">'+acts+"</div></td></tr>";
   });
   el.innerHTML=html+"</table>";
+}
+/* ============ 套餐项目（预存卡） ============ */
+var editingPkgId=null;
+var pkgItemRowSeq=0;
+function renderPackages(){
+  var el=$("pkgList");
+  if(!el)return;
+  var pkgs=(DB.packages||[]).filter(function(p){return String(p.name||"").indexOf("__DEL__")!==0;});
+  if(!pkgs.length){
+    el.innerHTML='<div class="empty"><div class="big">🎫</div><h3>暂无套餐</h3><p>套餐为预存款项目（如：面部清洁 10 次、胯部塑形 5 次疗程卡），到店直接购买收款。</p></div>';
+    return;
+  }
+  var html="<table><tr><th>套餐名称</th><th>包含项目</th><th>市价</th><th>共享股东价</th><th>总成本</th><th>已售</th><th style=\"text-align:right\">操作</th></tr>";
+  pkgs.forEach(function(p){
+    var desc=(p.items||[]).map(function(it){
+      var sv=serviceById(it.serviceId);
+      return (sv?sv.name:"(已删除项目)")+"×"+it.count+(sv&&sv.isRent?"天":"次");
+    }).join("、")||"—";
+    var sold=(DB.packageBuys||[]).filter(function(b){return b.pkgId===p.id;}).length;
+    var acts=canEdit()?
+      ('<button class="btn btn-ghost btn-xs" type="button" onclick="openPkgModal(\''+p.id+'\')">编辑</button>'+
+       '<button class="btn btn-ghost-danger btn-xs" type="button" onclick="delPkg(\''+p.id+'\')">删除</button>'):"";
+    html+="<tr><td><b>"+esc(p.name)+"</b>"+(p.note?'<div class="hint">'+esc(p.note)+"</div>":"")+"</td>"+
+      "<td><span class=\"hint\">"+desc+"</span></td>"+
+      "<td>"+fmtMoney(p.price)+"</td>"+
+      '<td>'+(p.priceShareholder!=null&&+p.priceShareholder!==+p.price?fmtMoney(p.priceShareholder):'<span class="hint">同市价</span>')+"</td>"+
+      '<td><span class="hint">'+(p.cost?fmtMoney(p.cost):"0 元")+"</span></td>"+
+      '<td><span class="tag tag-blue">'+sold+"</span></td>"+
+      '<td><div class="row-actions">'+acts+"</div></td></tr>";
+  });
+  el.innerHTML=html+"</table>";
+}
+function addPkgItemRow(it){
+  it=it||{serviceId:"",count:1};
+  var opts='<option value="">（选择项目）</option>'+(DB.services||[]).filter(function(s){return String(s.name||"").indexOf("__DEL__")!==0;}).map(function(s){
+    return '<option value="'+s.id+'"'+(it.serviceId===s.id?" selected":"")+'>'+esc(s.name)+"（"+fmtMoney(s.price)+"）</option>";
+  }).join("");
+  var row='<div style="display:flex;gap:8px;align-items:center" data-seq="'+pkgItemRowSeq+'">'+
+    '<select style="flex:1" onchange="pkgItemRow(\'s\',\''+pkgItemRowSeq+'\',this.value)">'+opts+"</select>"+
+    '<label id="pkgUnitLbl-'+pkgItemRowSeq+'" style="font-size:12px;color:var(--text-2);white-space:nowrap">'+(it.serviceId&&isRentOf(it.serviceId)?"天数":"次数")+"</label>"+
+    '<input type="number" min="1" step="1" value="'+Math.max(1,parseInt(it.count,10)||1)+'" style="width:60px" onchange="pkgItemRow(\'c\',\''+pkgItemRowSeq+'\',this.value)">'+
+    '<button class="btn btn-ghost-danger btn-xs" type="button" onclick="this.parentNode.parentNode.removeChild(this.parentNode)">✕</button></div>';
+  $("pkgItems").insertAdjacentHTML("beforeend",row);
+  pkgItemRowSeq++;
+}
+function isRentOf(sid){var s=serviceById(sid);return !!(s&&s.isRent);}
+function pkgItemRow(kind,seq,val){
+  var row=$("pkgItems").querySelector('div[data-seq="'+seq+'"]');
+  if(!row)return;
+  if(kind==="s"){
+    row.querySelector("select").value=val;
+    var lbl=row.querySelector('label[id^="pkgUnitLbl-"]');
+    if(lbl)lbl.textContent=isRentOf(val)?"天数":"次数";
+  }
+  if(kind==="c")row.querySelector('input[type="number"]').value=val;
+}
+function openPkgModal(id){
+  if(!canEdit()){toast("无权限修改套餐配置","err");return;}
+  var p=id?(DB.packages||[]).find(function(x){return x.id===id;}):null;
+  editingPkgId=id||null;
+  $("pkgModalTitle").textContent=p?"编辑套餐":"新增套餐";
+  $("pkgName").value=p?p.name:"";
+  $("pkgPrice").value=p?(p.price!=null?p.price:""):"";
+  $("pkgPriceSH").value=p?(p.priceShareholder!=null?p.priceShareholder:""):"";
+  $("pkgCost").value=p?(p.cost!=null?p.cost:""):"";
+  $("pkgNote").value=p?(p.note||""):"";
+  $("pkgItems").innerHTML="";
+  pkgItemRowSeq=0;
+  var items=(p&&p.items&&p.items.length)?p.items:[{serviceId:"",count:1}];
+  items.forEach(function(it){addPkgItemRow(it);});
+  showModal("pkgMask");
+}
+function savePkg(){
+  if(!canEdit()){toast("无权限修改套餐配置","err");return;}
+  var name=$("pkgName").value.trim();
+  if(!name){toast("请填写套餐名称","err");return;}
+  var rows=$("pkgItems").querySelectorAll('div[data-seq]');
+  var items=[],seen={};
+  Array.prototype.forEach.call(rows,function(r){
+    var sid=r.querySelector("select").value;
+    var cnt=Math.max(1,parseInt(r.querySelector('input[type="number"]').value,10)||1);
+    if(!sid)return;
+    if(seen[sid]){seen[sid].count+=cnt;}else{seen[sid]={serviceId:sid,count:cnt};items.push(seen[sid]);}
+  });
+  if(!items.length){toast("请至少添加一个包含项目","err");return;}
+  var price=Math.max(0,parseFloat($("pkgPrice").value)||0);
+  var shRaw=$("pkgPriceSH").value.trim();
+  var sh=shRaw===""?null:Math.max(0,parseFloat(shRaw)||0);
+  var cost=Math.max(0,parseFloat($("pkgCost").value)||0);
+  var note=$("pkgNote").value.trim();
+  if(editingPkgId){
+    var p=(DB.packages||[]).find(function(x){return x.id===editingPkgId;});
+    if(p){p.name=name;p.items=items;p.price=price;p.priceShareholder=sh;p.cost=cost;p.note=note;}
+    saveDB();toast("套餐已更新");
+  }else{
+    DB.packages=DB.packages||[];
+    DB.packages.push({id:uid(),name:name,items:items,price:price,priceShareholder:sh,cost:cost,note:note});
+    saveDB();toast("套餐已添加");
+  }
+  closeModal("pkgMask");
+  renderPackages();
+}
+function delPkg(id){
+  if(!canEdit()){toast("无权限修改套餐配置","err");return;}
+  var p=(DB.packages||[]).find(function(x){return x.id===id;});
+  if(!p)return;
+  if(!confirm("确定删除套餐「"+(p.name||"")+"」？已售出的套餐卡不受影响。"))return;
+  p.name="__DEL__"+p.name;
+  // 同步软删云端（pushAll/cloudPullAll 均已过滤 __DEL__ 墓碑，不会复活）
+  if(cloudMode&&sess&&isValidUUID(p.id)){cloudSoftDelete("packages",p.id).catch(function(e){toast("云端删除套餐失败："+((e&&e.message)||"请检查登录后重试"),"err");});}
+  saveDB();toast("套餐已删除");
+  renderPackages();
 }
 function onSIsRentChange(){
   $("sRentDaysRow").style.display=($("sIsRent").value==="1")?"":"none";
@@ -5485,15 +6330,26 @@ function openApptModal(id){
   var readonly=!!a&&!canEdit();
   $("apptModalTitle").textContent=readonly?"预约详情":(a?"编辑预约":"新建预约");
   $("aDate").value=a?a.date:todayStr();
-  $("aTime").value=a?a.time:"09:00";
+  // 10 分钟粒度时间选项（营业时间内每 10 分钟一个；历史非 10 分钟倍数时间追加保留）
+  (function(){
+    var sel=$("aTime");
+    var start=DB.schedule.start||"09:00",end=DB.schedule.end||"20:00";
+    var ts=minOf(start),te=minOf(end),opts="";
+    for(var t=ts;t<te;t+=10)opts+='<option value="'+fmtMin(t)+'">'+fmtMin(t)+"</option>";
+    sel.innerHTML=opts;
+    var val=a?a.time:"09:00";
+    if(opts.indexOf('value="'+val+'"')<0&&val)sel.insertAdjacentHTML("afterbegin",'<option value="'+val+'">'+val+"（原时间）</option>");
+    sel.value=val;
+  })();
+  refreshApptTimeDisabled();
   var so=$("aService");
-  so.innerHTML='<option value="">（不指定）</option>'+DB.services.filter(function(s){return !s.isRent;}).map(function(s){return '<option value="'+s.id+'">'+esc(s.name)+"（"+s.duration+" 分钟）</option>";}).join("");
+  so.innerHTML='<option value="">（不指定）</option>'+DB.services.filter(function(s){return !s.isRent&&String(s.name||"").indexOf("__DEL__")!==0;}).map(function(s){return '<option value="'+s.id+'">'+esc(s.name)+"（"+s.duration+" 分钟）</option>";}).join("");
   so.value=a?a.serviceId||"":"";
   var mo=$("aMember");
-  mo.innerHTML='<option value="">（不指定）</option>'+DB.members.map(function(m){return '<option value="'+m.id+'">'+esc(m.name)+(m.status==="leave"?"（休假）":"")+"</option>";}).join("");
-  mo.value=a?a.memberId||"":"";
+  mo.innerHTML='<option value="">（不指定）</option>'+DB.members.filter(function(m){return String(m.name||"").indexOf("__DEL__")!==0;}).map(function(m){return '<option value="'+m.id+'">'+esc(m.name)+(m.status==="leave"?"（休假）":"")+"</option>";}).join("");
+  mo.value=(a&&a.memberId&&String(a.memberId).indexOf("_DEL_")!==0)?a.memberId:"";
   var sv=a?serviceById(a.serviceId):null;
-  $("aDuration").value=a?(a.duration||sv&&sv.duration||60):(DB.services[0]?DB.services[0].duration:60);
+  $("aDuration").value=a?(a.duration||sv&&sv.duration||60):((function(){var f=DB.services.find(function(s){return !s.isRent&&String(s.name||"").indexOf("__DEL__")!==0;});return (f&&f.duration)||60;})());
   $("aStatus").value=a?a.status:"confirmed";
   $("aClient").value=a?a.client:"";
   $("aPhone").value=a?a.phone:"";
@@ -5513,7 +6369,7 @@ function openApptModal(id){
   var fields=["aDate","aTime","aService","aMember","aDuration","aStatus","aClient","aCustPick","aPhone","aNote"];
   fields.forEach(function(id2){$(id2).disabled=readonly;});
   $("apptSaveBtn").style.display=readonly?"none":"";
-  $("checkoutBtn").style.display=(readonly&&canEdit()&&a&&a.status!=="cancelled")?"":"none";
+  $("checkoutBtn").style.display=(canEdit()&&a&&a.status!=="cancelled")?"":"none";
   showModal("apptMask");
   checkConflict();
 }
@@ -5526,22 +6382,42 @@ $("aService").addEventListener("change",function(){
   if(sv)$("aDuration").value=sv.duration;
 });
 $("aTime").addEventListener("change",checkConflict);
-$("aDate").addEventListener("change",checkConflict);
+$("aDate").addEventListener("change",function(){checkConflict();refreshApptTimeDisabled();});
 $("aMember").addEventListener("change",checkConflict);
 $("aDuration").addEventListener("change",checkConflict);
+
+/* 已约时间点禁用：当前日期下已被预约（非取消、非本人编辑中）的时间在下拉中置灰不可选 */
+function refreshApptTimeDisabled(){
+  var sel=$("aTime");
+  if(!sel)return;
+  var date=$("aDate").value;
+  var busy={};
+  (DB.appointments||[]).forEach(function(x){
+    if(x.status==="cancelled")return;
+    if(x.id===editingApptId)return;
+    if(x.date===date)busy[x.time]=1;
+  });
+  var firstFree=null;
+  Array.prototype.forEach.call(sel.options,function(o){
+    o.disabled=!!busy[o.value];
+    if(!o.disabled&&!firstFree)firstFree=o;
+  });
+  if(sel.selectedOptions.length&&sel.selectedOptions[0].disabled&&firstFree)sel.value=firstFree.value;
+}
 
 function checkConflict(){
   var date=$("aDate").value,time=$("aTime").value,mid=$("aMember").value,dur=parseInt($("aDuration").value,10)||0;
   var tip=$("aConflictTip");
-  if(!date||!time||!mid||!dur){tip.classList.remove("show");return;}
+  if(!date||!time||!dur){tip.classList.remove("show");return;}
   var s=minOf(time),e=s+dur;
   var hit=DB.appointments.some(function(x){
     if(x.id===editingApptId)return false;
     if(x.status==="cancelled")return false;
-    if(x.memberId!==mid||x.date!==date)return false;
-    var xs=minOf(x.time),xe=xs+(x.duration||60);
-    return s<xe&&e>xs;
+    if(x.date!==date)return false;
+    // 同一时间点不可重复预约（9:00 已约则 9:00 不能再约；9:10 不受影响）
+    return x.time===time;
   });
+  tip.textContent=hit?"⚠️ 该时间点已有预约（同一时间不可重复预约），请选择其他时间":"";
   tip.classList.toggle("show",hit);
 }
 function saveAppt(){
@@ -5560,16 +6436,16 @@ function saveAppt(){
   }
   var prev=editingApptId?DB.appointments.find(function(x){return x.id===editingApptId;}):null;
   var data={id:editingApptId||uid(),date:date,time:time,duration:dur,serviceId:svid,memberId:mid,client:client,phone:$("aPhone").value.trim(),note:$("aNote").value.trim(),status:status,
-    amount:prev?(+prev.amount||0):0,payMethod:prev?prev.payMethod||"":"",paidAt:prev?prev.paidAt||"":"",customer_id:custId,kind:"appt",referrer:custId?(customerById(custId).referrer||""):""};
+    amount:prev?(+prev.amount||0):0,payMethod:prev?prev.payMethod||"":"",paidAt:prev?prev.paidAt||"":"",customer_id:custId,kind:"appt",referrer:custId?((customerById(custId)||{}).referrer||""):""};
   var s=minOf(time),e=s+dur;
   var hit=DB.appointments.some(function(x){
     if(x.id===data.id)return false;
     if(x.status==="cancelled")return false;
-    if(x.memberId!==mid||x.date!==date)return false;
-    var xs=minOf(x.time),xe=xs+(x.duration||60);
-    return s<xe&&e>xs;
+    if(x.date!==date)return false;
+    // 同一时间点不可重复预约
+    return x.time===time;
   });
-  if(hit&&!confirm("该成员在此时间段已有预约，仍要保存这条预约吗？"))return;
+  if(hit){toast("该时间点已有预约，不可重复预约","err");return;}
   if(editingApptId){
     var idx=DB.appointments.findIndex(function(x){return x.id===editingApptId;});
     DB.appointments[idx]=data;
@@ -5604,8 +6480,15 @@ function delAppt(id){
   if(!a)return;
   if(!confirm("确定删除 "+(a.date+" "+a.time)+" "+(a.client)+" 的这条预约？"))return;
 DB.appointments=DB.appointments.filter(function(x){return x.id!==id;});
+  // 同步删除关联消费台账（apptId 关联），保证统计报表/客户档案全视图一致
+  var relCons=(DB.consumptions||[]).filter(function(c){return c.apptId===id;}).map(function(c){return c.id;});
+  if(relCons.length){
+    DB.consumptions=DB.consumptions.filter(function(c){return relCons.indexOf(c.id)<0;});
+    if(cloudMode&&sess)cloudDeleteRows("consumptions",relCons).catch(function(e){toast("云端删除台账失败："+(e&&e.message?e.message:e),"err");});
+  }
   if(cloudMode&&sess){markDeleted("appointments",id);cloudDeleteRows("appointments",[id]).catch(function(e){toast("云端删除失败："+(e&&e.message?e.message:e),"err");});}
   saveDB();toast("预约已删除");
+  renderAll(); // 同步刷新工作台 / 日历 / 统计报表 / 共享板块 / 客户详情数据源
 }
 $("btnGlobalAdd").addEventListener("click",function(){
   if(uiLocked()){toast("请先登录后再操作","err");return;}
@@ -5614,6 +6497,124 @@ $("btnGlobalAdd").addEventListener("click",function(){
 
 /* ================= 结账收款 ================= */
 var checkoutApptId=null;
+var coRedeemPkg=""; // 结账时选中的套餐卡 id（核销不收款）
+/* 客户可用于抵扣某项目的套餐卡（剩余次数>0，不含已退款） */
+function pkgCardsOf(cid,serviceId){
+  if(!cid||!serviceId)return [];
+  return (DB.packageBuys||[]).filter(function(b){return b.customerId===cid&&!b.refunded&&b.remaining&&b.remaining[serviceId]>0;});
+}
+/* 套餐卡退款：先结算已核销次数（按市价），剩余未核销金额退款 */
+var refundPkgId=null;
+function refundPkg(bid){
+  if(!canEdit()){toast("仅管理员可以退款","err");return;}
+  var b=(DB.packageBuys||[]).find(function(x){return x.id===bid;});
+  if(!b){toast("套餐卡不存在","err");return;}
+  if(b.refunded){toast("该卡已退款","err");return;}
+  refundPkgId=bid;
+  var price=Math.round((+b.price||0)*100)/100;
+  var rows="",usedTotal=0,hasTotals=false;
+  var keys=Object.keys(b.totals||{});
+  if(keys.length){
+    hasTotals=true;
+    keys.forEach(function(k){
+      var sv=serviceById(k);
+      var total=(+b.totals[k]||0),rem=(+b.remaining[k]||0);
+      var used=Math.max(0,total-rem);
+      var up=sv?(+sv.price||0):0; // 已核销项目按市价结算（不按股东价）
+      var usedAmt=Math.round(used*up*100)/100;
+      usedTotal+=usedAmt;
+      rows+="<tr><td>"+esc(sv?sv.name:"?")+"</td><td style=\"text-align:center\">"+used+" "+(sv&&sv.isRent?"天":"次")+"</td><td style=\"text-align:center\">"+rem+" "+(sv&&sv.isRent?"天":"次")+"</td><td style=\"text-align:right\">"+fmtMoney(up)+"</td><td style=\"text-align:right\">"+fmtMoney(usedAmt)+"</td></tr>";
+    });
+  }else{
+    rows="<tr><td colspan=\"5\" style=\"text-align:center;color:var(--text-3)\">该卡购买记录较早，无初始次数明细，无法自动结算已核销；可手动修改下方退款金额。</td></tr>";
+  }
+  var refundAmt=Math.max(0,Math.round((price-usedTotal)*100)/100);
+  $("refundBody").innerHTML=
+    '<div style="padding:4px 2px 12px">'+
+      '<div class="member-cell"><span class="avatar" style="background:#d97706">🎫</span>'+
+      '<div class="info"><div class="name">'+esc(b.name)+'</div><div class="role">'+esc(b.date)+' 购 · 实付 '+fmtMoney(price)+' · '+(b.isShare?"共享股东价购":"普通价购")+"</div></div></div>"+
+      (hasTotals?
+        '<table style="margin-top:12px"><tr><th style="text-align:left">项目</th><th style="text-align:center">已核销</th><th style="text-align:center">剩余</th><th style="text-align:right">市价</th><th style="text-align:right">已核销金额</th></tr>'+rows+"</table>"+
+        '<div style="font-size:12.5px;color:var(--text-2);margin-top:10px;line-height:2">'+
+        '<div>已核销金额（按市价结算）：<b style="color:var(--danger)">'+fmtMoney(usedTotal)+'</b></div>'+
+        '<div>可退款（购买价 − 已核销金额）：<b style="font-size:18px;color:var(--text-1)">'+fmtMoney(refundAmt)+'</b></div></div>'
+        :'<div class="hint" style="margin-top:10px">可退款金额（默认=实付金额）：</div>')+
+      '<div class="form-item" style="margin-top:10px"><label>退款金额（元）<span class="req">*</span></label><input id="refundAmount" type="number" min="0" step="0.01" value="'+refundAmt+'"></div>'+
+      '<div class="hint" style="margin-top:8px">确认退款后：该卡不可再核销，其未核销的预拿佣金全部取消，已核销部分佣金不追回。</div>'+
+    "</div>";
+  showModal("refundMask");
+}
+function confirmRefundPkg(){
+  if(!canEdit()){toast("仅管理员可以退款","err");return;}
+  var b=(DB.packageBuys||[]).find(function(x){return x.id===refundPkgId;});
+  if(!b||b.refunded){closeModal("refundMask");return;}
+  var amt=Math.max(0,parseFloat($("refundAmount").value)||0);
+  if(!confirm("确认退款「"+b.name+"」"+fmtMoney(amt)+"？退款后该卡不可再核销，未核销的预拿佣金将取消。"))return;
+  b.refunded=true;
+  b.refundAt=todayStr()+" "+pad(new Date().getHours())+":"+pad(new Date().getMinutes());
+  b.refundAmount=Math.round(amt*100)/100;
+  b.usedAmount=Math.round(((+b.price||0)-amt)*100)/100;
+  // 退款记录（保留供统计报表查看）
+  DB.refunds=DB.refunds||[];
+  DB.refunds.push({id:uid(),cardId:b.id,date:todayStr(),time:pad(new Date().getHours())+":"+pad(new Date().getMinutes()),
+    cardName:b.name,customer:b.client,customerId:b.customerId||"",
+    amount:Math.round(amt*100)/100,usedAmount:b.usedAmount,price:Math.round((+b.price||0)*100)/100});
+  saveDB();
+  // 退款状态立即单条上推云端（不等周期全量推送，防刷新拉回旧值导致退款/预拿佣金复活）
+  if(cloudMode&&sess){
+    try{
+      cloudUpsert("packagebuys",[{id:b.id,customerid:b.customerId||null,customer_name:b.client||null,pkgid:b.pkgId||null,pkg_name:b.name||null,
+        price:(b.price!=null)?+b.price:0,cost:(b.pkgCost!=null)?+b.pkgCost:0,date:b.date||null,time:b.time||null,
+        isshare:!!b.isShare,remaining:b.remaining||{},totals:b.totals||{},refunded:true,
+        commeach:(b.commEach!=null)?+b.commEach:0,commtotal:(b.commTotal!=null)?+b.commTotal:0,commused:(b.commUsed!=null)?+b.commUsed:0}],"id").catch(function(e){toast("云端退款同步失败："+(e&&e.message?e.message:e),"err");});
+    }catch(e){}
+  }
+  closeModal("refundMask");
+  toast("已退款「"+b.name+"」"+fmtMoney(amt)+"，预拿佣金已取消");
+  renderAll(); // 全局刷新：杨亚拥等上级的可预拿佣金、统计报表等所有视图同步更新（退款卡已排除）
+  if($("customerConsumptionBody"))openCustomerConsumptionManager(b.customerId||"");
+}
+/* 套餐卡每次核销佣金：核销档位按购卡当月锁定（购卡时确定，此后档位变化不再影响）
+   (成交金额-成本)×购卡当月上级股东档位 ÷ 总次数 */
+function pkgCommEachOf(b){
+  if(!b)return 0;
+  var cust=b.customerId?customerById(b.customerId):null;
+  var ref=cust&&cust.referrer?customerById(cust.referrer):null;
+  var ratio=0;
+  if(ref&&ref.type==="shareholder"){var co=commissionOf(ref.id,(b.date||"").slice(0,7)||curYm());ratio=co&&co.ratio?co.ratio:0;}
+  if(ratio<=0)return 0;
+  var cost=+b.pkgCost||0;
+  if(cost<=0){cost=0;if(b.items)(b.items||[]).forEach(function(it){var svc=it.serviceId?serviceById(it.serviceId):null;cost+=(svc?+svc.cost||0:0)*(+it.count||1);});}
+  var profit=Math.max(0,(+b.price||0)-cost);
+  var total=0;
+  if(b.totals){for(var k in b.totals){total+=(+b.totals[k]||0);}}
+  else{for(var k2 in (b.remaining||{})){total+=(+b.remaining[k2]||0);}}
+  if(total<=0)return 0;
+  return Math.round(profit*ratio/total*100)/100;
+}
+/* 某股东名下可预拿佣金 = 其名下卡的未核销佣金（归属：卡主的介绍人/上级股东；实时按当前档位） */
+function pkgPendingCommOf(shId){
+  var s=0;
+  (DB.packageBuys||[]).forEach(function(b){
+    if(b.refunded)return;
+    var cust=b.customerId?customerById(b.customerId):null;
+    if(!cust)return;
+    var owner=cust.referrer||""; // 预拿佣金只归卡主上级介绍人；正式股东（无介绍人）归公司，不显示给本人
+    if(owner!==shId)return;
+    var each=pkgCommEachOf(b);
+    if(each<=0)return;
+    if(b.commTotal!=null&&b.commUsed!=null){
+      // 正确口径：可预拿 = 卡总佣金 − 已核销佣金（每核销一次扣一次，避免逐次四舍五入累积误差）
+      s+=Math.max(0,Math.round(((+b.commTotal)-(+b.commUsed))*100)/100);
+    }else{
+      // 旧卡无累计字段：按剩余单元 × 每单元佣金兜底
+      var cnt=0;
+      for(var k in b.remaining){if(b.remaining[k]>0)cnt+=b.remaining[k];}
+      s+=each*cnt;
+    }
+  });
+  return Math.round(s*100)/100;
+}
 var PAY_METHODS={cash:"现金",wechat:"微信",alipay:"支付宝",card:"银行卡",other:"其他"};
 function custOfAppt(a){
   var cust=a.customer_id?customerById(a.customer_id):null;
@@ -5645,7 +6646,38 @@ function openCheckout(id){
     (paid?'<div class="co-line"><span>已收款</span><b style="color:var(--ok)">'+fmtMoney(a.amount)+" · "+(PAY_METHODS[a.payMethod]||esc(a.payMethod)||"未记录")+'</b><span class="hint">（重新结账可修改金额）</span></div>':"");
   $("coAmount").value=def;
   $("coMethod").value=paid?a.payMethod:"cash";
+  // 套餐卡抵扣区：客户有含该项目次数的套餐卡时显示可选
+  coRedeemPkg="";
+  var cards=cust?pkgCardsOf(cust.id,sv?sv.id:""):[];
+  var pkgBox=$("coPkgBox"),pkgCards=$("coPkgCards");
+  if(pkgBox&&pkgCards){
+    if(cards.length){
+      pkgBox.style.display="";
+      pkgCards.innerHTML=cards.map(function(b,i){
+        return '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">'+
+          '<input type="radio" name="coPkgCard" value="'+b.id+'"'+(i===0?' checked':'')+' onchange="onCoPickPkg(this.value)">'+
+          '🎫 '+esc(b.name)+' <span class="tag tag-blue">剩余 '+b.remaining[sv.id]+' '+(sv&&sv.isRent?"天":"次")+'</span></label>';
+      }).join("");
+      // 有套餐卡自动优先核销：默认选中第一张，金额自动置 0
+      coRedeemPkg=cards[0].id;
+      onCoPickPkg(cards[0].id);
+    }else{
+      pkgBox.style.display="none";pkgCards.innerHTML="";
+    }
+  }
   showModal("checkoutMask");
+}
+function onCoPickPkg(cardId){
+  coRedeemPkg=cardId;
+  var sv=DB.appointments.find(function(x){return x.id===checkoutApptId;});
+  var svId=sv&&sv.serviceId?sv.serviceId:"";
+  var card=(DB.packageBuys||[]).find(function(b){return b.id===cardId;});
+  if(card&&card.remaining&&svId&&card.remaining[svId]>0){
+    $("coAmount").value=0;
+    var svU=serviceById(svId),unit=svU&&svU.isRent?"天":"次";
+    var tip=$("coTip");
+    if(tip)tip.innerHTML="已选套餐卡抵扣：<b>"+esc(card.name)+"</b> 扣减 1 "+unit+"（剩余 "+(card.remaining[svId]-1)+" "+unit+"），本次不收款";
+  }
 }
 function saveCheckout(){
   if(!canEdit()){toast("仅管理员可以结账","err");return;}
@@ -5656,14 +6688,28 @@ function saveCheckout(){
   if(!method){toast("请选择收款方式","err");return;}
   var sv=a.serviceId?serviceById(a.serviceId):null;
   var cust=custOfAppt(a);
+  var redeemNote="";
+  // 套餐卡核销：扣减对应项目次数，本次不收款；佣金=卡锁定每次核销佣金
+  if(coRedeemPkg){
+    var card=(DB.packageBuys||[]).find(function(b){return b.id===coRedeemPkg;});
+    if(card&&card.remaining&&sv&&card.remaining[sv.id]>0){
+      card.remaining[sv.id]--;
+      card.commUsed=Math.round(((+card.commUsed||0)+pkgCommEachOf(card))*100)/100; // 已核销佣金累计（预拿=总佣金−已核销）
+      amt=0;
+      a.redeemValue=custPrice(sv,cust); // 核销价值：客户消费流水
+      a.commEarned=pkgCommEachOf(card); // 套餐佣金：每次核销 = (成交金额-成本)×购卡当月档位÷总次数（购卡时锁定）
+      redeemNote=card.name+"（剩余 "+card.remaining[sv.id]+" "+(sv.isRent?"天":"次")+"）"+(a.commEarned>0?" · 佣金 "+fmtMoney(a.commEarned):"");
+    }
+  }
   a.amount=amt;
   a.payMethod=method;
   a.paidAt=new Date().toISOString();
   a.status="done";
+  if(redeemNote)a.note=(a.note?a.note+" · ":"")+"套餐核销："+redeemNote;
   if(sv){a.unitPrice=custPrice(sv,cust);a.serviceCost=(+sv.cost||0);}else{a.unitPrice=null;a.serviceCost=null;}
   saveDB();
   closeModal("checkoutMask");
-  toast(amt>0?("已收款 "+fmtMoney(amt)+"（"+(PAY_METHODS[method]||method)+"）"):"已结账（金额为 0）");
+  toast(redeemNote?("已核销套餐卡："+redeemNote):(amt>0?("已收款 "+fmtMoney(amt)+"（"+(PAY_METHODS[method]||method)+"）"):"已结账（金额为 0）"));
   upsertConsumptionFromAppt(a,"checkout");
   openReceipt(checkoutApptId);
 }
@@ -5671,6 +6717,7 @@ function saveCheckout(){
 /* ================= 直接购买（免预约收银） ================= */
 var buyCustId="";
 var buySelections={}; // serviceId -> {qty:number}
+var buyRedeems={}; // serviceId -> true（用套餐卡核销，不收款）
 function renderBuy(){
   var custSel=$("buyCustPick"),proj=$("buyProjects");
   if(!custSel||!proj)return;
@@ -5682,6 +6729,7 @@ function renderBuy(){
   if(buyCustId)custSel.value=buyCustId;
   updateBuyPriceNote();
   renderBuyProjects();
+  renderBuyPackages();
 }
 function renderBuyProjects(){
   var proj=$("buyProjects");
@@ -5690,13 +6738,16 @@ function renderBuyProjects(){
     proj.innerHTML='<div class="empty-tip" style="padding:24px">暂无可直接购买的项目（出租项目请在「出租登记」操作）</div>';
     return;
   }
-  var isShare=!!(buyCust()&&buyCust().type==="shareholder");
+  var c=buyCust();
+  var isShare=!!(c&&c.type==="shareholder");
   var html="";
-  DB.services.filter(function(s){return !s.isRent;}).forEach(function(s){
+  DB.services.filter(function(s){return !s.isRent&&String(s.name||"").indexOf("__DEL__")!==0;}).forEach(function(s){
     var price=isShare&&s.priceShareholder!=null? +s.priceShareholder : +s.price;
     var sel=buySelections[s.id];
     var checked=sel?"checked":"";
     var qty=sel?sel.qty:1;
+    var rcards=c?pkgCardsOf(c.id,s.id):[];
+    if(buyRedeems[s.id]===undefined&&rcards.length)buyRedeems[s.id]=true; // 有卡自动优先核销（用户手动取消后不再勾选）
     html+='<div class="buy-row" style="display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:#fff">'+
       '<label style="display:flex;align-items:center;gap:8px;flex:1;cursor:pointer"><input type="checkbox" '+(checked?'checked':'')+' onchange="toggleBuyItem(\''+s.id+'\',this.checked)">'+
       '<span class="dot" style="width:10px;height:10px;border-radius:50%;background:'+esc(s.color||"#6b7280")+'"></span>'+
@@ -5705,10 +6756,57 @@ function renderBuyProjects(){
       (isShare&&s.priceShareholder!=null?'<span class="tag tag-warn" style="font-size:10px">股东价</span>':"")+
       '<span style="font-size:13px;color:var(--text-3)">数量</span>'+
       '<input type="number" min="1" value="'+qty+'" style="width:64px" '+(checked?'':'disabled')+' id="buyQty-'+s.id+'" onchange="updateBuyTotal()">'+
+      (rcards.length?'<label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text-2);cursor:pointer;white-space:nowrap"><input type="checkbox" '+(buyRedeems[s.id]===false?'':(buyRedeems[s.id]||rcards.length?'checked':''))+' onchange="toggleBuyRedeem(\''+s.id+'\',this.checked)">🪪 用套餐</label>':"")+
       '<span class="tag tag-gray" style="font-size:11px;min-width:76px;text-align:center" id="buyLine-'+s.id+'">'+(checked?fmtMoney(price*qty):"未选")+"</span></div>";
   });
   proj.innerHTML=html;
   updateBuyTotal();
+}
+function toggleBuyRedeem(sid,on){
+  if(on)buyRedeems[sid]=true;
+  else buyRedeems[sid]=false; // false = 用户手动取消（有卡也不自动勾选）
+  renderBuy();
+  updateBuyTotal();
+}
+/* ---- 直接购买：套餐（预存卡） ---- */
+var buyPkgSelections={}; // pkgId -> true
+function renderBuyPackages(){
+  var box=$("buyPackages");
+  if(!box)return;
+  var pkgs=(DB.packages||[]).filter(function(p){return String(p.name||"").indexOf("__DEL__")!==0;});
+  if(!pkgs.length){
+    box.innerHTML='<div class="empty-tip" style="padding:16px">暂无套餐（在「项目与时段 → 套餐项目」中新增）</div>';
+    return;
+  }
+  var c=buyCust(),isShare=!!(c&&c.type==="shareholder");
+  var html="";
+  pkgs.forEach(function(p){
+    var price=isShare&&p.priceShareholder!=null? +p.priceShareholder : +p.price;
+    var desc=(p.items||[]).map(function(it){
+      var sv=serviceById(it.serviceId);
+      return (sv?sv.name:"?")+"×"+it.count;
+    }).join("、");
+    var checked=buyPkgSelections[p.id]?"checked":"";
+    html+='<div class="buy-row" style="display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:#fff">'+
+      '<label style="display:flex;align-items:center;gap:8px;flex:1;cursor:pointer"><input type="checkbox" '+checked+' onchange="toggleBuyPkg(\''+p.id+'\',this.checked)">'+
+      '<b>🎫 '+esc(p.name)+'</b></label>'+
+      '<span class="hint">'+esc(desc)+"</span>"+
+      '<span style="font-size:13px;color:var(--text-2)">'+fmtMoney(price)+'</span>'+
+      (isShare&&p.priceShareholder!=null?'<span class="tag tag-warn" style="font-size:10px">股东价</span>':"")+
+      '<span class="tag tag-gray" style="font-size:11px;min-width:76px;text-align:center" id="buyPkgLine-'+p.id+'">'+(buyPkgSelections[p.id]?fmtMoney(price):"未选")+"</span></div>";
+  });
+  box.innerHTML=html;
+}
+function toggleBuyPkg(pid,on){
+  if(on)buyPkgSelections[pid]=true;
+  else delete buyPkgSelections[pid];
+  renderBuyPackages();
+  updateBuyTotal();
+}
+function buyPkgList(){
+  return Object.keys(buyPkgSelections).map(function(id){
+    return (DB.packages||[]).find(function(p){return p.id===id;});
+  }).filter(function(p){return p;});
 }
 function buyCust(){
   return buyCustId?customerById(buyCustId):null;
@@ -5735,11 +6833,24 @@ function toggleBuyItem(sid,on){
 function updateBuyTotal(){
   var c=buyCust(),isShare=!!(c&&c.type==="shareholder");
   var total=0,cnt=0,rows=[];
-  DB.services.filter(function(s){return !s.isRent;}).forEach(function(s){
+  DB.services.filter(function(s){return !s.isRent&&String(s.name||"").indexOf("__DEL__")!==0;}).forEach(function(s){
     var sel=buySelections[s.id],priceEl=$("buyPrice-"+s.id),qtyEl=$("buyQty-"+s.id),lineEl=$("buyLine-"+s.id);
     if(!sel)return;
     var qty=Math.max(1,parseInt(qtyEl&&qtyEl.value,10)||1);
     sel.qty=qty;
+    // 用套餐卡核销：不收款，扣卡次数
+    if(buyRedeems[s.id]){
+      var rc=c?pkgCardsOf(c.id,s.id)[0]:null;
+      if(rc){
+        if(priceEl)priceEl.textContent=fmtMoney(0);
+        if(lineEl)lineEl.textContent="套餐核销";
+        rows.push(s.name+"（用套餐卡）");
+        if(qtyEl)qtyEl.disabled=false;
+        return;
+      }else{
+        delete buyRedeems[s.id];
+      }
+    }
     var price=isShare&&s.priceShareholder!=null? +s.priceShareholder : +s.price;
     if(priceEl)priceEl.textContent=fmtMoney(price);
     var sub=price*qty;
@@ -5748,13 +6859,22 @@ function updateBuyTotal(){
     rows.push(s.name+" ×"+qty);
     if(qtyEl)qtyEl.disabled=false;
   });
+  // 套餐金额
+  var c2=buyCust(),isShare2=!!(c2&&c2.type==="shareholder");
+  buyPkgList().forEach(function(p){
+    var price=isShare2&&p.priceShareholder!=null? +p.priceShareholder : +p.price;
+    total+=price;cnt++;
+    var lineEl=$("buyPkgLine-"+p.id);
+    if(lineEl)lineEl.textContent=fmtMoney(price);
+    rows.push("套餐·"+p.name);
+  });
   var totalEl=$("buyTotal");
   if(totalEl)totalEl.textContent=fmtMoney(total);
   var note=$("buyTotalNote");
   if(note)note.innerHTML=cnt?("已选 "+cnt+" 个项目："+rows.join("、")):"请选择至少一个项目";
 }
 function resetBuy(){
-  buyCustId="";buySelections={};
+  buyCustId="";buySelections={};buyPkgSelections={};buyRedeems={};
   var cs=$("buyCustPick");if(cs)cs.value="";
   $("buyClient").value="";$("buyPhone").value="";$("buyMethod").value="cash";
   renderBuy();
@@ -5764,21 +6884,40 @@ function saveDirectBuy(){
   var client=$("buyClient").value.trim();
   if(!client){toast("请填写客户姓名","err");return;}
   var c=buyCust(),isShare=!!(c&&c.type==="shareholder");
-  var items=[],total=0,cost=0,mainSvid="";
-  DB.services.filter(function(s){return !s.isRent;}).forEach(function(s){
+  var items=[],total=0,cost=0,mainSvid="",redeemVal=0;
+  DB.services.filter(function(s){return !s.isRent&&String(s.name||"").indexOf("__DEL__")!==0;}).forEach(function(s){
     var sel=buySelections[s.id];
     if(!sel)return;
     var qty=Math.max(1,parseInt(sel.qty,10)||1);
+    // 套餐卡核销：不收款，扣卡次数（保存后统一扣减）
+    if(buyRedeems[s.id]){
+      var rc=c?pkgCardsOf(c.id,s.id)[0]:null;
+      if(rc){
+        items.push({kind:"redeem",serviceId:s.id,name:s.name+"（套餐核销）",unitPrice:0,qty:qty,subtotal:0,cardId:rc.id,cardName:rc.name});
+        redeemVal+=custPrice(s,c)*qty; // 核销价值：佣金按此到账
+        if(!mainSvid)mainSvid=s.id;
+        return;
+      }
+      delete buyRedeems[s.id];
+    }
     var price=isShare&&s.priceShareholder!=null? +s.priceShareholder : +s.price;
     var sub=price*qty;
     items.push({serviceId:s.id,name:s.name,unitPrice:price,qty:qty,subtotal:sub});
     total+=sub;cost+=(+s.cost||0)*qty;
     if(!mainSvid)mainSvid=s.id;
   });
-  if(!items.length){toast("请选择至少一个项目","err");return;}
+  // 套餐（预存卡）金额与成本
+  var pkgSel=buyPkgList();
+  pkgSel.forEach(function(p){
+    var price=isShare&&p.priceShareholder!=null? +p.priceShareholder : +p.price;
+    items.push({kind:"pkg",pkgId:p.id,name:p.name,unitPrice:price,qty:1,subtotal:price});
+    total+=price;cost+=(+p.cost||0);
+  });
+  if(!items.length){toast("请选择至少一个项目或套餐","err");return;}
   var method=$("buyMethod").value;
   if(!method){toast("请选择收款方式","err");return;}
   var now=new Date();
+  var pkgFirstName=pkgSel.length?pkgSel[0].name:"";
   var rec={
     id:uid(),date:todayStr(),time:pad(now.getHours())+":"+pad(now.getMinutes()),
     duration:0,serviceId:mainSvid,memberId:"",
@@ -5786,18 +6925,74 @@ function saveDirectBuy(){
     note:c?("直接购买 · "+esc(c.name)):"直接购买 · 散客",
     status:"done",amount:Math.round(total*100)/100,payMethod:method,paidAt:now.toISOString(),
     customer_id:c?c.id:"",referrer:c?c.referrer:"",kind:"direct",
+    pkgBuyOnly:!!pkgSel.length, // 套餐购买：预存款不计佣金，核销时才到账
+    redeemValue:Math.round(redeemVal*100)/100, // 本单核销价值（佣金按此计提）
     unitPrice:Math.round(total*100)/100,serviceCost:Math.round(cost*100)/100,
-    items:items
+    serviceName:pkgFirstName||"",items:items
   };
   DB.appointments.push(rec);
+  // 生成套餐卡记录（预存款，含各项目剩余次数；并锁定套餐佣金：利润×比例÷总次数=每次核销佣金）
+  pkgSel.forEach(function(p){
+    var price=isShare&&p.priceShareholder!=null? +p.priceShareholder : +p.price;
+    var remaining={},totals={};
+    (p.items||[]).forEach(function(it){var c0=Math.max(1,parseInt(it.count,10)||1);totals[it.serviceId]=(totals[it.serviceId]||0)+c0;remaining[it.serviceId]=(remaining[it.serviceId]||0)+c0;});
+    var totalCount=(p.items||[]).reduce(function(s,it){return s+Math.max(1,parseInt(it.count,10)||1);},0);
+    var pkgCostTotal=(+p.cost||0);
+    if(pkgCostTotal<=0){pkgCostTotal=0;(p.items||[]).forEach(function(it){var svc=serviceById(it.serviceId);pkgCostTotal+=(svc?+svc.cost||0:0)*Math.max(1,parseInt(it.count,10)||1);});}
+    var pkgProfit=Math.max(0,Math.round((price-pkgCostTotal)*100)/100);
+    var shRef=c?(c.referrer?customerById(c.referrer):null):null; // 佣金只归上级介绍人；正式股东（无介绍人）购买佣金归公司，不记本人
+    var ratio=0;
+    if(shRef&&shRef.type==="shareholder"){var co=commissionOf(shRef.id,curYm());ratio=co&&co.ratio?co.ratio:0;}
+    var commTotal=Math.round(pkgProfit*ratio*100)/100;
+    var commEach=totalCount>0?Math.round(commTotal/totalCount*100)/100:0;
+    DB.packageBuys=DB.packageBuys||[];
+    DB.packageBuys.push({id:uid(),pkgId:p.id,name:p.name,customerId:c?c.id:"",client:client,phone:$("buyPhone").value.trim(),
+      date:todayStr(),time:pad(now.getHours())+":"+pad(now.getMinutes()),price:Math.round(price*100)/100,
+      isShare:!!isShare,method:method,remaining:remaining,totals:totals,
+      commEach:commEach,commTotal:commTotal,pkgCost:pkgCostTotal});
+  });
+  // 套餐卡核销扣次（选中的「用套餐」项目），并累计本单核销佣金
+  var redeemLog=[],commEarned=0;
+  items.forEach(function(it){
+    if(it.kind!=="redeem"||!it.cardId)return;
+    var card=(DB.packageBuys||[]).find(function(b){return b.id===it.cardId;});
+    if(card&&card.remaining&&card.remaining[it.serviceId]>0){
+      card.remaining[it.serviceId]=Math.max(0,card.remaining[it.serviceId]-it.qty);
+      redeemLog.push(card.name+" -"+it.qty);
+      // 套餐佣金：每次核销 = (成交金额-成本)×当前档位÷总次数（实时，不按购卡锁定）
+      if(card){commEarned+=pkgCommEachOf(card)*it.qty;card.commUsed=Math.round(((+card.commUsed||0)+pkgCommEachOf(card)*it.qty)*100)/100;}
+      else{
+        var svR=serviceById(it.serviceId);
+        var shR=c?(c.referrer?customerById(c.referrer):null):null; // 核销兜底同样只归上级介绍人
+        var ratioR=0;
+        if(shR&&shR.type==="shareholder"){var coR=commissionOf(shR.id,curYm());ratioR=coR&&coR.ratio?coR.ratio:0;}
+        commEarned+=Math.round(custPrice(svR,c)*ratioR*100)/100*it.qty;
+      }
+    }
+  });
+  if(commEarned>0)rec.commEarned=Math.round(commEarned*100)/100;
   saveDB();
   closeModal("checkoutMask");
-  toast("已收款 "+fmtMoney(total)+"（"+(PAY_METHODS[method]||method)+"）");
+  toast(redeemLog.length?("已收款 "+fmtMoney(total)+"（"+(PAY_METHODS[method]||method)+"）· 核销："+redeemLog.join("、")):("已收款 "+fmtMoney(total)+"（"+(PAY_METHODS[method]||method)+"）"));
   upsertConsumptionFromAppt(rec,"buy");
   resetBuy();
   openReceipt(rec.id);
 }
 
+/* 客户退款消费调整（退套餐预存款；ym 传则只统计该月）：
+   退款卡对应直购单（预存款）已计入消费 → 扣减退款额（消费=购买价−退款=已核销真实消费）；
+   直购单已不存在 → 补记已核销真实消费（购买价−退款），保证已真实消费部分不丢 */
+function refundAdjustOf(cid,ym){
+  var s=0;
+  (DB.refunds||[]).forEach(function(r){
+    if(r.customerId!==cid||(ym&&(r.date||"").indexOf(ym)!==0))return;
+    var rAmt=+r.amount||0;if(!rAmt)return;
+    var card=r.cardId?(DB.packageBuys||[]).find(function(b){return b.id===r.cardId;}):null;
+    var hasBuy=card&&(DB.appointments||[]).some(function(a){return a.kind==="direct"&&a.customer_id===cid&&a.date===card.date&&a.time===card.time;});
+    s+=hasBuy? -rAmt : Math.max(0,(+r.price||0)-rAmt);
+  });
+  return s;
+}
 /* ================= 总消费记录（历史消费台账） ================= */
 var conEditId=null;
 function curYm(){var d=new Date();return d.getFullYear()+"-"+(d.getMonth()<9?"0":"")+(d.getMonth()+1);}
@@ -5806,49 +7001,72 @@ function monthSpentOf(cid,ym){
   var s=0,keyed={};
   (DB.consumptions||[]).forEach(function(c){
     var custId=c.customer_id||c.customerId||"";
-    if(custId===cid&&(c.date||"").indexOf(ym)===0){s+=(+c.amount||0);if(c.apptId)keyed[c.apptId]=1;}
+    if(c.pkgBuy)return; // 套餐购买预存款在 appointments 同单统计，避免此处重复
+    if(custId===cid&&(c.date||"").indexOf(ym)===0){
+      if(c.apptId){
+        var ap=DB.appointments.find(function(a){return a.id===c.apptId;});
+        if(ap&&(+ap.redeemValue||0)>0){ // 核销/混合台账：台账含核销价值，消费统计按预约实收（避免把未收款核销价值计入）
+          if(+ap.amount>0)keyed[ap.id]=1;
+          return;
+        }
+      }
+      s+=(+c.amount||0);if(c.apptId)keyed[c.apptId]=1;
+    }
   });
   DB.appointments.forEach(function(a){
     if(a.customer_id===cid&&(a.date||"").indexOf(ym)===0&&!keyed[a.id]&&(a.status==="done"||(a.kind==="rent"&&a.status==="returned")))s+=(+a.amount||0);
   });
-  return Math.round(s*100)/100;
+  return Math.round(Math.max(0,s+refundAdjustOf(cid,ym))*100)/100;
+}
+/* 客户历史总消费（不限月份，含出租归还租金；与 monthSpentOf 同口径） */
+function totalSpentOf(cid){
+  var s=0,keyed={};
+  (DB.consumptions||[]).forEach(function(c){
+    var custId=c.customer_id||c.customerId||"";
+    if(c.pkgBuy)return; // 套餐购买预存款在 appointments 同单统计，避免此处重复
+    if(custId===cid){
+      if(c.apptId){
+        var ap=DB.appointments.find(function(a){return a.id===c.apptId;});
+        if(ap&&(+ap.redeemValue||0)>0){ // 核销/混合台账：消费统计按预约实收
+          if(+ap.amount>0)keyed[ap.id]=1;
+          return;
+        }
+      }
+      s+=(+c.amount||0);if(c.apptId)keyed[c.apptId]=1;
+    }
+  });
+  DB.appointments.forEach(function(a){
+    if(a.customer_id===cid&&!keyed[a.id]&&(a.status==="done"||(a.kind==="rent"&&a.status==="returned")))s+=(+a.amount||0);
+  });
+  return Math.round(Math.max(0,s+refundAdjustOf(cid))*100)/100;
 }
 /* 结账 / 直接购买后自动登记消费记录（同预约重复结账只更新，不新增） */
 function upsertConsumptionFromAppt(a,kind){
   if(!DB.consumptions)DB.consumptions=[];
   var found=DB.consumptions.find(function(c){return c.apptId===a.id;});
   var itemName=a.serviceId?(function(){var sv=serviceById(a.serviceId);return sv?sv.name:(a.serviceName||"预约项目");})():(a.serviceName||(kind==="buy"?"直接购买":"预约"));
-  var amt=Math.round((+a.amount||0)*100)/100;
+  if((+a.redeemValue||0)>0)itemName+="（套餐核销）"; // 核销记录加标记，便于识别
+  var amt=Math.round((+a.amount||0)*100)/100; // 台账按实收记录：纯套餐核销收款 0 元 → 台账 0 元（记录核销行为）
+  var isPkgBuy=!!a.pkgBuyOnly;
   if(found){
-    found.date=a.date;found.customer_id=a.customer_id||"";found.customer=a.client||"";
+    found.date=a.date;found.customer_id=(a.customer_id&&isValidUUID(a.customer_id))?a.customer_id:"";found.customer=a.client||"";
     found.item=itemName;found.amount=amt;found.method=a.payMethod||"";found.kind=kind;
+    found.pkgBuy=isPkgBuy?true:(found.pkgBuy||false);
     found.note=(kind==="buy"?"直接购买":"预约结账")+(a.note?(" · "+a.note):"");
   }else{
     DB.consumptions.push({
-      id:uid(),date:a.date,customer_id:a.customer_id||"",customer:a.client||"",
+      id:uid(),date:a.date,customer_id:(a.customer_id&&isValidUUID(a.customer_id))?a.customer_id:"",customer:a.client||"",
       item:itemName,amount:amt,method:a.payMethod||"",kind:kind,
       note:(kind==="buy"?"直接购买":"预约结账")+(a.note?(" · "+a.note):""),
-      apptId:a.id
+      apptId:a.id,pkgBuy:isPkgBuy?true:false
     });
   }
   saveDB();
 }
-function renderConsumption(){
-  var wrap=$("consumptionBody");
-  if(!wrap)return;
-  var rows=DB.consumptions||[];
-  rows=rows.slice().sort(function(x,y){return (x.date<y.date)?1:(x.date>y.date?-1:(x.id<y.id?1:-1));});
-  var total=rows.reduce(function(s,r){return s+(+r.amount||0);},0);
-  var d=curYm();
-  var mtotal=rows.reduce(function(s,r){return s+(((r.date||"").indexOf(d)===0)?(+r.amount||0):0);},0);
-  if(!rows.length){
-    wrap.innerHTML='<div class="empty"><div class="big">💰</div><h3>暂无消费记录</h3><p>预约结账、直接购买会自动登记在这里，也可手动新增。删除记录会同步删除其关联预约。</p></div>';
-    return;
-  }
-  var h='<div style="display:flex;gap:12px;flex-wrap:wrap;padding:14px 16px;border-bottom:1px solid var(--border)">'+
-  '<div style="background:var(--bg-1);border-radius:10px;padding:10px 16px;text-align:center"><div style="font-size:22px;font-weight:800;color:var(--primary)">'+fmtMoney(total)+'</div><div class="hint">历史总消费（'+rows.length+' 笔）</div></div>'+
-  '<div style="background:var(--bg-1);border-radius:10px;padding:10px 16px;text-align:center"><div style="font-size:22px;font-weight:800;color:#16a34a">'+fmtMoney(mtotal)+'</div><div class="hint">本月消费（'+d+'）</div></div></div>';
-  h+='<table><tr><th>日期</th><th>客户</th><th>项目</th><th style="text-align:right">金额</th><th>收款方式</th><th>备注</th><th style="text-align:right">操作</th></tr>';
+/* 消费台账行表格（总消费记录页与统计报表页共用） */
+function consumptionRowsHtml(rows){
+  if(!rows||!rows.length)return "";
+  var h='<table><tr><th>日期</th><th>客户</th><th>项目</th><th style="text-align:right">金额</th><th>收款方式</th><th>备注</th><th style="text-align:right">操作</th></tr>';
   rows.forEach(function(r){
     var custName=r.customer||(r.customer_id?((function(){var c=customerById(r.customer_id);return c?c.name:"";})()):"")||"散客";
     var tag=r.kind==="buy"?'<span class="tag tag-blue">购买</span>':(r.kind==="checkout"?'<span class="tag tag-green">结账</span>':'<span class="tag tag-gray">手动</span>');
@@ -5860,7 +7078,139 @@ function renderConsumption(){
   });
   h+='<tr><td colspan="7" style="font-size:12px;color:var(--text-3);padding:8px 14px">删除某条消费记录时，其关联的预约会同步删除（股东「我预约的项目」中相应记录同时消失）。</td></tr>';
   h+="</table>";
+  return h;
+}
+/* 统计报表页：直接购买记录（直接购买/套餐购买/套餐核销） */
+var rpConQ=""; // 总消费记录搜索关键字
+var rpDirectQ=""; // 直接购买记录搜索关键字
+var curRpR=null;
+var rpDirectHeadInited=false,rpConHeadInited=false;
+/* 直购记录：头部（统计+搜索框）只渲染一次，输入时仅刷新表格，避免搜索框失焦 */
+function renderRpDirect(R){
+  var wrap=$("rpDirectBody");
+  if(!wrap)return;
+  if(!rpDirectHeadInited){
+    rpDirectHeadInited=true;
+    wrap.innerHTML='<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:14px 16px;border-bottom:1px solid var(--border)">'+
+    '<div style="background:var(--bg-1);border-radius:10px;padding:8px 16px;text-align:center"><div id="rpDirectStat" style="font-size:20px;font-weight:800;color:var(--primary)"></div><div class="hint" id="rpDirectStatSub"></div></div>'+
+    '<input id="rpDirectQ" placeholder="搜索姓名/项目/金额" value="'+esc(rpDirectQ)+'" style="width:200px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;outline:none" oninput="rpDirectQ=this.value;rpDirectRefresh()">'+
+    '</div><div id="rpDirectTable"></div>';
+  }
+  curRpR=R;
+  rpDirectRefresh();
+}
+function rpDirectRefresh(){
+  var wrap=$("rpDirectTable");
+  if(!wrap)return;
+  var R=curRpR||rpRange();
+  var rows=(DB.appointments||[]).filter(function(a){return a.kind==="direct"&&(a.date||"")>=R.s&&(a.date||"")<=R.e;});
+  rows=rows.sort(function(x,y){return (x.date<y.date)?1:(x.date>y.date?-1:(x.id<y.id?1:-1));});
+  var q=(rpDirectQ||"").toLowerCase().trim();
+  if(q){
+    rows=rows.filter(function(a){
+      var cn=(a.client||"").toLowerCase();
+      var det=normalizeItems(a.items).map(function(it){return (it.name||"")+(it.cardName||"");}).join(" ").toLowerCase();
+      var amt=String(a.amount||0);
+      return cn.indexOf(q)>=0||det.indexOf(q)>=0||amt.indexOf(q)>=0;
+    });
+  }
+  var filtered=!!q;
+  var total=rows.reduce(function(s,a){return s+(+a.amount||0);},0);
+  $("rpDirectStat").innerHTML=fmtMoney(total);
+  $("rpDirectStatSub").innerHTML=R.label+'直购总额（'+rows.length+' 笔'+(filtered?'，已筛选':"")+'）';
+  if(!rows.length){
+    if(filtered){wrap.innerHTML='<div class="empty"><div class="big">🔍</div><h3>没有匹配的直接购买记录</h3><p>切换关键词或清空搜索后重试。</p></div>';return;}
+    wrap.innerHTML='<div class="empty"><div class="big">🛒</div><h3>该周期内暂无直接购买记录</h3><p>在「直接购买」页完成的购买、套餐购买与套餐核销会显示在这里。</p></div>';
+    return;
+  }
+  var h='<table><tr><th>日期</th><th>时间</th><th>客户</th><th>项目明细</th><th style="text-align:right">金额</th><th>收款方式</th><th>类型</th><th style="text-align:right">操作</th></tr>';
+  rows.forEach(function(a){
+    var custName=a.client||(a.customer_id?((function(){var c=customerById(a.customer_id);return c?c.name:"";})()):"")||"散客";
+    var det=normalizeItems(a.items).map(function(it){
+      if(it.kind==="pkg")return "购买套餐 · "+it.name;
+      if(it.kind==="redeem")return "核销套餐 · "+(it.cardName||"")+"( -"+it.qty+" )";
+      return it.name||"";
+    }).join("、")||(a.serviceName||a.item||"-");
+    var typ=a.pkgBuyOnly?'<span class="tag tag-warn">套餐购买</span>':((+a.redeemValue||0)>0?'<span class="tag tag-blue" style="background:#ede9fe;color:#7c3aed;border-color:#ddd6fe">直购含核销</span>':'<span class="tag tag-blue">直接购买</span>');
+    h+="<tr><td>"+a.date+"</td><td>"+(a.time||"-")+"</td><td>"+esc(custName)+"</td><td>"+esc(det)+"</td>"+
+      '<td style="text-align:right"><b>'+fmtMoney(a.amount||0)+"</b></td>"+
+      "<td>"+esc((PAY_METHODS[a.payMethod||a.method]||a.payMethod||a.method||"-"))+"</td><td>"+typ+"</td>"+
+      '<td style="text-align:right"><button class="btn btn-danger btn-xs" type="button" data-id="'+a.id+'" onclick="delDirectAppt(this)">删除</button></td></tr>';
+  });
+  h+='<tr><td colspan="8" style="font-size:12px;color:var(--text-3);padding:8px 14px">删除直购记录时，其关联的消费台账、本单创建的套餐卡（未核销的预拿佣金同步取消）会一并删除，并同步到云端。</td></tr>';
+  h+="</table>";
   wrap.innerHTML=h;
+}
+/* 删除直购单：同步删除关联消费台账、本单创建的套餐卡，并上推云端墓碑 */
+function delDirectAppt(btn){
+  if(!canEdit()){toast("普通用户不能删除","err");return;}
+  var id=btn.getAttribute("data-id");
+  var a=DB.appointments.find(function(x){return x.id===id;});
+  if(!a)return;
+  var pkgNames=normalizeItems(a.items).filter(function(it){return it.kind==="pkg";}).map(function(it){return it.name;});
+  if(!confirm("确定删除 "+(a.date+" "+a.time)+" "+a.client+" 的直接购买记录？"+(pkgNames.length?"\n其创建的套餐卡（"+pkgNames.join("、")+"）及未核销预拿佣金将一并取消。":"")))return;
+  // 1) 删除预约本身
+  DB.appointments=DB.appointments.filter(function(x){return x.id!==id;});
+  // 2) 删除关联消费台账（apptId 关联）
+  DB.consumptions=(DB.consumptions||[]).filter(function(c){return c.apptId!==id;});
+  // 3) 删除本单创建的套餐卡（同客户+同日+同时刻 即视为本单创建；退款卡保留统计记录）
+  var cardIds=[];
+  (DB.packageBuys||[]).forEach(function(b){
+    if(!b.refunded&&b.customerId===a.customer_id&&b.date===a.date&&b.time===a.time){
+      cardIds.push(b.id);
+    }
+  });
+  if(cardIds.length)DB.packageBuys=(DB.packageBuys||[]).filter(function(b){return cardIds.indexOf(b.id)<0;});
+  // 4) 云端墓碑同步删除（预约 + 本单创建的套餐卡）
+  if(cloudMode&&sess){
+    markDeleted("appointments",id);
+    cloudDeleteRows("appointments",[id]).catch(function(e){toast("云端删除失败："+(e&&e.message?e.message:e),"err");});
+    if(cardIds.length)cloudDeleteRows("packagebuys",cardIds).catch(function(e){toast("云端删除套餐卡失败："+(e&&e.message?e.message:e),"err");});
+  }
+  saveDB();
+  toast("直购记录已删除"+(cardIds.length?"，套餐卡 "+cardIds.length+" 张已一并删除":""));
+  renderAll(); // 同步刷新工作台 / 预约 / 统计报表 / 共享板块等所有视图
+}
+/* 统计报表页：按当前统计周期渲染消费明细台账（支持搜索） */
+function renderRpConsumption(R){
+  var wrap=$("rpConsumptionBody");
+  if(!wrap)return;
+  if(!rpConHeadInited){
+    rpConHeadInited=true;
+    wrap.innerHTML='<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:14px 16px;border-bottom:1px solid var(--border)">'+
+    '<div style="background:var(--bg-1);border-radius:10px;padding:8px 16px;text-align:center"><div id="rpConStat" style="font-size:20px;font-weight:800;color:var(--primary)"></div><div class="hint" id="rpConStatSub"></div></div>'+
+    '<input id="rpConQ" placeholder="搜索姓名/项目/金额" value="'+esc(rpConQ)+'" style="width:200px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;outline:none" oninput="rpConQ=this.value;rpConRefresh()">'+
+    '</div><div id="rpConTable"></div>';
+  }
+  R=R||curRpR;
+  curRpR=R||rpRange();
+  rpConRefresh();
+}
+function rpConRefresh(){
+  var wrap=$("rpConTable");
+  if(!wrap)return;
+  var R=curRpR||rpRange();
+  var rows=(DB.consumptions||[]).filter(function(r){return (r.date||"")>=R.s&&(r.date||"")<=R.e&&r.kind!=="buy";});
+  rows=rows.sort(function(x,y){return (x.date<y.date)?1:(x.date>y.date?-1:(x.id<y.id?1:-1));});
+  var q=(rpConQ||"").toLowerCase().trim();
+  if(q){
+    rows=rows.filter(function(r){
+      var cn=((r.customer||"")+(r.customer_id?((function(){var c=customerById(r.customer_id);return c?c.name:"";})()):"")).toLowerCase();
+      var it=(r.item||"").toLowerCase();
+      var amt=String(r.amount||0);
+      return cn.indexOf(q)>=0||it.indexOf(q)>=0||amt.indexOf(q)>=0;
+    });
+  }
+  var filtered=!!q;
+  var total=rows.reduce(function(s,r){return s+(+r.amount||0);},0);
+  $("rpConStat").innerHTML=fmtMoney(total);
+  $("rpConStatSub").innerHTML=R.label+'总消费（'+rows.length+' 笔'+(filtered?'，已筛选':"")+'）';
+  if(!rows.length){
+    if(filtered){wrap.innerHTML='<div class="empty"><div class="big">🔍</div><h3>没有匹配的消费记录</h3><p>切换关键词或清空搜索后重试。</p></div>';return;}
+    wrap.innerHTML='<div class="empty"><div class="big">💰</div><h3>该周期内暂无消费记录</h3><p>切换上方时间范围查看其他周期；预约结账、手动登记会显示在这里，直接购买请查看上方「直接购买记录」。</p></div>';
+    return;
+  }
+  wrap.innerHTML=consumptionRowsHtml(rows);
 }
 function openConById(btn){var id=btn.getAttribute("data-id");if(id)openConsumptionModal(id);}
 function delConById(btn){var id=btn.getAttribute("data-id");if(id)delConsumption(id);}
@@ -5915,12 +7265,26 @@ function delConsumption(id){
   if(!confirm(msg))return;
   DB.consumptions=DB.consumptions.filter(function(x){return x.id!==id;});
   if(r.apptId){
+    // 直购套餐单：先找本单创建的套餐卡，随预约一并删除（含云端），避免统计删除后卡残留；同客户+同日+同时刻即视为本单创建（一单一刻）
+    var _cardIds=[];
+    var _da=(DB.appointments||[]).find(function(x){return x.id===r.apptId;});
+    if(_da&&(_da.kind==="direct"||(_da.items||[]).some(function(i){return i.kind==="pkg";}))){
+      (DB.packageBuys||[]).forEach(function(b){
+        if(!b.refunded&&b.customerId===_da.customer_id&&b.date===_da.date&&b.time===_da.time)_cardIds.push(b.id);
+      });
+      if(_cardIds.length)DB.packageBuys=(DB.packageBuys||[]).filter(function(b){return _cardIds.indexOf(b.id)<0;});
+    }
     DB.appointments=DB.appointments.filter(function(x){return x.id!==r.apptId;});
-    if(cloudMode&&sess){markDeleted("appointments",r.apptId);cloudDeleteRows("appointments",[r.apptId]).catch(function(e){toast("云端删除预约失败："+(e&&e.message?e.message:e),"err");});}
+    if(cloudMode&&sess){
+      markDeleted("appointments",r.apptId);
+      cloudDeleteRows("appointments",[r.apptId]).catch(function(e){toast("云端删除预约失败："+(e&&e.message?e.message:e),"err");});
+      if(_cardIds.length)cloudDeleteRows("packagebuys",_cardIds).catch(function(e){toast("云端删除套餐卡失败："+(e&&e.message?e.message:e),"err");});
+    }
   }
   if(cloudMode&&sess){markDeleted("consumptions",id);cloudDeleteRows("consumptions",[id]).catch(function(e){toast("云端删除记录失败："+(e&&e.message?e.message:e),"err");});}
   saveDB();
   toast("消费记录已删除"+(r.apptId?"（关联预约已同步删除）":""));
+  renderAll(); // 同步刷新工作台 / 预约 / 统计报表 / 共享板块等所有视图
 }
 
 
@@ -5934,7 +7298,7 @@ function renderRent(){
   }).join("");
   cs.innerHTML=opts;
   if(rentCustId)cs.value=rentCustId;
-  var rsOpts=DB.services.filter(function(s){return s.isRent;});
+  var rsOpts=DB.services.filter(function(s){return s.isRent&&String(s.name||"").indexOf("__DEL__")!==0;});
   rs.innerHTML='<option value="">（选择出租项目）</option>'+rsOpts.map(function(s){return '<option value="'+s.id+'">'+esc(s.name)+"（租期 "+Math.max(1,parseInt(s.rentDays,10)||1)+" 天 / "+fmtMoney(s.price)+"）</option>";}).join("");
   if(rentSvid)rs.value=rentSvid;
   if(!$("rentDate").value)$("rentDate").value=todayStr();
@@ -6004,7 +7368,8 @@ function retUnitPrice(a){
   if(sv){var c=a.customer_id?customerById(a.customer_id):null;var isSh=c&&c.type==="shareholder";
     return (isSh&&sv.priceShareholder!=null)?(+sv.priceShareholder):(+sv.price||0);}
   if(a.unitPrice)return +a.unitPrice;
-  var e=a.items&&a.items[0]?+a.items[0].subtotal:0,d=Math.max(1,parseInt(a.rentDays,10)||1);
+  var its=normalizeItems(a.items);
+  var e=its[0]?+its[0].subtotal:0,d=Math.max(1,parseInt(a.rentDays,10)||1);
   return e?Math.round(e/d*100)/100:0;
 }
 function retDaysChanged(){
@@ -6012,8 +7377,16 @@ function retDaysChanged(){
   var a=DB.appointments.find(function(x){return x.id===returnRentId;});
   if(!a||a.kind!=="rent")return;
   var days=Math.max(1,parseInt($("retDays").value,10)||1);
+  var sv=a.serviceId?serviceById(a.serviceId):null;
+  var cust=a.customer_id?customerById(a.customer_id):null;
+  // 优先扣套餐卡剩余天数：应收=超出天数×单价
+  var freeDays=0;
+  if(cust&&sv&&sv.isRent){
+    var crd=(DB.packageBuys||[]).find(function(b){return b.customerId===cust.id&&!b.refunded&&b.remaining&&(+b.remaining[sv.id]||0)>0;});
+    if(crd)freeDays=Math.min(days,Math.max(0,+crd.remaining[sv.id]||0));
+  }
   var unit=retUnitPrice(a);
-  var fee=Math.round(unit*days*100)/100;
+  var fee=Math.round(unit*Math.max(0,days-freeDays)*100)/100;
   $("retCalc").value=fmtMoney(fee);
   $("retAmount").value=fee;
 }
@@ -6030,10 +7403,15 @@ function openReturnRent(id){
   var unit=retUnitPrice(a);
   var fee=Math.round(unit*registDays*100)/100;
   var ctypeTxt=c?(c.type==="shareholder"?"（共享股东 · 股东价）":"（普通客户 · 普通价）"):"（散客）";
+  var pkgTip="";
+  if(c&&sv&&sv.isRent){
+    var crd=(DB.packageBuys||[]).find(function(b){return b.customerId===c.id&&!b.refunded&&b.remaining&&(+b.remaining[sv.id]||0)>0;});
+    if(crd){pkgTip='<div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:8px 10px;font-size:12px;color:#92400e;margin-top:8px">🎫 该客户有「'+esc(crd.name)+'」剩余 苗衣出租×'+crd.remaining[sv.id]+' 天，归还结算时优先扣除（免费不收款），核销佣金给其上级介绍人</div>';}
+  }
   $("retInfo").innerHTML='<b style="color:var(--text-1)">'+esc(a.client||"")+'</b> 租借「'+esc(svcName)+"」<br>"+
     "借出 "+a.date+" · 租期 "+registDays+" 天 · 应还 <b>"+esc(a.dueDate||"-")+"</b><br>"+
     "单价 <b style=\"color:var(--primary)\">"+fmtMoney(unit)+"/天</b> · 按登记天数应收 <b style=\"color:var(--primary)\">"+fmtMoney(fee)+"</b>"+ctypeTxt+"<br>"+
-    '<span style="color:var(--danger);font-size:12px">如实际天数与登记不同，请在上方修改「实际出租天数」，应收将自动重算。</span>';
+    '<span style="color:var(--danger);font-size:12px">如实际天数与登记不同，请在上方修改「实际出租天数」，应收将自动重算。</span>'+pkgTip;
   $("retDays").value=registDays;
   $("retCalc").value=fmtMoney(fee);
   $("retAmount").value=fee;
@@ -6047,23 +7425,50 @@ function saveReturnRent(){
   if(!canEdit()){toast("仅管理员可以执行归还","err");return;}
   var days=Math.max(1,parseInt($("retDays").value,10)||1);
   if(isNaN(days)||days<1){toast("请填写正确的实际出租天数","err");return;}
+  var sv=a.serviceId?serviceById(a.serviceId):null;
+  var cust=a.customer_id?customerById(a.customer_id):null;
+  // 优先使用套餐卡剩余（苗衣出租按天）：免费部分=套餐核销，超出部分按单价收费
+  var card=null;
+  if(cust&&sv&&sv.isRent){
+    card=(DB.packageBuys||[]).find(function(b){return b.customerId===cust.id&&!b.refunded&&b.remaining&&(+b.remaining[sv.id]||0)>0;});
+  }
+  var freeDays=0;
+  if(card)freeDays=Math.min(days,Math.max(0,+card.remaining[sv.id]||0));
+  var chargeDays=Math.max(0,days-freeDays);
   var unit=retUnitPrice(a);
-  var expectFee=Math.round(unit*days*100)/100;
+  var expectFee=Math.round(unit*chargeDays*100)/100;
   var amount=Math.max(0,parseFloat($("retAmount").value)||0);
   var method=$("retMethod").value;
   if(!method){toast("请选择收款方式","err");return;}
   var now=new Date();
+  // 套餐核销：扣减剩余天数 + 核销佣金（卡单日平均佣金×免费天数，购卡时已锁定档位）
+  var redeemValue=0,commEarned=null;
+  if(card&&freeDays>0){
+    card.remaining[sv.id]=(+card.remaining[sv.id]||0)-freeDays;
+    if(card.remaining[sv.id]<=0)delete card.remaining[sv.id];
+    redeemValue=Math.round(unit*freeDays*100)/100;
+    var each=+(card.commEach||0);
+    if(each>0)commEarned=Math.round(each*freeDays*100)/100;
+    card.commUsed=Math.round(((+card.commUsed||0)+commEarned)*100)/100; // 已核销佣金累计（预拿=总佣金−已核销）
+    // 备注与预约结账一致：套餐核销·套餐名（剩余X天）·佣金XX.XX
+    var redeemNote=card.name+"（剩余 "+((card.remaining[sv.id]!==undefined)?card.remaining[sv.id]:0)+" "+(sv.isRent?"天":"次")+"）"+(commEarned>0?" · 佣金 "+fmtMoney(commEarned):"");
+    a.note=(a.note?a.note+" · ":"")+"套餐核销："+redeemNote;
+    saveDB();
+  }
   // 按实际天数结算：更新租期、应还日期、明细数量与金额
   a.rentDays=days;
   a.dueDate=addDays(a.date||todayStr(),days-1);
-  if(a.items&&a.items[0]){a.items[0].qty=days;a.items[0].subtotal=expectFee;}
+  if(normalizeItems(a.items)[0]){var its=normalizeItems(a.items);its[0].qty=days;its[0].subtotal=expectFee;a.items=its;}
+  a.chargeDays=chargeDays; // 收费天数（佣金拆分用）
   a.status="returned";a.amount=Math.round(amount*100)/100;a.payMethod=method;a.paidAt=now.toISOString();a.returnedAt=now.toISOString();
+  a.redeemValue=redeemValue; // 套餐免费部分服务价值
+  a.commEarned=commEarned; // 核销佣金（有免费部分才写，归卡主上级）
   saveDB();
-  // 归还/结算后立即单条上推：共享股东会话(sess 仍在)下 pushAll 走普通用户分支只推新建记录，
-  // 若不单独推送，云端将停留在 rented，下次拉取会用本地优先策略保本地但云端永久不同步
-  if(cloudMode&&sess&&shareSess){
-    try{cloudUpsert("appointments",[apptToCloudRow(a,new Date().toISOString())],"id")
-      .catch(function(e){toast("归还结算上推失败："+(e&&e.message?e.message:e),"err");});}catch(e){}
+  // 出租归还收款后登记消费台账（统计报表-消费明细显示；纯套餐核销 0 元收款也记录；同单只更新不重复）
+  try{upsertConsumptionFromAppt(a,"checkout");saveDB();}catch(e){}
+  // 归还/结算后立即单条上推：共享股东走 pushShareAppt RPC
+  if(cloudMode&&shareSess){
+    try{pushShareAppt(a);}catch(e){}
   }
   closeModal("retMask");
   toast("已归还（实际 "+days+" 天）并收款 "+fmtMoney(a.amount)+"（"+(PAY_METHODS[method]||method)+"），苗衣可再次出租");
@@ -6077,17 +7482,22 @@ function receiptHtml(a){
   var sv=a.serviceId?serviceById(a.serviceId):null;
   var mb=a.memberId?DB.members.find(function(x){return x.id===a.memberId;}):null;
   var isRent=!!(a.kind==="rent");
-  var paid=isRent?
-    ((+a.amount||0)>0?fmtMoney(a.amount):(a.status==="returned"?"0.00":fmtMoney((+a.unitPrice||0)*((a.items&&a.items[0])?1:1))))
-    :((+a.amount||0)>0?fmtMoney(a.amount):fmtMoney((sv&&+sv.price)||0));
-  if(isRent&&a.status==="returned"&&(+a.amount||0)>0)paid=fmtMoney(a.amount);
+  var paid;
+  if(isRent){
+    if((+a.amount||0)>0)paid=fmtMoney(a.amount);
+    else if(a.status==="returned")paid="0.00";
+    else paid=fmtMoney(Math.round(retUnitPrice(a)*Math.max(1,parseInt(a.rentDays,10)||1)*100)/100);
+  }else{
+    paid=(+a.amount||0)>0?fmtMoney(a.amount):fmtMoney((sv&&+sv.price)||0);
+  }
   function line(k,v){return '<div class="r-line"><span>'+esc(k)+'</span><b>'+esc(v)+'</b></div>';}
   // 多项目明细（直接购买可一次购买多个项目）
   var itemsHtml="";
-  if(a.items&&a.items.length){
+  var itsA=normalizeItems(a.items);
+  if(itsA.length){
     itemsHtml='<div class="r-sep"></div>';
-    a.items.forEach(function(it){
-      var nm=it.name||(it.serviceId?serviceById(it.serviceId).name:"");
+    itsA.forEach(function(it){
+      var nm=it.name||(it.serviceId?((serviceById(it.serviceId)||{}).name||""):"");
       itemsHtml+='<div class="r-line"><span>'+esc(nm)+' ×'+it.qty+'</span><b>'+fmtMoney((+it.unitPrice||0)*(it.qty||1))+'</b></div>';
     });
   }
@@ -6116,7 +7526,7 @@ function receiptHtml(a){
     line("日期",a.date+" "+a.time)+
     line("客户",a.client||"-")+
     line("电话",a.phone||"-")+
-    (a.items&&a.items.length?itemsHtml:line("项目",sv?sv.name:"未指定项目"))+
+    (itsA.length?itemsHtml:line("项目",sv?sv.name:"未指定项目"))+
     line("成员",mb?mb.name:"-")+
     line("状态",a.status==="done"?"已完成":"待完成")+
     '<div class="r-sep"></div>'+
@@ -6177,9 +7587,10 @@ function importData(input){
       var data=obj&&obj.data?obj.data:obj;
       if(!data||!data.members||!data.services||!data.schedule)throw new Error("格式不正确");
       if(!confirm("导入将用备份数据覆盖当前全部数据，确定继续？")){input.value="";return;}
-      DB=data;
+DB=data;
       if(!DB.appointments)DB.appointments=[];
       if(!DB.consumptions)DB.consumptions=[];
+      migrateShortIds();
       saveDB();
       toast("数据已从备份恢复");
       switchView("dashboard");
@@ -6192,8 +7603,9 @@ function importData(input){
 }
 function confirmLoadSample(){
   if(!canEdit()){toast("普通用户无权执行数据管理","err");return;}
-  if(!confirm("载入示例数据将覆盖当前全部数据（包含 4 位成员、5 个项目与多天示例预约），确定继续？"))return;
+if(!confirm("载入示例数据将覆盖当前全部数据（包含 4 位成员、5 个项目与多天示例预约），确定继续？"))return;
   DB=buildSample();
+  migrateShortIds();
   saveDB();
   toast("示例数据已载入");
 }
@@ -6201,9 +7613,9 @@ function confirmClear(){
   if(!canEdit()){toast("普通用户无权执行数据管理","err");return;}
   if(!confirm("确定清空全部数据？此操作不可恢复，建议先导出备份。"))return;
   if(cloudMode&&sess){
-    var tables=["members","services","appointments","schedule"];
+    var tables=["members","services","appointments","schedule","customers","consumptions"];
     var doClear=function(i){
-      if(i>=tables.length){DB={members:[],services:[],schedule:{start:"09:00",end:"20:00"},appointments:[]};saveDB();toast("全部数据已清空");return;}
+      if(i>=tables.length){DB={members:[],services:[],schedule:{start:"09:00",end:"20:00"},appointments:[],customers:[],consumptions:[],withdrawals:[]};saveDB();toast("全部数据已清空");return;}
       var tb=tables[i];
       cloudSelect(tb+"?select=id").then(function(rows){
         var ids=(rows||[]).map(function(r){return r.id;});
@@ -6214,9 +7626,37 @@ function confirmClear(){
     doClear(0);
     return;
   }
-  DB={members:[],services:[],schedule:{start:"09:00",end:"20:00"},appointments:[]};
+  DB={members:[],services:[],schedule:{start:"09:00",end:"20:00"},appointments:[],customers:[],consumptions:[],withdrawals:[]};
   saveDB();
   toast("全部数据已清空");
+}
+/* 清空预约与统计（保留客户档案/股东账号/服务项目/套餐定义）：预约、直购、出租、消费台账、套餐卡、退款记录、提现记录 */
+function clearTestData(){
+  if(!canEdit()){toast("普通用户无权执行数据管理","err");return;}
+  if(!confirm("确定清空预约与统计数据？\n将清空：预约/直购/出租、消费台账、套餐卡、退款记录、提现记录\n保留：客户档案、股东账号、服务项目、套餐定义。"))return;
+  var doLocal=function(){
+    DB.appointments=[];DB.consumptions=[];DB.packageBuys=[];DB.refunds=[];DB.withdrawals=[];
+    ["appointments","consumptions","packagebuys","refunds","withdrawals"].forEach(function(t){delete tomb[t];});
+    saveTomb();
+    saveDB();
+    toast("预约与统计数据已清空");
+    if(typeof renderDataPage==="function")renderDataPage();
+  };
+  if(cloudMode&&sess){
+    var tables=["appointments","consumptions","packagebuys","refunds","withdrawals"];
+    var doClear=function(i){
+      if(i>=tables.length){doLocal();return;}
+      var tb=tables[i];
+      cloudSelect(tb+"?select=id").then(function(rows){
+        var ids=(rows||[]).map(function(r){return r.id;});
+        return ids.length?cloudDeleteRows(tb,ids):Promise.resolve();
+      }).catch(function(e){toast("云端清空 "+tb+" 失败："+(e&&e.message?e.message:e),"err");})
+        .then(function(){doClear(i+1);});
+    };
+    doClear(0);
+    return;
+  }
+  doLocal();
 }
 function renderDataPage(){
   $("dDataMembers").textContent=DB.members.length;
@@ -6331,6 +7771,11 @@ applyCloudHash();
 loadSess();
 loadTomb();
 loadDB();
+// 股东会话对应的客户档案已被删除（软删除墓碑）时自动失效，避免用已删除账号继续登录
+if(shareSess&&(DB.customers||[]).some(function(c){return c.id===shareSess.cid&&String(c.name||"").indexOf("__DEL__")===0;})){
+  clearShareSess();
+  toast("原股东账号已被删除，请使用当前有效账号重新登录","err");
+}
 if(cloudCfg&&cloudCfg.url&&cloudCfg.anonKey){
   cloudMode=true;cloudConnected=false;
   if(sess&&sess.access_token){
@@ -6340,6 +7785,11 @@ if(cloudCfg&&cloudCfg.url&&cloudCfg.anonKey){
         renderAll();startCloudSync();
       });
     });
+  }else if(shareSess){
+    // 共享股东已登录：直接进入共享板块，不再弹登录框，并立即拉取一次云端最新数据
+    renderAll();
+    startCloudSync();
+    if(navigator.onLine)sharePull().then(function(ok){if(!ok)toast("云端数据刷新失败，当前显示本地缓存","err");});
   }else{
     renderAll();
     openLogin();
@@ -6350,6 +7800,264 @@ if(cloudCfg&&cloudCfg.url&&cloudCfg.anonKey){
 }
 initSectionFolds();
 renderSchedule();
+
+/* ================= 统一客户消费管理中心 ================= */
+var ccManagerTargetId=null,ccManagerFilter="",ccManagerScope="all";
+function openCustomerConsumptionManager(cid){
+  var c=customerById(cid);
+  if(!c){toast("未找到该客户","err");return;}
+  ccManagerTargetId=cid;
+  ccManagerFilter="";
+  ccManagerScope="all";
+  renderCustomerConsumptionManager();
+  showModal("customerConsumptionMask");
+}
+function getCCScopeCustomers(cid){
+  var c=customerById(cid);if(!c)return[];
+  // 共享股东视角：消费管理只显示该客户本人（名下客户）的消费，不纳入任何下级客户
+  if(shareSess&&!sess)return (DB.customers||[]).filter(function(x){return x.id===cid;});
+  var ids={};ids[cid]=1;
+  (DB.customers||[]).forEach(function(x){if(x.referrer===cid)ids[x.id]=1;});
+  var lv1Ids={};(DB.customers||[]).forEach(function(x){if(x.referrer===cid)lv1Ids[x.id]=1;});
+  (DB.customers||[]).forEach(function(x){if(x.referrer&&lv1Ids[x.referrer])ids[x.id]=1;});
+  return (DB.customers||[]).filter(function(x){return ids[x.id];});
+}
+function getCCRecords(cid){
+  var scope=getCCScopeCustomers(cid);
+  var scopeIds={};scope.forEach(function(c){scopeIds[c.id]=1;});
+  var allCustNames={};(DB.customers||[]).forEach(function(c){allCustNames[c.id]=c.name;});
+  var rows=[];
+  (DB.appointments||[]).forEach(function(a){
+    if(!a.customer_id||!scopeIds[a.customer_id])return;
+    if(a.status==="cancelled")return;
+    var sv=a.serviceId?serviceById(a.serviceId):null;
+    var custName=allCustNames[a.customer_id]||a.client||"散客";
+    var mb=a.memberId?DB.members.find(function(x){return x.id===a.memberId;}):null;
+    var paid=(a.status==="done"||(a.kind==="rent"&&a.status==="returned"))&&(+a.amount||0)>0;
+    var amt=a.kind==="rent"&&a.status==="rented"?0:(+a.amount||0);
+    rows.push({
+      id:a.id,date:a.date||"",time:a.time||"",customerId:a.customer_id,customerName:custName,
+      item:sv?sv.name:(a.kind==="rent"?"苗衣出租":(a.serviceName||"预约")),amount:amt,
+      method:a.payMethod||"",memberName:mb?mb.name:"",status:a.status,kind:a.kind||"appt",
+      note:a.note||"",paid:paid,isAppt:true,raw:a
+    });
+  });
+  (DB.consumptions||[]).forEach(function(cn){
+    if(!cn.customer_id||!scopeIds[cn.customer_id])return;
+    var custName=allCustNames[cn.customer_id]||cn.customer||"散客";
+    rows.push({
+      id:cn.id,date:cn.date||"",time:"",customerId:cn.customer_id,customerName:custName,
+      item:cn.item||"消费",amount:+cn.amount||0,method:cn.method||"",memberName:"",
+      status:"done",kind:cn.kind||"manual",note:cn.note||"",paid:true,isAppt:false,raw:cn
+    });
+  });
+  return rows.sort(function(x,y){return x.date<y.date?1:(x.date>y.date?-1:0);});
+}
+function renderCustomerConsumptionManager(){
+  var c=customerById(ccManagerTargetId);if(!c)return;
+  var isAdminRole=isAdmin(),isSh=c.type==="shareholder";
+  $("customerConsumptionTitle").textContent=esc(c.name)+" · "+(isSh?"股东详情":"客户详情");
+  // ---- 客户详细信息卡（佣金等级 / 佣金 / 本月消费 / 历史消费） ----
+  var html='<div style="padding:16px;border-bottom:1px solid var(--border)">'+
+    (function(){
+      var ym2=curYm();
+      var com2=isSh?commissionOf(c.id,ym2):null;
+      var csum2=isSh?commissionSummary(c.id):{total:0,withdrawn:0,pending:0};
+      // 个人消费 = 本人作为客户的所有已收款金额（含套餐预存款；退款时扣减退款额）；团队消费 = 名下一级客户已收款金额合计（含预存款）
+      var personalSpent=0,teamSpent=0,lv1set={};
+      (DB.customers||[]).forEach(function(x){if(x.referrer===c.id)lv1set[x.id]=1;});
+      (DB.appointments||[]).forEach(function(a){
+        if(!isPaidAppt(a))return;
+        var amt=(+a.amount||0);
+        if(!amt)return;
+        if(a.customer_id===c.id)personalSpent+=amt;
+        else if(a.customer_id&&lv1set[a.customer_id])teamSpent+=amt;
+      });
+      // 退款：预存款单已计入 → 扣退款额（消费=购买价−退款=已核销真实消费）；预存款单不存在 → 补记已核销真实消费
+      var refundedCardIds={};(DB.refunds||[]).forEach(function(r){refundedCardIds[r.cardId]=1;});
+      (DB.refunds||[]).forEach(function(r){
+        var rAmt=+r.amount||0;if(!rAmt)return;
+        var isSelf=r.customerId===c.id;
+        var isTeam=r.customerId&&lv1set[r.customerId];
+        if(!isSelf&&!isTeam)return;
+        var card=r.cardId?(DB.packageBuys||[]).find(function(b){return b.id===r.cardId;}):null;
+        var hasBuy=card&&(DB.appointments||[]).some(function(a){return a.kind==="direct"&&a.customer_id===r.customerId&&a.date===card.date&&a.time===card.time;});
+        var delta=hasBuy? -rAmt : Math.max(0,(+r.price||0)-rAmt);
+        if(isSelf)personalSpent+=delta;else teamSpent+=delta;
+      });
+      // 兜底：旧退款卡无退款记录时，按卡上退款金额扣减（避免重复扣已处理过的）
+      (DB.packageBuys||[]).forEach(function(b){
+        if(!b.refunded||refundedCardIds[b.id])return;
+        var rAmt=+b.refundAmount||0;if(!rAmt)return;
+        if(b.customerId===c.id)personalSpent-=rAmt;
+        else if(b.customerId&&lv1set[b.customerId])teamSpent-=rAmt;
+      });
+      personalSpent=Math.max(0,Math.round(personalSpent*100)/100);
+      teamSpent=Math.max(0,Math.round(teamSpent*100)/100);
+      return '<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:stretch">'+
+        '<div style="min-width:220px;flex:1.3;background:var(--bg-1);border-radius:10px;padding:14px">'+
+          '<div class="member-cell"><span class="avatar" style="background:'+esc(c.color||"#d97706")+'">'+esc((c.name||"?")[0])+"</span>"+
+          '<div class="info"><div class="name">'+esc(c.name)+(isSh?' <span class="tag tag-warn">共享股东</span>':' <span class="tag tag-gray">普通客户</span>')+'</div>'+
+          '<div class="role">电话：'+(esc(c.phone)||"-")+'</div></div></div>'+
+          '<div style="margin-top:10px;font-size:12.5px;color:var(--text-2);line-height:2">'+
+          (isSh?
+            '<div>佣金等级：<b style="font-size:20px;font-weight:800;color:var(--primary)">'+(com2?Math.round(com2.ratio*100):0)+'%</b>　可预拿佣金：<b style="font-size:18px;font-weight:800;color:#d97706">'+fmtMoney(pkgPendingCommOf(c.id))+'</b></div>'+
+            '<div>总佣金：<b style="color:var(--text-1)">'+fmtMoney(csum2.total)+'</b>　已提现 '+fmtMoney(csum2.withdrawn)+' · 待提现 '+fmtMoney(csum2.pending)+'</div>'
+            :'<div>该客户为普通客户，无股东佣金。</div>')+
+          '</div></div>'+
+        '<div style="min-width:230px;flex:1;display:flex;flex-direction:column;gap:10px">'+
+          '<div style="display:flex;gap:10px;flex-wrap:wrap">'+
+            '<div style="flex:1;min-width:100px;background:var(--bg-1);border-radius:10px;padding:10px;text-align:center"><div style="font-size:20px;font-weight:800;color:var(--primary)">'+fmtMoney(personalSpent)+'</div><div class="hint">个人消费</div></div>'+
+            '<div style="flex:1;min-width:100px;background:var(--bg-1);border-radius:10px;padding:10px;text-align:center"><div style="font-size:20px;font-weight:800;color:#16a34a">'+fmtMoney(teamSpent)+'</div><div class="hint">团队消费</div></div>'+
+          '</div>'+
+          '<div style="display:flex;gap:10px">'+
+            '<button class="btn btn-primary btn-sm" style="flex:1" type="button" onclick="openSharePersonalConsumption(\''+c.id+'\')">个人消费详情</button>'+
+            '<button class="btn btn-primary btn-sm" style="flex:1" type="button" onclick="openShareTeamConsumption(\''+c.id+'\')">团队消费详情</button>'+
+          '</div>'+
+        '</div></div>';
+    })()+
+    '</div>';
+  // ---- 套餐卡（预存卡：已购套餐与剩余次数；已退款自动移除不显示） ----
+  var pbList=(DB.packageBuys||[]).filter(function(b){return b.customerId===c.id&&!b.refunded;});
+  if(pbList.length){
+    html+='<div style="padding:12px 16px;border-bottom:1px solid var(--border)">'+
+      '<div style="font-size:13px;font-weight:700;color:var(--text-1);margin-bottom:8px">套餐卡（'+pbList.length+' 张）</div>'+
+      pbList.map(function(b){
+        var arr=[];
+        for(var k in b.remaining){var sv=serviceById(k);if(b.remaining[k]>0)arr.push((sv?sv.name:"?")+"×"+b.remaining[k]+(sv&&sv.isRent?"天":"次"));}
+        var rem=arr.join("、")||"已用完";
+        return '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--bg-1);border-radius:8px;padding:8px 10px;margin-bottom:8px">'+
+          '<b style="color:'+(b.refunded?"var(--text-3)":"var(--primary)")+'">🎫 '+esc(b.name)+'</b>'+
+          '<span class="hint">'+esc(b.date)+' 购 · '+fmtMoney(b.price)+'</span>'+
+          (b.refunded?'<span class="tag tag-gray" style="font-size:11px">已退款 '+fmtMoney(b.refundAmount||b.price)+'</span>':'<span class="tag tag-blue" style="font-size:11px">剩余 '+esc(rem)+'</span>')+
+          (canEdit()&&!b.refunded?'<button class="btn btn-ghost-danger btn-xs" type="button" onclick="refundPkg(\''+b.id+'\')">退款</button>':"")+
+          '</div>';
+      }).join("")+"</div>";
+  }
+  // ---- 名下一级客户列表（排序 1-n 紧贴姓名，点击姓名可继续下钻查看其名下客户） ----
+  var lv1m2=lv1IdsOf(c.id);
+  var lv1List=(DB.customers||[]).filter(function(x){return lv1m2[x.id]&&String(x.name||"").indexOf("__DEL__")!==0;});
+  if(isAdminRole){
+    html+='<div style="display:flex;justify-content:flex-end;padding:12px 16px 0"><button class="btn btn-primary btn-sm" type="button" onclick="addFromLv1=true;closeModal(\'customerConsumptionMask\');openCustomerModal(null,\''+c.id+'\')">＋ 增加下级客户</button></div>';
+  }
+  if(!lv1List.length){
+    html+='<div class="empty"><div class="big">&#x1F464;</div><h3>暂无名下客户</h3><p>其他客户建档时选择「'+esc(c.name)+'」作为介绍人后，会显示在这里（一级客户=直接介绍人）。</p></div>';
+  }else{
+    html+='<div style="padding:12px 16px"><div style="font-size:13px;font-weight:700;color:var(--text-1);margin-bottom:8px">名下一级客户（'+lv1List.length+' 人）</div>'+
+      '<table><tr><th style="text-align:left">客户</th><th>身份</th></tr>'+
+      lv1List.map(function(x,i){
+        return '<tr><td><div class="member-cell">'+
+          '<span style="display:inline-flex;width:22px;height:22px;border-radius:50%;background:var(--primary);color:#fff;font-size:12px;font-weight:700;align-items:center;justify-content:center;flex:0 0 auto">'+(i+1)+'</span>'+
+          '<span class="avatar" style="background:'+esc(x.color||"#6b7280")+'">'+esc((x.name||"?")[0])+"</span>"+
+          '<div class="info"><div class="name" style="cursor:pointer;color:var(--primary);text-decoration:underline" onclick="openSharePersonalConsumption(\''+x.id+'\')" title="点击查看该客户的消费记录">'+esc(x.name)+'</div><div class="role">'+(esc(x.phone)||'-')+'</div></div></div></td>'+
+          '<td>'+custTypeTag(x)+'</td></tr>';
+      }).join("")+"</table></div>";
+  }
+  $("customerConsumptionBody").innerHTML=html;
+  $("customerConsumptionFoot").innerHTML='<button class="btn btn-ghost" type="button" onclick="closeModal(\'customerConsumptionMask\')">关闭</button>';
+}
+/* 股东详情：个人 / 团队预约消费记录查看 */
+function shareConsumptionRows(appts,title,lv1Cid){
+  var rows=appts.slice().sort(function(x,y){return x.date<y.date?1:(x.date>y.date?-1:(x.time<y.time?1:(x.time>y.time?-1:0)));});
+  var h='<div style="padding:12px 16px;border-bottom:1px solid var(--border);font-size:13px;color:var(--text-2)">共 '+rows.length+' 条预约消费记录</div>';
+  if(!rows.length){
+    h+='<div class="empty"><div class="big">&#x1F4B0;</div><h3>暂无记录</h3><p>该范围内暂无预约消费记录。</p></div>';
+  }else{
+    var total=0;
+    var stm={confirmed:["待到店","tag-blue"],done:["已完成","tag-green"],cancelled:["已取消","tag-gray"],rented:["出租中","tag-warn"],returned:["已归还","tag-green"]};
+    h+='<table><tr><th>日期</th><th>时间</th><th>客户</th><th>项目</th><th style="text-align:right">金额</th><th>收款</th><th>方式</th><th>成员</th><th>状态</th><th>备注</th>'+(isAdmin()?'<th style="text-align:right">操作</th>':"")+'</tr>';
+    rows.forEach(function(a){
+      var cn=(a.customer_id&&customerById(a.customer_id))?customerById(a.customer_id).name:"散客";
+      var sv=a.serviceId?serviceById(a.serviceId):null;
+      var item=sv?sv.name:(a.kind==="rent"?"苗衣出租":"预约");
+      var st=stm[a.status]||["未知","tag-gray"];
+      var paid=(a.status==="done"||(a.kind==="rent"&&a.status==="returned"))&&(+a.amount||0)>0;
+      if(paid)total+=(+a.amount||0);
+      var mem=a.memberId?((function(){var m=memberById(a.memberId);return m?m.name:"";})()):"";
+      h+='<tr><td>'+a.date+'</td><td>'+(a.time||"-")+'</td><td>'+esc(cn)+'</td><td>'+esc(item)+'</td>'+
+        '<td style="text-align:right"><b>'+fmtMoney(a.amount||0)+'</b></td>'+
+        '<td style="text-align:center">'+(paid?'&#x2705;':'&#x23F3;')+'</td>'+
+        '<td>'+esc((PAY_METHODS[a.payMethod]||a.payMethod||"-"))+'</td>'+
+        '<td>'+esc(mem||"-")+'</td>'+
+        '<td><span class="tag '+st[1]+'">'+st[0]+'</span></td>'+
+        '<td style="font-size:12px;max-width:150px;overflow:hidden;text-overflow:ellipsis">'+esc(a.note||"")+'</td>'+
+        (isAdmin()?'<td style="text-align:right"><button class="btn btn-danger btn-xs" type="button" data-id="'+a.id+'" onclick="delShareAppt(this)">删除</button></td>':"")+'</tr>';
+    });
+    h+='</table>';
+    h+='<div style="padding:10px 16px;font-size:13px;color:var(--text-2)">已收款合计：<b style="color:var(--primary)">'+fmtMoney(Math.round(total*100)/100)+'</b></div>';
+  }
+  $("shareConsumptionTitle").textContent=title;
+  $("shareConsumptionBody").innerHTML=h;
+  var foot='<button class="btn btn-ghost" type="button" onclick="closeModal(\'shareConsumptionMask\')">关闭</button>';
+  if(lv1Cid){
+    foot='<button class="btn btn-primary" type="button" onclick="closeModal(\'shareConsumptionMask\');openCustomerConsumptionManager(\''+lv1Cid+'\')">查看名下客户</button>'+foot;
+  }
+  $("shareConsumptionFoot").innerHTML=foot;
+  showModal("shareConsumptionMask");
+}
+/* 消费详情弹窗内删除预约：确认后删除并关闭弹窗，关联佣金/统计/工作台同步清除 */
+function delShareAppt(btn){
+  if(!isAdmin()){toast("仅管理员可删除","err");return;}
+  var id=btn.getAttribute("data-id");
+  var a=DB.appointments.find(function(x){return x.id===id;});
+  if(!a)return;
+  if(!confirm("确定删除 "+(a.date+" "+a.time)+" "+(a.client)+" 的这条预约？\n删除后：个人/团队消费详情、佣金统计、工作台预约将同步清除。"))return;
+  delAppt(id);
+  closeModal("shareConsumptionMask");
+}
+function openSharePersonalConsumption(cid){
+  var c=customerById(cid);if(!c)return;
+  var appts=(DB.appointments||[]).filter(function(a){return a.customer_id===cid&&a.status!=="cancelled";});
+  shareConsumptionRows(appts,c.name+" · 个人消费详情",cid);
+}
+function openShareTeamConsumption(cid){
+  var c=customerById(cid);if(!c)return;
+  var lv1m=lv1IdsOf(cid);
+  var appts=(DB.appointments||[]).filter(function(a){return a.customer_id&&lv1m[a.customer_id]&&a.status!=="cancelled";});
+  shareConsumptionRows(appts,c.name+" · 团队消费详情（名下客户）",null);
+}
+/* 消费管理中心：编辑记录 */
+function editCCRecord(id,isAppt){
+  if(!isAdmin()){toast("仅管理员可编辑","err");return;}
+  if(isAppt){
+    var a=(DB.appointments||[]).find(function(x){return x.id===id;});
+if(!a){toast("未找到该记录","err");return;}
+    if(a.kind==="rent"){
+      if(a.status==="rented"){openReturnRent(id);return;}
+      openReceipt(id);return;
+    }
+    openCheckout(id);
+  }else{
+    var cn=(DB.consumptions||[]).find(function(x){return x.id===id;});
+    if(!cn){toast("未找到该记录","err");return;}
+    openConsumptionModal(id);
+  }
+}
+/* 消费管理中心：删除记录 */
+function deleteCCRecord(id,isAppt){
+  if(!isAdmin()){toast("仅管理员可删除","err");return;}
+  var msg="确定删除这条消费记录？";
+  if(isAppt){
+    var a=(DB.appointments||[]).find(function(x){return x.id===id;});
+    if(a)msg="确定删除 "+(a.date||"")+" "+(a.client||"散客")+" 的「"+(a.serviceId?(serviceById(a.serviceId)||{}).name||"":"")+"」记录（"+fmtMoney(a.amount||0)+"）？";
+    if(!confirm(msg))return;
+    DB.appointments=DB.appointments.filter(function(x){return x.id!==id;});
+    if(DB.consumptions)DB.consumptions=DB.consumptions.filter(function(x){return x.apptId!==id;});
+    if(cloudMode&&sess){markDeleted("appointments",id);cloudDeleteRows("appointments",[id]).catch(function(e){});}
+  }else{
+    var cn=(DB.consumptions||[]).find(function(x){return x.id===id;});
+    if(cn)msg="确定删除 "+(cn.date||"")+" "+(cn.customer||"散客")+" 的消费记录（"+fmtMoney(cn.amount||0)+"）？";
+    if(!confirm(msg))return;
+    DB.consumptions=(DB.consumptions||[]).filter(function(x){return x.id!==id;});
+    if(cloudMode&&sess){markDeleted("consumptions",id);cloudDeleteRows("consumptions",[id]).catch(function(e){});}
+  }
+  saveDB();renderCustomerConsumptionManager();toast("记录已删除");
+}
+/* 消费管理中心：新增消费记录 */
+function openConsumptionModalFromCC(){
+  closeModal('customerConsumptionMask');
+  openConsumptionModal(null);
+}
 </script>
 <!-- 模态框：总消费记录 -->
 <div class="mask" id="consumptionMask">
