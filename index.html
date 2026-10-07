@@ -4134,7 +4134,7 @@ function repairPkgFlags(){
   var dupDel=[];
   (DB.appointments||[]).forEach(function(a){
     if(a.kind==="direct"&&a.pkgBuyOnly&&(+a.amount||0)>0&&a.commEarned==null){
-      var pkgKey=(a.items||[]).map(function(i){return i.name||i.pkgId||"";}).join(",")||a.serviceName||a.serviceId||"none";
+      var pkgKey=(a.client||"")+"|"+(a.date||"")+"|"+((a.items||[]).map(function(i){return i.name||i.pkgId||"";}).join(",")||a.serviceName||a.serviceId||"none");
       var key=a.customer_id+"|"+a.date+"|"+pkgKey+"|"+a.amount;
       if(seen[key])dupDel.push(a.id);
       else seen[key]=1;
