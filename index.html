@@ -3540,7 +3540,7 @@ function cloudPullAll(){
   if(!cloudMode||!sess)return Promise.resolve(false);
   if(syncBusy)return Promise.resolve(false);
   syncBusy=true;
-  if(pushTimer){clearTimeout(pushTimer);pushTimer=null;}
+  // 不取消待上推任务：pushAll 在 syncBusy 时会自动 200ms 重试，拉取结束后补推，避免"拉取旧值覆盖刚结账状态"
   var _dbBackup={members:DB.members.slice(),services:DB.services.slice(),appointments:DB.appointments.slice(),customers:DB.customers.slice(),schedule:JSON.parse(JSON.stringify(DB.schedule||{start:"09:00",end:"20:00"}))};
   // 拉取前记录本地已有预约ID集合，用于检测新增
   var localApptIds={};
@@ -3620,7 +3620,13 @@ if(r.returned_at!=null){r.returnedAt=r.returned_at;delete r.returned_at;}
       cloudRows.forEach(function(r){cloudIds[r.id]=1;});
       var lmap={};
       DB.appointments.forEach(function(a){if(a&&a.id)lmap[a.id]=a;});
-      var pending=cloudRows.map(function(r){return lmap[r.id]||r;});
+      var pending=cloudRows.map(function(r){
+        var l=lmap[r.id];
+        if(!l)return r;
+        // 本地刚结账/刚修改（updatedAt 较新）→ 本地优先，防止云端旧值覆盖实时状态；否则以云端为准
+        if(l.updatedAt&&r.updated_at&&String(l.updatedAt)>String(r.updated_at))return l;
+        return r;
+      });
       var seen={};
       pending.forEach(function(r){seen[r.id]=1;});
       DB.appointments.forEach(function(a){
@@ -3709,6 +3715,7 @@ var sched=res[3]&&res[3][0];
       updateCloudUI();
       cloudConnected=true;updateCloudUI();
       syncBusy=false;
+      queuePush(); // 拉取完成后补推本地最新状态（防上推被拉取时序打断导致云端旧值长期覆盖）
       startCloudSync();
       renderAll();
       return true;
@@ -4904,7 +4911,13 @@ if(a.due_date!=null){a.dueDate=a.due_date;delete a.due_date;}
   });
   var byId={};
   DB.appointments.forEach(function(x){if(x&&x.id)byId[x.id]=x;});
-  appt.forEach(function(x){if(x&&x.id)byId[x.id]=x;});
+  appt.forEach(function(x){
+    if(!x||!x.id)return;
+    var l=byId[x.id];
+    // 本地刚修改（updatedAt 较新）→ 本地优先，防止云端旧值覆盖（结账/核销等实时状态）
+    if(l&&l.updatedAt&&x.updated_at&&String(l.updatedAt)>String(x.updated_at))return;
+    byId[x.id]=x;
+  });
   // 股东端删除同步：上次拉取确认过、本次云端已不存在的预约 → 本地跟随删除（防手机残留已删预约/消费）
   var SHARE_CONF_KEY="bkgbook_share_conf_v1",shareConf=[];
   try{shareConf=JSON.parse(localStorage.getItem(SHARE_CONF_KEY)||"[]");}catch(e){shareConf=[];}
@@ -6459,7 +6472,7 @@ function saveAppt(){
   }
   var prev=editingApptId?DB.appointments.find(function(x){return x.id===editingApptId;}):null;
   var data={id:editingApptId||uid(),date:date,time:time,duration:dur,serviceId:svid,memberId:mid,client:client,phone:$("aPhone").value.trim(),note:$("aNote").value.trim(),status:status,
-    amount:prev?(+prev.amount||0):0,payMethod:prev?prev.payMethod||"":"",paidAt:prev?prev.paidAt||"":"",customer_id:custId,kind:"appt",referrer:custId?((customerById(custId)||{}).referrer||""):""};
+    amount:prev?(+prev.amount||0):0,payMethod:prev?prev.payMethod||"":"",paidAt:prev?prev.paidAt||"":"",customer_id:custId,kind:"appt",referrer:custId?((customerById(custId)||{}).referrer||""):"",updatedAt:new Date().toISOString()};
   var s=minOf(time),e=s+dur;
   var hit=DB.appointments.some(function(x){
     if(x.id===data.id)return false;
@@ -6728,6 +6741,7 @@ function saveCheckout(){
   a.payMethod=method;
   a.paidAt=new Date().toISOString();
   a.status="done";
+  a.updatedAt=new Date().toISOString(); // 结账时间戳：合并时本地优先，防云端旧值覆盖实时状态
   if(redeemNote)a.note=(a.note?a.note+" · ":"")+"套餐核销："+redeemNote;
   if(sv){a.unitPrice=custPrice(sv,cust);a.serviceCost=(+sv.cost||0);}else{a.unitPrice=null;a.serviceCost=null;}
   saveDB();
@@ -6951,7 +6965,8 @@ function saveDirectBuy(){
     pkgBuyOnly:!!pkgSel.length, // 套餐购买：预存款不计佣金，核销时才到账
     redeemValue:Math.round(redeemVal*100)/100, // 本单核销价值（佣金按此计提）
     unitPrice:Math.round(total*100)/100,serviceCost:Math.round(cost*100)/100,
-    serviceName:pkgFirstName||"",items:items
+    serviceName:pkgFirstName||"",items:items,
+    updatedAt:now.toISOString()
   };
   DB.appointments.push(rec);
   // 生成套餐卡记录（预存款，含各项目剩余次数；并锁定套餐佣金：利润×比例÷总次数=每次核销佣金）
@@ -7378,7 +7393,8 @@ function saveRent(){
     status:"rented",amount:0,payMethod:"",paidAt:"",
     customer_id:c?c.id:"",referrer:c?c.referrer:"",kind:"rent",
     rentDays:days,rentedAt:now.toISOString(),dueDate:due,returnedAt:"",
-    unitPrice:price,serviceCost:(+s.cost||0),items:[{serviceId:s.id,name:s.name,unitPrice:price,qty:days,subtotal:fee}]
+    unitPrice:price,serviceCost:(+s.cost||0),items:[{serviceId:s.id,name:s.name,unitPrice:price,qty:days,subtotal:fee}],
+    updatedAt:now.toISOString()
   };
   DB.appointments.push(rec);
   saveDB();
@@ -7483,7 +7499,7 @@ function saveReturnRent(){
   a.dueDate=addDays(a.date||todayStr(),days-1);
   if(normalizeItems(a.items)[0]){var its=normalizeItems(a.items);its[0].qty=days;its[0].subtotal=expectFee;a.items=its;}
   a.chargeDays=chargeDays; // 收费天数（佣金拆分用）
-  a.status="returned";a.amount=Math.round(amount*100)/100;a.payMethod=method;a.paidAt=now.toISOString();a.returnedAt=now.toISOString();
+  a.status="returned";a.amount=Math.round(amount*100)/100;a.payMethod=method;a.paidAt=now.toISOString();a.returnedAt=now.toISOString();a.updatedAt=now.toISOString();
   a.redeemValue=redeemValue; // 套餐免费部分服务价值
   a.commEarned=commEarned; // 核销佣金（有免费部分才写，归卡主上级）
   saveDB();
