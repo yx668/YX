@@ -3703,21 +3703,27 @@ var sched=res[3]&&res[3][0];
       }),DB.packages||[]);
       // 拉取前快照本地已退款卡，merge 后强制恢复（防云端旧值 refunded=false 覆盖本地刚执行的退款标记 → 卡/预拿佣金复活）
       var _localRefunded={};(DB.packageBuys||[]).forEach(function(_b){if(_b&&_b.refunded)_localRefunded[_b.id]=1;});
-      DB.packageBuys=mergeRows((res[7]||[]).map(stripRow).map(function(b){
-        if(b.customerid!=null){b.customerId=b.customerid;delete b.customerid;}
-        if(b.pkgid!=null){b.pkgId=b.pkgid;delete b.pkgid;}
-        if(b.isshare!=null){b.isShare=!!b.isshare;delete b.isshare;}
-        if(b.commeach!=null){b.commEach=+b.commeach;delete b.commeach;}
-        if(b.commtotal!=null){b.commTotal=+b.commtotal;delete b.commtotal;}
-        if(b.commused!=null){b.commUsed=+b.commused;delete b.commused;}
-        if(b.pkg_name!=null){b.name=b.pkg_name;delete b.pkg_name;}
-        if(b.customer_name!=null){b.client=b.customer_name;delete b.customer_name;}
-        if(b.cost!=null){b.pkgCost=+b.cost;delete b.cost;}
-        if(b.refunded!=null)b.refunded=!!b.refunded;
-        return b;
-      }),DB.packageBuys||[]).filter(function(b){return b&&b.id&&!isDeletedLocal("packagebuys",b.id);});
-      (DB.packageBuys||[]).forEach(function(_b){if(_b&&_localRefunded[_b.id])_b.refunded=true;});
-      DB.refunds=mergeRows((res[8]||[]).map(stripRow).map(function(r){
+      if(res[7]&&res[7].length){
+        DB.packageBuys=mergeRows((res[7]||[]).map(stripRow).map(function(b){
+          if(b.customerid!=null){b.customerId=b.customerid;delete b.customerid;}
+          if(b.pkgid!=null){b.pkgId=b.pkgid;delete b.pkgid;}
+          if(b.isshare!=null){b.isShare=!!b.isshare;delete b.isshare;}
+          if(b.commeach!=null){b.commEach=+b.commeach;delete b.commeach;}
+          if(b.commtotal!=null){b.commTotal=+b.commtotal;delete b.commtotal;}
+          if(b.commused!=null){b.commUsed=+b.commused;delete b.commused;}
+          if(b.pkg_name!=null){b.name=b.pkg_name;delete b.pkg_name;}
+          if(b.customer_name!=null){b.client=b.customer_name;delete b.customer_name;}
+          if(b.cost!=null){b.pkgCost=+b.cost;delete b.cost;}
+          if(b.refunded!=null)b.refunded=!!b.refunded;
+          return b;
+        }),DB.packageBuys||[]).filter(function(b){return b&&b.id&&!isDeletedLocal("packagebuys",b.id);});
+        (DB.packageBuys||[]).forEach(function(_b){if(_b&&_localRefunded[_b.id])_b.refunded=true;});
+      }else if(res[7]){
+        (DB.packageBuys||[]).forEach(function(_b){if(_b&&_b.id)markDeleted("packagebuys",_b.id);});
+        DB.packageBuys=[]; // 云端套餐卡已清空：本地旧卡墓碑化（防周期上推复活云端）并清除
+      }
+      if(res[8]&&res[8].length){
+        DB.refunds=mergeRows((res[8]||[]).map(stripRow).map(function(r){
         if(r.cardid!=null){r.cardId=r.cardid;delete r.cardid;}
         if(r.customerid!=null){r.customerId=r.customerid;delete r.customerid;}
         if(r.cardname!=null){r.cardName=r.cardname;delete r.cardname;}
@@ -3725,6 +3731,10 @@ var sched=res[3]&&res[3][0];
         if(r.customer_name!=null){r.customer=r.customer_name;delete r.customer_name;}
         return r;
       }),DB.refunds||[]).filter(function(r){return r&&r.id&&!isDeletedLocal("refunds",r.id);});
+      }else if(res[8]){
+        (DB.refunds||[]).forEach(function(_r){if(_r&&_r.id)markDeleted("refunds",_r.id);});
+        DB.refunds=[]; // 云端退款已清空：本地旧退款墓碑化并清除，防孤儿退款残留
+      }
       DB.withdrawals=mergeRows((res[9]||[]).map(stripRow).map(function(w){
         if(w.customerid!=null){w.shareId=w.customerid;delete w.customerid;}
         if(w.customer_name!=null){w.name=w.customer_name;delete w.customer_name;}
@@ -4823,7 +4833,7 @@ function fetchShareData(mob,hp){
             var d=r.json;
             d.packages=(rp.ok&&rp.json)?rp.json:[];
             d.packageBuys=(rb.ok&&rb.json)?rb.json:[];
-            d.refunds=(rr.ok&&rr.json)?rr.json:[];
+            d.refunds=(rr.ok&&rr.json)?rr.json:undefined;
             return d;
           });
         });
@@ -5000,9 +5010,12 @@ if(a.due_date!=null){a.dueDate=a.due_date;delete a.due_date;}
       if(b.refunded!=null)b.refunded=!!b.refunded;
       return b;
     }),DB.packageBuys||[]);
+  }else if(d.packageBuys){
+    (DB.packageBuys||[]).forEach(function(_b){if(_b&&_b.id)markDeleted("packagebuys",_b.id);});
+    DB.packageBuys=[]; // 云端套餐卡已清空：股东本地旧卡墓碑化并清除
   }
   // 退款记录合并到股东本地（退款后消费/佣金同步调整）
-  if(d.refunds){
+  if(d.refunds&&d.refunds.length){
     DB.refunds=mergeRows(d.refunds.map(function(r){
       if(r.cardid!=null){r.cardId=r.cardid;delete r.cardid;}
       if(r.customerid!=null){r.customerId=r.customerid;delete r.customerid;}
@@ -5011,6 +5024,9 @@ if(a.due_date!=null){a.dueDate=a.due_date;delete a.due_date;}
       if(r.customer_name!=null){r.customer=r.customer_name;delete r.customer_name;}
       return r;
     }).filter(function(r){return r&&r.id&&!isDeletedLocal("refunds",r.id);}),DB.refunds||[]).filter(function(r){return r&&r.id&&!isDeletedLocal("refunds",r.id);});
+  }else if(d.refunds){
+    (DB.refunds||[]).forEach(function(_r){if(_r&&_r.id)markDeleted("refunds",_r.id);});
+    DB.refunds=[]; // 云端退款已清空：股东本地旧退款墓碑化并清除
   }
   // 合并成功后把「本人」的完整档案写回本地（含头像色、介绍人等渲染字段）
   var meRow=customerById(d.me.id);
