@@ -3745,7 +3745,7 @@ function apptToCloudRow(a,now){
     else if(k==="due_date"){o.due_date=(a.due_date!=null)?a.due_date:(a.dueDate!=null?a.dueDate:null);}
     else if(k==="returned_at"){o.returned_at=(a.returned_at!=null)?a.returned_at:(a.returnedAt!=null?a.returnedAt:null);}
     else if(k==="redeemvalue"){o.redeemvalue=(a.redeemValue!=null)?+a.redeemValue:0;}
-    else if(k==="commearned"){o.commearned=(a.commEarned!=null)?+a.commEarned:0;}
+    else if(k==="commearned"){o.commearned=(a.commEarned!=null&&(+a.commEarned||0)>0)?+a.commEarned:null;}
     else if(k==="chargedays"){o.chargedays=(a.chargeDays!=null)?+a.chargeDays:0;}
     else{o[k]=(a[k]!==undefined)?a[k]:null;}
     if(o[k]==="")o[k]=null; // 空串会导致 timestamptz 列 22007，统一转 null
@@ -3858,12 +3858,12 @@ function pushAll(){
 }
 function startCloudSync(){
   if(cloudTimer)clearInterval(cloudTimer);
-  // 管理员（sess）走全量双向同步；共享股东（shareSess）走股东数据拉取；拉取周期 30 秒
+  // 管理员（sess）走全量双向同步；共享股东（shareSess）走股东数据拉取；拉取周期 10 秒（结账/佣金需较实时到账）
   if(cloudMode&&(sess||shareSess))cloudTimer=setInterval(function(){
     if(!navigator.onLine)return;
     if(sess)cloudPullAll();
     if(shareSess)sharePull();
-  },30000);
+  },10000);
 }
 window.addEventListener("online",function(){
   if(cloudMode&&(sess||shareSess)){
@@ -3990,7 +3990,7 @@ function openDataDiag(){
       var mark=[];
       if(a.pkgBuyOnly)mark.push('<span class="tag tag-blue" style="font-size:11px">套餐购买</span>');
       if(dDupe[a.id])mark.push('<span class="tag" style="font-size:11px;background:var(--danger);color:#fff">重复</span>');
-      if(a.commEarned!=null)mark.push('<span class="tag tag-warn" style="font-size:11px">已核销</span>');
+      if((+a.commEarned||0)>0)mark.push('<span class="tag tag-warn" style="font-size:11px">已核销</span>');
       h+="<tr><td>"+esc(a.date||"-")+"</td><td>"+esc(a.client||"-")+"</td><td style='text-align:right'><b>"+fmtMoney(a.amount||0)+"</b></td><td>"+esc(its)+"</td><td>"+(mark.join(" ")||"-")+"</td></tr>";
     });
     h+="</table>";
@@ -5718,11 +5718,11 @@ function calcCommission(list){
     var cust=customerById(cid);
     if(!cust)return;
     var shId2;
-    if(a.commEarned!=null){shId2=cust.referrer||"";} // 套餐核销单：佣金只归卡主的上级介绍人；正式股东（无介绍人）归公司，不记本人
+    if((+a.commEarned||0)>0){shId2=cust.referrer||"";} // 套餐核销单：佣金只归卡主的上级介绍人；正式股东（无介绍人）归公司，不记本人
     else{shId2=cust.referrer||"";}
     var sh=customerById(shId2);
     if(!sh||sh.type!=="shareholder")return;
-    if(a.commEarned!=null){c+=+a.commEarned||0;return;} // 套餐核销单：固定佣金
+    if((+a.commEarned||0)>0){c+=+a.commEarned||0;return;} // 套餐核销单：固定佣金
     var p=apptProfit(a);
     if(p.amount<=0)return;
     var com=commissionOf(sh.id,(a.date||"").slice(0,7));
@@ -5771,7 +5771,7 @@ function commissionOf(shareId,ym){
   var profitSum=0,lv1Count=0,commFixed=0;
   doneApptsInMonth(ym).forEach(function(a){
     var cid=a.customer_id;
-    if(a.commEarned!=null){
+    if((+a.commEarned||0)>0){
       // 套餐核销单：佣金只归卡主的上级介绍人；正式股东（无介绍人）归公司，不记本人
       var custX=cid?customerById(cid):null;
       var ownerX=custX?(custX.referrer||""):"";
