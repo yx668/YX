@@ -3655,8 +3655,10 @@ if(r.returned_at!=null){r.returnedAt=r.returned_at;delete r.returned_at;}
       });
       DB.appointments=pending;
       sweepGhostMemberIds(); // 清除已删除成员残留引用（含云端拉回的墓碑 member_id）
-      // 检测云端新增预约（其他设备/股东创建）并提醒管理员
-      var newAppts=cloudRows.filter(function(r){return r&&r.id&&!localApptIds[r.id];});
+      // 检测云端新增预约（其他设备/股东创建）并提醒管理员（同一条预约仅提醒一次，防周期拉取重复弹窗）
+      var SHOWN_KEY="bkgbook_appt_shown_v1",shown={};
+      try{shown=JSON.parse(localStorage.getItem(SHOWN_KEY)||"{}");}catch(e){}
+      var newAppts=cloudRows.filter(function(r){return r&&r.id&&!localApptIds[r.id]&&!shown[r.id];});
       if(newAppts.length&&isAdmin()){
         newAppts.forEach(function(a){
           var detail="预约客户：「"+(a.client||"未知")+"」<br>预约时间："+(a.date||"")+" "+(a.time||"");
@@ -3669,6 +3671,8 @@ if(r.returned_at!=null){r.returnedAt=r.returned_at;delete r.returned_at;}
           if(a.memberId){var mem2=memberById(a.memberId);if(mem2)speakText+="，服务人员"+mem2.name;}
           speakNotifyText(speakText);
           notifyAppt("您有一单客户预约需要处理","预约客户：「"+(a.client||"未知")+"」\n预约时间："+(a.date||"")+" "+(a.time||""));
+          shown[a.id]=1;
+          try{localStorage.setItem(SHOWN_KEY,JSON.stringify(shown));}catch(e){}
         });
       }
       cloudSelectedApptIds=cloudRows.map(function(r){return r.id;});
