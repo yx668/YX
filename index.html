@@ -3527,6 +3527,7 @@ function normalizeItems(v){
   return [];
 }
 var cloudSelectedApptIds=[]; // 本机视图已确认存在于云端的预约 id（普通用户据此判断哪些预约需要上推）
+var cloudSelectedMemIds=[],cloudSelectedCustIds=[]; // 成员/客户：云端确认过但现在缺失 → 本地跟随删除（防其他设备删除后本机残留）
 /* 云端∪本地合并：缺省以云端为权威（同 id 云端覆盖本地），但本地存在而云端
    缺少的行必须保留——防止“拉取旧数据覆盖刚新增/离线修改”导致客户/成员/服务
    悄悄丢失（曾导致共享股东新增后消失）。 */
@@ -3566,6 +3567,12 @@ function cloudPullAll(){
       res[0]=dropSoftDel("members",res[0]);
       res[1]=dropSoftDel("services",res[1]);
       res[4]=dropSoftDel("customers",res[4]);
+      // 成员删除跟随：云端确认过但现在已不存在（其他设备删除）→ 本地同步删（墓碑防复活）
+      var memCloudIds={};
+      (res[0]||[]).forEach(function(r){if(r&&r.id)memCloudIds[r.id]=1;});
+      DB.members.forEach(function(m){if(m&&m.id&&!memCloudIds[m.id]&&cloudSelectedMemIds.indexOf(m.id)>=0)markDeleted("members",m.id);});
+      DB.members=DB.members.filter(function(m){return !(m&&m.name&&String(m.name).indexOf("__DEL__")===0);});
+      cloudSelectedMemIds=(res[0]||[]).filter(function(r){return r&&r.id;}).map(function(r){return r.id;});
       DB.members=mergeRows((res[0]||[]).filter(function(r){return !isDeletedLocal("members",r.id);}).map(stripRow),DB.members);
       var svcCloud=(res[1]||[]).filter(function(r){return !isDeletedLocal("services",r.id);}).map(stripRow).map(function(s){
         if(s.price_shareholder!=null){s.priceShareholder=s.price_shareholder;delete s.price_shareholder;}
@@ -3659,6 +3666,12 @@ if(r.returned_at!=null){r.returnedAt=r.returned_at;delete r.returned_at;}
       cloudSelectedApptIds=cloudRows.map(function(r){return r.id;});
 var sched=res[3]&&res[3][0];
       DB.schedule=sched?{id:sched.id||"00000000-0000-0000-0000-000000000001",date:sched.date||"",shift:sched.shift||"morning",start:sched.start||"09:00",end:sched.end||"20:00"}:DB.schedule||{id:"00000000-0000-0000-0000-000000000001",date:"",shift:"morning",start:"09:00",end:"20:00"};
+      // 客户删除跟随：云端确认过但现在已不存在（其他设备删除）→ 本地同步删（墓碑防复活）
+      var custCloudIds={};
+      (res[4]||[]).forEach(function(r){if(r&&r.id)custCloudIds[r.id]=1;});
+      DB.customers.forEach(function(c){if(c&&c.id&&!custCloudIds[c.id]&&cloudSelectedCustIds.indexOf(c.id)>=0)markDeleted("customers",c.id);});
+      DB.customers=DB.customers.filter(function(c){return !(c&&c.name&&String(c.name).indexOf("__DEL__")===0);});
+      cloudSelectedCustIds=(res[4]||[]).filter(function(r){return r&&r.id;}).map(function(r){return r.id;});
       DB.customers=mergeRows((res[4]||[]).filter(function(r){return !isDeletedLocal("customers",r.id);}).map(stripRow).map(function(c){
         if(c.wx==null)c.wx="";
         return c;
@@ -4289,7 +4302,7 @@ function buildSample(){
 }
 
 /* ================= 渲染 ================= */
-var currentView="dashboard",calMode="month",calAnchor=todayStr(),editingMemberId=null,editingServiceId=null,editingApptId=null;
+var currentView=(function(){try{var v=localStorage.getItem("bkgbook_view");return (v&&["dashboard","calendar","list","buy","customers","members","config","data","report","share"].indexOf(v)>=0)?v:"dashboard";}catch(e){return "dashboard";}})(),calMode="month",calAnchor=todayStr(),editingMemberId=null,editingServiceId=null,editingApptId=null;
 var PALETTE=["#2563eb","#7c3aed","#db2777","#ea580c","#16a34a","#0891b2","#ca8a04","#dc2626","#4f46e5","#059669"];
 
 function $(id){return document.getElementById(id);}
@@ -4358,6 +4371,7 @@ function switchView(v){
   if(shareSess&&v!=="share"){toast("共享股东仅可查看自己的共享板块","err");return;}
   if(!isAdmin()&&["customers","members","config","data","report","buy"].indexOf(v)>=0){toast("普通用户仅可查看与新建预约","err");return;}
   currentView=v;
+  try{localStorage.setItem("bkgbook_view",v);}catch(e){}
   renderNav();
 }
 
@@ -5547,7 +5561,7 @@ function renderList(){
     return true;
   });
   var body=$("listBody");
-  if(!list.length){body.innerHTML='<div class="empty"><div class="big">📋</div><h3>没有匹配的预约</h3><p>调整筛选条件，或点击右上角「新建预约」</p></div>';return;}
+  if(!list.length){body.innerHTML='<div class="empty"><div class="big">📋</div><h3>没有匹配的预约</h3><p>调整筛选条件，或点击右上角「新建预约」</p></div>';}else{
   var html="<table><tr><th>日期</th><th>时间</th><th>客户</th><th>项目</th><th>成员</th><th>状态</th><th>备注</th><th style=\"text-align:right\">操作</th></tr>";
   list.forEach(function(a){
     var m=memberById(a.memberId),sv=serviceById(a.serviceId);
@@ -5571,6 +5585,7 @@ function renderList(){
       '<td><div class="row-actions">'+acts+"</div></td></tr>";
   });
   body.innerHTML=html+'</table><div style="padding:12px 16px;font-size:12px;color:var(--text-3)">共 '+list.length+" 条记录</div>";
+  }
   renderTodaySettled();
 }
 /* 预约列表：今日已完成结算记录卡片（已结账单自动从上方列表清除，这里集中展示当天结账情况） */
