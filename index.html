@@ -4816,13 +4816,16 @@ function fetchShareData(mob,hp){
   return sFetch("/rest/v1/rpc/load_share_data",{method:"POST",body:{phone_input:mob,pwd_hash:hp}}).then(function(r){
     // RPC 返回的 me 是已删除墓碑账号时视为无效，继续走 REST 兜底（防旧版 SQL 命中墓碑）
     if(r&&r.ok&&r.json&&r.json.me&&String(r.json.me.name||"").indexOf("__DEL__")!==0){
-      // RPC 成功后再补拉套餐定义与套餐卡（云端表 packagebuys 小写），保证股东能看到自己购买的套餐卡
+      // RPC 成功后再补拉套餐定义与套餐卡（云端表 packagebuys 小写），保证股东能看到自己购买的套餐卡；退款记录用于退款后的消费/佣金调整
       return sFetch("/rest/v1/packages?select=*").then(function(rp){
         return sFetch("/rest/v1/packagebuys?select=*").then(function(rb){
-          var d=r.json;
-          d.packages=(rp.ok&&rp.json)?rp.json:[];
-          d.packageBuys=(rb.ok&&rb.json)?rb.json:[];
-          return d;
+          return sFetch("/rest/v1/refunds?select=*").then(function(rr){
+            var d=r.json;
+            d.packages=(rp.ok&&rp.json)?rp.json:[];
+            d.packageBuys=(rb.ok&&rb.json)?rb.json:[];
+            d.refunds=(rr.ok&&rr.json)?rr.json:[];
+            return d;
+          });
         });
       });
     }
@@ -4840,10 +4843,11 @@ function fetchShareData(mob,hp){
         sFetch("/rest/v1/customers?select=*"),
         sFetch("/rest/v1/schedule?select=*&limit=1"),
         sFetch("/rest/v1/packages?select=*"),
-        sFetch("/rest/v1/packagebuys?select=*")
+        sFetch("/rest/v1/packagebuys?select=*"),
+        sFetch("/rest/v1/refunds?select=*")
       ]).then(function(rs){
         rs.forEach(function(x){if(!x.ok)throw new Error(errMsg(x)||"读取共享数据失败");});
-        return {me:me,members:rs[0].json,services:rs[1].json,appointments:rs[2].json,customers:rs[3].json,schedule:rs[4].json,packages:rs[5].json,packageBuys:rs[6].json};
+        return {me:me,members:rs[0].json,services:rs[1].json,appointments:rs[2].json,customers:rs[3].json,schedule:rs[4].json,packages:rs[5].json,packageBuys:rs[6].json,refunds:rs[7].json};
       });
     });
   });
@@ -4996,6 +5000,17 @@ if(a.due_date!=null){a.dueDate=a.due_date;delete a.due_date;}
       if(b.refunded!=null)b.refunded=!!b.refunded;
       return b;
     }),DB.packageBuys||[]);
+  }
+  // 退款记录合并到股东本地（退款后消费/佣金同步调整）
+  if(d.refunds){
+    DB.refunds=mergeRows(d.refunds.map(function(r){
+      if(r.cardid!=null){r.cardId=r.cardid;delete r.cardid;}
+      if(r.customerid!=null){r.customerId=r.customerid;delete r.customerid;}
+      if(r.cardname!=null){r.cardName=r.cardname;delete r.cardname;}
+      if(r.usedamount!=null){r.usedAmount=+r.usedamount;delete r.usedamount;}
+      if(r.customer_name!=null){r.customer=r.customer_name;delete r.customer_name;}
+      return r;
+    }).filter(function(r){return r&&r.id&&!isDeletedLocal("refunds",r.id);}),DB.refunds||[]).filter(function(r){return r&&r.id&&!isDeletedLocal("refunds",r.id);});
   }
   // 合并成功后把「本人」的完整档案写回本地（含头像色、介绍人等渲染字段）
   var meRow=customerById(d.me.id);
@@ -7068,25 +7083,27 @@ var conEditId=null;
 function curYm(){var d=new Date();return d.getFullYear()+"-"+(d.getMonth()<9?"0":"")+(d.getMonth()+1);}
 function monthSpentOf(cid,ym){
   ym=ym||curYm();
-  var s=0,keyed={};
-  (DB.consumptions||[]).forEach(function(c){
-    var custId=c.customer_id||c.customerId||"";
-    if(c.pkgBuy)return; // 套餐购买预存款在 appointments 同单统计，避免此处重复
-    if(custId===cid&&(c.date||"").indexOf(ym)===0){
-      if(c.apptId){
-        var ap=DB.appointments.find(function(a){return a.id===c.apptId;});
-        if(ap&&(+ap.redeemValue||0)>0){ // 核销/混合台账：台账含核销价值，消费统计按预约实收（避免把未收款核销价值计入）
-          if(+ap.amount>0)keyed[ap.id]=1;
-          return;
-        }
-      }
-      s+=(+c.amount||0);if(c.apptId)keyed[c.apptId]=1;
-    }
+  var s=0;
+  // 与管理端客户详情卡同一口径：已收款预约（含套餐预存款/出租归还）+ 退款调整，不依赖台账残留
+  (DB.appointments||[]).forEach(function(a){
+    if(!isPaidAppt(a))return;
+    var amt=(+a.amount||0);if(!amt)return;
+    if(a.customer_id===cid&&(a.date||"").indexOf(ym)===0)s+=amt;
   });
-  DB.appointments.forEach(function(a){
-    if(a.customer_id===cid&&(a.date||"").indexOf(ym)===0&&!keyed[a.id]&&(a.status==="done"||(a.kind==="rent"&&a.status==="returned")))s+=(+a.amount||0);
+  var refundedCardIds={};(DB.refunds||[]).forEach(function(r){refundedCardIds[r.cardId]=1;});
+  (DB.refunds||[]).forEach(function(r){
+    if(r.customerId!==cid||(ym&&(r.date||"").indexOf(ym)!==0))return;
+    var rAmt=+r.amount||0;if(!rAmt)return;
+    var card=r.cardId?(DB.packageBuys||[]).find(function(b){return b.id===r.cardId;}):null;
+    var hasBuy=card&&(DB.appointments||[]).some(function(a){return a.kind==="direct"&&a.customer_id===cid&&a.date===card.date&&a.time===card.time;});
+    s+=hasBuy? -rAmt : Math.max(0,(+r.price||0)-rAmt);
   });
-  return Math.round(Math.max(0,s+refundAdjustOf(cid,ym))*100)/100;
+  (DB.packageBuys||[]).forEach(function(b){
+    if(!b.refunded||refundedCardIds[b.id])return;
+    var rAmt=+b.refundAmount||0;if(!rAmt)return;
+    if(b.customerId===cid)s-=rAmt;
+  });
+  return Math.round(Math.max(0,s)*100)/100;
 }
 /* 客户历史总消费（不限月份，含出租归还租金；与 monthSpentOf 同口径） */
 function totalSpentOf(cid){
