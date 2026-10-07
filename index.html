@@ -917,6 +917,7 @@ tr:hover td{background:#fafbfc}
   <div class="modal" style="max-width:430px">
     <div class="modal-head"><h3 id="loginTitle">登录</h3></div>
     <div class="modal-body">
+      <div id="lgNoCfgTip" style="display:none;background:#fff7ed;border:1px solid #fdba74;color:#b45309;border-radius:8px;padding:9px 12px;font-size:12.5px;line-height:1.7;margin-bottom:12px">⚠️ <b>新设备首次使用：请先配置云端才能登录。</b><br>让门店管理员在电脑端「备份与恢复 → 云端多设备同步」生成二维码，用手机扫码自动配置；或手动填入云端地址与密钥后即可正常登录。</div>
       <div style="display:flex;gap:8px;margin-bottom:12px">
         <button class="btn btn-primary btn-sm" type="button" id="lgTabShare" onclick="switchLoginTab('share')" style="flex:1">共享股东登录</button>
         <button class="btn btn-ghost btn-sm" type="button" id="lgTabAdmin" onclick="switchLoginTab('admin')" style="flex:1">管理员 / 云端账号</button>
@@ -3832,21 +3833,21 @@ function pushAll(){
         });
         o.updated_at=now;return o;
       }),"id"));
-      jobs.push(cloudUpsert("packagebuys",(DB.packageBuys||[]).map(function(b){
+      jobs.push(cloudUpsert("packagebuys",(DB.packageBuys||[]).filter(function(b){return b&&b.id&&!isDeletedLocal("packagebuys",b.id);}).map(function(b){
         var o={id:b.id,customerid:b.customerId||null,customer_name:b.client||null,pkgid:b.pkgId||null,pkg_name:b.name||null,
           price:(b.price!=null)?+b.price:0,cost:(b.pkgCost!=null)?+b.pkgCost:0,date:b.date||null,time:b.time||null,
           isshare:!!b.isShare,remaining:b.remaining||{},totals:b.totals||{},refunded:!!b.refunded,
           commeach:(b.commEach!=null)?+b.commEach:0,commtotal:(b.commTotal!=null)?+b.commTotal:0,commused:(b.commUsed!=null)?+b.commUsed:0};
         o.updated_at=now;return o;
       }),"id"));
-      jobs.push(cloudUpsert("refunds",(DB.refunds||[]).map(function(r){
+      jobs.push(cloudUpsert("refunds",(DB.refunds||[]).filter(function(r){return r&&r.id&&!isDeletedLocal("refunds",r.id);}).map(function(r){
         var o={id:r.id,cardid:r.cardId||null,customerid:r.customerId||null,customer_name:r.customer||null,
           cardname:r.cardName||null,date:r.date||null,time:r.time||null,
           amount:(r.amount!=null)?+r.amount:0,usedamount:(r.usedAmount!=null)?+r.usedAmount:0,
           price:(r.price!=null)?+r.price:0,note:r.note||null};
         o.updated_at=now;return o;
       }),"id"));
-      jobs.push(cloudUpsert("withdrawals",(DB.withdrawals||[]).map(function(w){
+      jobs.push(cloudUpsert("withdrawals",(DB.withdrawals||[]).filter(function(w){return w&&w.id&&!isDeletedLocal("withdrawals",w.id);}).map(function(w){
         var o={id:w.id,customerid:w.shareId||null,customer_name:w.name||null,date:w.time||null,
           amount:(w.amount!=null)?+w.amount:0,note:w.note||null,by:w.by||null};
         o.updated_at=now;return o;
@@ -4269,6 +4270,10 @@ if(!DB.withdrawals)DB.withdrawals=[];
     DB.members=(DB.members||[]).filter(function(m){return String(m.name||"").indexOf("__DEL__")!==0;});
     sweepGhostMemberIds();
     repairPkgFlags(); // 自愈直购套餐单标记
+    // 墓碑标记的套餐卡/退款/提现不进入内存（防止被渲染或周期上推复活；云端残留由拉取过滤兜底）
+    DB.packageBuys=(DB.packageBuys||[]).filter(function(b){return b&&b.id&&!isDeletedLocal("packagebuys",b.id);});
+    DB.refunds=(DB.refunds||[]).filter(function(r){return r&&r.id&&!isDeletedLocal("refunds",r.id);});
+    DB.withdrawals=(DB.withdrawals||[]).filter(function(w){return w&&w.id&&!isDeletedLocal("withdrawals",w.id);});
     return;
   }
   DB=defaultData();
@@ -5114,6 +5119,9 @@ function doShareLogout(){
 }
 function openLogin(){
   loginMode="signin";renderLoginUI();loginTab="share";switchLoginTab("share");showModal("loginMask");
+  // 未配置云端（新设备）：登录弹窗顶部显示醒目配置引导
+  var tip=$("lgNoCfgTip");
+  if(tip)tip.style.display=(cloudCfg&&cloudCfg.url&&cloudCfg.anonKey)?"none":"";
 }
 function closeMasks(){
   document.querySelectorAll(".mask.show").forEach(function(m){if(m.id!=="loginMask"&&m.id!=="apptNotifyMask")closeModal(m.id);});
