@@ -3802,7 +3802,8 @@ function pushAll(){
       });
       o.updated_at=now;return o;
     }),"id"));
-    jobs.push(cloudUpsert("appointments",DB.appointments.filter(function(a){return !isDeletedLocal("appointments",a.id);}).map(function(a){return apptToCloudRow(a,now);}),"id"));
+    var memSet={};DB.members.forEach(function(m){memSet[m.id]=1;});
+    jobs.push(cloudUpsert("appointments",DB.appointments.filter(function(a){return !isDeletedLocal("appointments",a.id);}).map(function(a){var x=apptToCloudRow(a,now);if(x.member_id&&!memSet[x.member_id])x.member_id=null;return x;}),"id"));
     jobs.push(cloudUpsert("customers",DB.customers.filter(function(c){return !isDeletedLocal("customers",c.id)&&!(c.name&&String(c.name).indexOf("__DEL__")===0);}).map(function(c){
       var o={};
 ["id","name","phone","type","referrer","account_email","note","wx","login_enabled","login_pwd","login_pwd_plain"].forEach(function(k){
@@ -4111,9 +4112,10 @@ function cloudCleanOrphans(){
    避免被重复计入消费与佣金。判定：kind=direct 且未核销（无 commEarned）且（items 含套餐 或 无 serviceId）且有金额 → 套餐购买 */
 /* 清除预约里已删除成员（_DEL_/__DEL__ 墓碑 id）的残留引用，防止界面显示原始英文串 */
 function sweepGhostMemberIds(){
+  var mem={};(DB.members||[]).forEach(function(m){mem[m.id]=1;});
   var fixed=0;
   (DB.appointments||[]).forEach(function(a){
-    if(a&&a.memberId&&String(a.memberId).indexOf("_DEL_")>=0){a.memberId="";fixed++;}
+    if(a&&a.memberId&&(!mem[a.memberId]||String(a.memberId).indexOf("_DEL_")>=0||String(a.memberId).indexOf("__DEL__")>=0)){a.memberId="";fixed++;}
   });
   return fixed;
 }
