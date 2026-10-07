@@ -3494,8 +3494,15 @@ function cloudDeleteRows(table,ids){
 return sFetch("/rest/v1/"+table+"?id=in.("+q+")",{method:"DELETE"})
       .then(function(r){
         if(!r.ok)throw new Error(errMsg(r)||"云端删除失败");
-        // 云端删除成功：延迟清除墓碑（避免在途拉取快照把已删行合并回本地并补推回云端）
-        ids.forEach(function(id){scheduleUnmark(table,id);});
+        // 删除后复查：部分表 RLS 会静默拦截 DELETE（返回 200 但行未删），
+        // 确认云端确无残留才延迟清墓碑；残留则保留墓碑由拉取过滤/retryDeleted 兜底，杜绝"删了又复活"
+        return cloudSelect(table+"?select=id&id=in.("+q+")").then(function(rows){
+          var still=(rows||[]).filter(function(x){return x&&x.id;}).length;
+          if(!still){
+            ids.forEach(function(id){scheduleUnmark(table,id);});
+          }
+          /* 仍有残留：不清理墓碑，本地拉取时永久过滤该行 */
+        }).catch(function(){/* 复查失败按残留处理：保留墓碑，安全方向 */});
       });
   });
 }
@@ -3707,7 +3714,7 @@ var sched=res[3]&&res[3][0];
         if(b.cost!=null){b.pkgCost=+b.cost;delete b.cost;}
         if(b.refunded!=null)b.refunded=!!b.refunded;
         return b;
-      }),DB.packageBuys||[]);
+      }),DB.packageBuys||[]).filter(function(b){return b&&b.id&&!isDeletedLocal("packagebuys",b.id);});
       (DB.packageBuys||[]).forEach(function(_b){if(_b&&_localRefunded[_b.id])_b.refunded=true;});
       DB.refunds=mergeRows((res[8]||[]).map(stripRow).map(function(r){
         if(r.cardid!=null){r.cardId=r.cardid;delete r.cardid;}
@@ -3716,12 +3723,12 @@ var sched=res[3]&&res[3][0];
         if(r.usedamount!=null){r.usedAmount=+r.usedamount;delete r.usedamount;}
         if(r.customer_name!=null){r.customer=r.customer_name;delete r.customer_name;}
         return r;
-      }),DB.refunds||[]);
+      }),DB.refunds||[]).filter(function(r){return r&&r.id&&!isDeletedLocal("refunds",r.id);});
       DB.withdrawals=mergeRows((res[9]||[]).map(stripRow).map(function(w){
         if(w.customerid!=null){w.shareId=w.customerid;delete w.customerid;}
         if(w.customer_name!=null){w.name=w.customer_name;delete w.customer_name;}
         return w;
-      }),DB.withdrawals||[]);
+      }),DB.withdrawals||[]).filter(function(w){return w&&w.id&&!isDeletedLocal("withdrawals",w.id);});
       repairPkgFlags(); // 云端拉回的直购套餐单同样自愈
       cloudConnected=true;
       renderAll();
@@ -7179,6 +7186,11 @@ function rpDirectRefresh(){
     return;
   }
   var h='<table><tr><th>日期</th><th>时间</th><th>客户</th><th>项目明细</th><th style="text-align:right">金额</th><th>收款方式</th><th>类型</th><th style="text-align:right">操作</th></tr>';
+  /* 退款关联：直购单 items.pkgId + 客户 + 日期 → 套餐卡(packageBuys) → 退款记录(refunds.cardId) → 退款金额 */
+  var cardByKey={};
+  (DB.packageBuys||[]).forEach(function(b){if(!b)return;var k=(b.customerId||b.client||"")+"|"+(b.pkgId||"")+"|"+(b.date||"");if(!cardByKey[k])cardByKey[k]=b;});
+  var refundAmtByCard={};
+  (DB.refunds||[]).forEach(function(r){if(r&&r.cardId&&!refundAmtByCard[r.cardId])refundAmtByCard[r.cardId]=+r.amount||0;});
   rows.forEach(function(a){
     var custName=a.client||(a.customer_id?((function(){var c=customerById(a.customer_id);return c?c.name:"";})()):"")||"散客";
     var det=normalizeItems(a.items).map(function(it){
@@ -7187,6 +7199,17 @@ function rpDirectRefresh(){
       return it.name||"";
     }).join("、")||(a.serviceName||a.item||"-");
     var typ=a.pkgBuyOnly?'<span class="tag tag-warn">套餐购买</span>':((+a.redeemValue||0)>0?'<span class="tag tag-blue" style="background:#ede9fe;color:#7c3aed;border-color:#ddd6fe">直购含核销</span>':'<span class="tag tag-blue">直接购买</span>');
+    /* 退款状态：套餐购买单关联套餐卡与退款记录，已退款则显示退款金额 */
+    var refundAmt=0;
+    if(a.pkgBuyOnly){
+      var pkgItem=(a.items||[]).find(function(it){return it&&it.kind==="pkg";});
+      if(pkgItem&&(pkgItem.pkgId||pkgItem.id)){
+        var ck=(a.customer_id||a.client||"")+"|"+(pkgItem.pkgId||pkgItem.id)+"|"+(a.date||"");
+        var card=cardByKey[ck];
+        if(card)refundAmt=refundAmtByCard[card.id]||0;
+      }
+    }
+    if(refundAmt>0)typ+=' <span class="tag" style="background:#fee2e2;color:#dc2626;border-color:#fecaca">已退款 '+fmtMoney(refundAmt)+'</span>';
     h+="<tr><td>"+a.date+"</td><td>"+(a.time||"-")+"</td><td>"+esc(custName)+"</td><td>"+esc(det)+"</td>"+
       '<td style="text-align:right"><b>'+fmtMoney(a.amount||0)+"</b></td>"+
       "<td>"+esc((PAY_METHODS[a.payMethod||a.method]||a.payMethod||a.method||"-"))+"</td><td>"+typ+"</td>"+
@@ -7692,7 +7715,9 @@ function clearTestData(){
   if(!confirm("确定清空预约与统计数据？\n将清空：预约/直购/出租、消费台账、套餐卡、退款记录、提现记录\n保留：客户档案、股东账号、服务项目、套餐定义。"))return;
   var doLocal=function(){
     DB.appointments=[];DB.consumptions=[];DB.packageBuys=[];DB.refunds=[];DB.withdrawals=[];
-    ["appointments","consumptions","packagebuys","refunds","withdrawals"].forEach(function(t){delete tomb[t];});
+    /* 保留墓碑标记：云端删除前发出的拉取快照可能仍在途，若此刻清除墓碑，
+       快照返回时会把已删行合并回本地（"清空后自动拉回"）。墓碑由 retryDeleted
+       在后续拉取时发现云端已无该 id 自动清除。 */
     saveTomb();
     saveDB();
     toast("预约与统计数据已清空");
@@ -7705,7 +7730,14 @@ function clearTestData(){
       var tb=tables[i];
       cloudSelect(tb+"?select=id").then(function(rows){
         var ids=(rows||[]).map(function(r){return r.id;});
-        return ids.length?cloudDeleteRows(tb,ids):Promise.resolve();
+        if(ids.length){
+          // 先写墓碑再删：防止删除请求往返期间在途的拉取快照把已删行合并回本地
+          if(!tomb[tb])tomb[tb]={};
+          ids.forEach(function(id){tomb[tb][id]=1;});
+          saveTomb();
+          return cloudDeleteRows(tb,ids);
+        }
+        return Promise.resolve();
       }).catch(function(e){toast("云端清空 "+tb+" 失败："+(e&&e.message?e.message:e),"err");})
         .then(function(){doClear(i+1);});
     };
