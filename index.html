@@ -880,6 +880,7 @@ tr:hover td{background:#fafbfc}
             <option value="wechat">微信</option>
             <option value="alipay">支付宝</option>
             <option value="card">银行卡</option>
+            <option value="free">免费（不收钱）</option>
             <option value="other">其他</option>
           </select>
         </div>
@@ -3421,7 +3422,11 @@ function sFetch(path,opts){
   if(tok)h["Authorization"]="Bearer "+tok;
   // 离线检测：网络断开时直接拒绝，避免无意义请求
   if(!navigator.onLine)return Promise.reject(new Error("网络已断开，数据暂存本地"));
-  return fetch(cBase()+path,{method:opts.method||"GET",headers:h,body:opts.body!==undefined?JSON.stringify(opts.body):undefined})
+  var __ctl=null,__to=null;
+  try{__ctl=new AbortController();}catch(e){}
+  var __opts={method:opts.method||"GET",headers:h,body:opts.body!==undefined?JSON.stringify(opts.body):undefined};
+  if(__ctl){__opts.signal=__ctl.signal;__to=setTimeout(function(){try{__ctl.abort();}catch(e){}},opts.timeout||20000);}
+  return fetch(cBase()+path,__opts).then(function(r){if(__to)clearTimeout(__to);return r;},function(e){if(__to)clearTimeout(__to);throw e;})
     .then(function(r){return r.text().then(function(t){var j=null;try{j=JSON.parse(t);}catch(e){}return {ok:r.ok,status:r.status,json:j};});})
     .catch(function(e){cloudConnected=false;updateCloudUI();throw e;});
 }
@@ -3559,7 +3564,11 @@ function mergeRows(cloudRows,localRows){
   (cloudRows||[]).forEach(function(r){if(r&&r.id)byId[r.id]=r;});
   return Object.keys(byId).map(function(k){return byId[k];});
 }
+var cloudPullFail=[];
+function __pullFail(t){return function(e){var m=t+"："+String((e&&e.message)||e).slice(0,40);if(cloudPullFail.indexOf(m)<0)cloudPullFail.push(m);return [];};}
+function cloudPullFailMsg(){return cloudPullFail.length?("（"+cloudPullFail.join("；")+"）"):"";}
 function cloudPullAll(){
+  cloudPullFail=[];
   if(!cloudMode||!sess)return Promise.resolve(false);
   if(syncBusy)return Promise.resolve(false);
   syncBusy=true;
@@ -3568,7 +3577,7 @@ function cloudPullAll(){
   // 拉取前记录本地已有预约ID集合，用于检测新增
   var localApptIds={};
   DB.appointments.forEach(function(a){if(a&&a.id)localApptIds[a.id]=1;});
-  return Promise.all([cloudSelect("members"),cloudSelect("services"),cloudSelect("appointments"),cloudSelect("schedule"),cloudSelect("customers"),cloudSelect("consumptions"),cloudSelect("packages"),cloudSelect("packagebuys"),cloudSelect("refunds"),cloudSelect("withdrawals")])
+  return Promise.all([cloudSelect("members").catch(__pullFail("members")),cloudSelect("services").catch(__pullFail("services")),cloudSelect("appointments").catch(__pullFail("appointments")),cloudSelect("schedule").catch(__pullFail("schedule")),cloudSelect("customers").catch(__pullFail("customers")),cloudSelect("consumptions").catch(__pullFail("consumptions")),cloudSelect("packages").catch(__pullFail("packages")),cloudSelect("packagebuys").catch(__pullFail("packagebuys")),cloudSelect("refunds").catch(__pullFail("refunds")),cloudSelect("withdrawals").catch(__pullFail("withdrawals"))])
     .then(function(res){
       retryDeleted("members",res[0]);
       retryDeleted("services",res[1]);
@@ -6732,7 +6741,7 @@ function pkgPendingCommOf(shId){
   });
   return Math.round(s*100)/100;
 }
-var PAY_METHODS={cash:"现金",wechat:"微信",alipay:"支付宝",card:"银行卡",other:"其他"};
+var PAY_METHODS={cash:"现金",wechat:"微信",alipay:"支付宝",card:"银行卡",other:"其他",free:"免费"};
 function custOfAppt(a){
   var cust=a.customer_id?customerById(a.customer_id):null;
   if(!cust&&a.client)cust=(DB.customers||[]).find(function(c){return c.name===a.client;})||null;
@@ -6742,6 +6751,9 @@ function custPrice(sv,cust){
   if(!sv)return null;
   var isSh=cust&&cust.type==="shareholder";
   return isSh&&sv.priceShareholder!=null? +sv.priceShareholder : +sv.price;
+}
+function isFreeGiftAppt(a){
+  return !!(a&&String(a.note||"").indexOf("领取一次免费洗脸")>=0);
 }
 function openCheckout(id){
   if(!canEdit()){toast("仅管理员可以结账","err");return;}
@@ -6754,7 +6766,8 @@ function openCheckout(id){
   var isSh=cust&&cust.type==="shareholder";
   var unit=custPrice(sv,cust);
   var paid=(+a.amount||0)>0;
-  var def=paid?a.amount:(unit!=null?unit:0);
+  var isGift=isFreeGiftAppt(a);
+  var def=isGift?0:(paid?a.amount:(unit!=null?unit:0));
   $("coSummary").innerHTML=
     '<div class="co-line"><span>预约</span><b>'+esc(a.date+" "+a.time)+"</b></div>"+
     '<div class="co-line"><span>客户</span><b>'+esc(a.client)+" "+(cust?(cust.type==="shareholder"?"<span class=\"tag tag-warn\">共享股东</span>":(cust.referrer?"<span class=\"tag tag-blue\">客户</span>":"<span class=\"tag tag-gray\">散客</span>")):"<span class=\"tag tag-gray\">未登记</span>")+"</b></div>"+
@@ -6762,7 +6775,19 @@ function openCheckout(id){
     (sv&&unit!=null?'<div class="co-line"><span>计价</span><b>'+(isSh&&sv.priceShareholder!=null?"共享股东价":"普通价")+' '+fmtMoney(unit)+'</b><span class="hint">'+((cust&&isSh&&sv.priceShareholder==null)?"（该项目未设共享股东价，按普通价结算）":((cust&&!isSh)?"（共享股东本人消费才享共享股东价）":"（可手动修改）"))+'</span></div>':"")+
     (paid?'<div class="co-line"><span>已收款</span><b style="color:var(--ok)">'+fmtMoney(a.amount)+" · "+(PAY_METHODS[a.payMethod]||esc(a.payMethod)||"未记录")+'</b><span class="hint">（重新结账可修改金额）</span></div>':"");
   $("coAmount").value=def;
-  $("coMethod").value=paid?a.payMethod:"cash";
+  var oldGiftTip=document.getElementById("coGiftTip");
+  if(oldGiftTip&&oldGiftTip.parentNode)oldGiftTip.parentNode.removeChild(oldGiftTip);
+  $("coAmount").disabled=false;
+  if(isGift){
+    var giftTip=document.createElement("div");
+    giftTip.id="coGiftTip";
+    giftTip.style.cssText="margin-top:10px;background:#ecfdf5;border:1px solid #6ee7b7;color:#047857;border-radius:8px;padding:9px 12px;font-size:13px;line-height:1.7";
+    giftTip.innerHTML="<b>股东分享领取的免费洗脸名额</b>：本次核销<b>不收款</b>，金额固定为 0。";
+    $("coAmount").value=0;
+    $("coAmount").disabled=true;
+    if($("coAmount").parentNode)$("coAmount").parentNode.appendChild(giftTip);
+  }
+  $("coMethod").value=isGift?"free":(paid?a.payMethod:"cash");
   // 套餐卡抵扣区：客户有含该项目次数的套餐卡时显示可选
   coRedeemPkg="";
   var cards=cust?pkgCardsOf(cust.id,sv?sv.id:""):[];
@@ -6802,7 +6827,9 @@ function saveCheckout(){
   if(!a){closeModal("checkoutMask");return;}
   var amt=Math.max(0,parseFloat($("coAmount").value)||0);
   var method=$("coMethod").value;
-  if(!method){toast("请选择收款方式","err");return;}
+  var isGift=isFreeGiftAppt(a);
+  if(isGift){amt=0;if(!method)method="free";}
+  else if(!method){toast("请选择收款方式","err");return;}
   var sv=a.serviceId?serviceById(a.serviceId):null;
   var cust=custOfAppt(a);
   var redeemNote="";
@@ -6824,10 +6851,11 @@ function saveCheckout(){
   a.status="done";
   a.updatedAt=new Date().toISOString(); // 结账时间戳：合并时本地优先，防云端旧值覆盖实时状态
   if(redeemNote)a.note=(a.note?a.note+" · ":"")+"套餐核销："+redeemNote;
+  if(isGift)a.note=(a.note?a.note+" · ":"")+"免费名额核销（不收款）";
   if(sv){a.unitPrice=custPrice(sv,cust);a.serviceCost=(+sv.cost||0);}else{a.unitPrice=null;a.serviceCost=null;}
   saveDB();
   closeModal("checkoutMask");
-  toast(redeemNote?("已核销套餐卡："+redeemNote):(amt>0?("已收款 "+fmtMoney(amt)+"（"+(PAY_METHODS[method]||method)+"）"):"已结账（金额为 0）"));
+  toast(redeemNote?("已核销套餐卡："+redeemNote):(isGift?"已核销免费领取名额（不收款）":(amt>0?("已收款 "+fmtMoney(amt)+"（"+(PAY_METHODS[method]||method)+"）"):"已结账（金额为 0）")));
   upsertConsumptionFromAppt(a,"checkout");
   openReceipt(checkoutApptId);
 }
@@ -7928,7 +7956,15 @@ if(cloudCfg&&cloudCfg.url&&cloudCfg.anonKey){
   if(sess&&sess.access_token){
     fetchMyProfile().catch(function(){myRole="user";}).then(function(){
       cloudPullAll().then(function(ok){
-        if(!ok)toast("云端连接失败，当前显示本地缓存数据","err");
+        if(!ok){
+          toast("云端连接失败"+cloudPullFailMsg()+"，当前显示本地缓存数据，3 秒后自动重试","err");
+          setTimeout(function(){
+            cloudPullAll().then(function(ok2){
+              if(ok2){toast("云端已恢复连接","ok");renderAll();}
+              else{toast("云端仍连接失败"+cloudPullFailMsg()+"，请检查手机网络能否打开 Supabase 地址","err");}
+            });
+          },3000);
+        }
         renderAll();startCloudSync();
       });
     });
