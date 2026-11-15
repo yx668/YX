@@ -4238,8 +4238,8 @@ function doShareLogout(){
   renderAuthUI();renderAll();
   toast("已退出共享股东账号"+(nm?"（"+nm+"）":""));
 }
-function openLogin(){
-  loginMode="signin";renderLoginUI();loginTab="share";switchLoginTab("share");showModal("loginMask");
+function openLogin(tab){
+  loginMode="signin";renderLoginUI();showModal("loginMask");switchLoginTab(tab||"admin");
 }
 function renderLoginUI(){
   $("loginTitle").textContent=loginMode==="signin"?"登录云端账号":"注册账号";
@@ -4440,7 +4440,7 @@ function renderUserAdmin(){
   qs.style.display="";
   var list=$("userAdminList");
   list.innerHTML='<div class="hint" style="padding:16px">加载中…</div>';
-  cloudSelect("profiles?select=*&order=email").then(function(rows){
+  cloudSelect("profiles?select=*&order=created_at").then(function(rows){
     if(!rows||!rows.length){
       list.innerHTML='<div class="hint" style="padding:16px">暂无已注册账号（第一个注册的账号自动成为管理员）</div>';
       return;
@@ -6066,7 +6066,7 @@ renderSchedule();
     }
     function goLogin(){
       if(!/login=share/.test(q)) return;
-      try{ if(typeof openLogin === 'function'){ openLogin(); } }catch(e){}
+      try{ if(typeof openLogin === 'function'){ openLogin(); if(typeof switchLoginTab==='function'){ switchLoginTab('share'); } } }catch(e){}
     }
     function boot(){ addBack(); goLogin(); }
     if(document.readyState === 'complete'){ boot(); }
