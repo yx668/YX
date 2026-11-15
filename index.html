@@ -6250,7 +6250,12 @@ renderSchedule();
   if(!/[?&]book=free/.test(Q)) return;
 
   var m = /[?&]ref=([^&#]*)/.exec(Q);
-  var REF = m ? decodeURIComponent(m[1]) : '';
+  var REF = '';
+  if(m){
+    var _raw = decodeURIComponent(m[1]);
+    var _uid = _raw.match(/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/);
+    REF = _uid ? _uid[0] : _raw.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64);
+  }
 
   /* 建库后把 Supabase 的 Project URL 和 anon key 填到下面两行，客户手机才能提交 */
   var BUILTIN_URL = 'https://ryubnhwyqzicpvnrvgcn.supabase.co';
