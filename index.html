@@ -3623,6 +3623,9 @@ function cloudPullAll(){
         }
       }catch(e){DB.services=mergeRows(svcCloud,DB.services);}
       var cloudRows=(res[2]||[]).map(stripRow).map(function(r){
+        if(r.time==null)r.time="";
+        if(r.date==null)r.date="";
+        if(r.client==null)r.client="";
         if(r.items!=null)r.items=normalizeItems(r.items);
         if(r.unitprice!=null){r.unitPrice=r.unitprice;delete r.unitprice;}
         else delete r.unitPrice;
@@ -5624,7 +5627,7 @@ function dayTimelineHTML(date,appts){
 /* ================= 预约列表 ================= */
 function renderList(){
   var d=$("lfDate").value,st=$("lfState").value,fm=$("lfMember").value,q=$("lfSearch").value.trim().toLowerCase();
-  var list=DB.appointments.slice().sort(function(a,b){return (a.date+a.time).localeCompare(b.date+b.time);});
+  var list=DB.appointments.slice().sort(function(a,b){return (String(a.date||"")+String(a.time||"")).localeCompare(String(b.date||"")+String(b.time||""));});
   list=list.filter(function(a){
     if(a.kind==="direct")return false; // 直接购买不显示在预约列表
     if(a.status==="done")return false; // 已结账自动清除（保留在统计报表）
@@ -5673,7 +5676,7 @@ function renderTodaySettled(){
     if(a.date!==today)return false;
     if(a.status!=="done"&&!(a.kind==="rent"&&a.status==="returned"))return false;
     return true;
-  }).sort(function(x,y){return x.time.localeCompare(y.time);});
+  }).sort(function(x,y){return String(x.time||"").localeCompare(String(y.time||""));});
   var total=list.reduce(function(s,a){return s+((+a.amount||0)+(+a.redeemValue||0));},0);
   var h='<div class="section" style="margin-top:12px"><div class="section-head"><div><h2>今日已完成结算</h2><div class="desc">'+today+' 已结账的预约 · 共 '+list.length+' 笔 · 合计 <b style="color:var(--primary)">'+fmtMoney(Math.round(total*100)/100)+'</b></div></div></div><div class="section-body no-pad">';
   if(!list.length){
