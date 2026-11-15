@@ -4,6 +4,19 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>银绣智享管理系统</title>
+<script>
+/* 云端配置迁移：浏览器里若还留着已失效的旧项目地址，自动换成当前生产库 */
+(function(){
+  try{
+    var U='https://ryubnhwyqzicpvnrvgcn.supabase.co';
+    var K='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ5dWJuaHd5cXppY3B2bnJ2Z2NuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTExNjIwMjIsImV4cCI6MjEwNjczODAyMn0.NtcRy9tAc1xe5VyoFmn-fA5cttMHPAx0Rh_eue24050';
+    var v=JSON.parse(localStorage.getItem('bkgbook_cloud_v1')||'null');
+    if(v && typeof v.url==='string' && v.url && v.url.indexOf('ryubnhwyqzicpvnrvgcn')<0){
+      localStorage.setItem('bkgbook_cloud_v1', JSON.stringify({url:U, anonKey:K}));
+    }
+  }catch(e){}
+})();
+</script>
 <style>
 :root{
   --bg:#0d1820; --panel:#ffffff; --border:#e2ddd1; --bg-1:#f2efe8; --bg-2:#e9e4d9; --text-1:#141c24;
@@ -6253,10 +6266,12 @@ renderSchedule();
 
   function cfg(){
     var u = BUILTIN_URL, k = BUILTIN_KEY;
-    try{
-      var v = JSON.parse(localStorage.getItem('bkgbook_cloud_v1') || 'null');
-      if(v && v.url && v.anonKey){ u = v.url; k = v.anonKey; }
-    }catch(e){}
+    if(!u || !k){
+      try{
+        var v = JSON.parse(localStorage.getItem('bkgbook_cloud_v1') || 'null');
+        if(v && v.url && v.anonKey){ u = v.url; k = v.anonKey; }
+      }catch(e){}
+    }
     if(!u || !k) return null;
     return { url: String(u).replace(/\/+$/, ''), key: k };
   }
