@@ -5494,7 +5494,7 @@ function renderTimeline(container,date,compact,srcAppts){
   var bySlot={};
   appts.forEach(function(a){
     var m=memberById(a.memberId),sv=serviceById(a.serviceId);
-    var label=(sv?sv.name:"预约")+(m?"·"+m.name:"")+" "+a.client;
+    var label=(sv?sv.name:(a.kind==="site"?"官网报名":"预约"))+(m?"·"+m.name:"")+" "+a.client;
     // 只点亮起始时刻那一格（9:00 预约只亮 9:00 格，不按项目时长扩展）
     var st=Math.max(minOf(a.time),s);
     if(st<e&&!bySlot[st])bySlot[st]={id:a.id,label:label,startT:st};
@@ -5678,8 +5678,8 @@ function renderList(){
        '<button class="btn btn-ghost-danger btn-xs" type="button" onclick="delAppt(\''+a.id+'\')">删除</button>'):
       ('<button class="btn btn-ghost btn-xs" type="button" onclick="openApptModal(\''+a.id+'\')">查看</button>');
     html+="<tr><td>"+(a.date===todayStr()?'<span class="tag tag-blue">今天</span> ':"")+a.date+"</td>"+
-      "<td>"+esc(a.time)+'</td><td><b>'+esc(a.client)+'</b>'+(a.kind==="direct"?' <span class="tag tag-warn" style="font-size:10px">直购</span>':(isRent?' <span class="tag tag-warn" style="font-size:10px">出租</span>':""))+'<br><span class="hint">'+esc(a.phone||"")+"</span></td>"+
-      "<td>"+(sv?esc(sv.name):'<span class="hint">-</span>')+"</td>"+
+      "<td>"+esc(a.time)+'</td><td><b>'+esc(a.client)+'</b>'+(a.kind==="direct"?' <span class="tag tag-warn" style="font-size:10px">直购</span>':(isRent?' <span class="tag tag-warn" style="font-size:10px">出租</span>':""))+(a.kind==="site"?' <span class="tag tag-blue" style="font-size:10px">官网</span>':"")+'<br><span class="hint">'+esc(a.phone||"")+"</span></td>"+
+      "<td>"+(sv?esc(sv.name):(a.kind==="site"?'<span class="tag tag-blue" style="font-size:10px">官网报名</span>':'<span class="hint">-</span>'))+"</td>"+
       '<td>'+(m?'<div class="member-cell"><span class="avatar" style="background:'+esc(m.color)+'">'+esc(m.name[0])+"</span>"+esc(m.name)+"</div>":'<span class="hint">未分配</span>')+"</td>"+
       '<td><span class="tag '+stm[1]+'">'+stm[0]+"</span>"+(a.amount>0?' <span class="tag tag-green" title="'+esc(a.payMethod?PAY_METHODS[a.payMethod]||a.payMethod:"")+'">已收款 '+fmtMoney(a.amount)+"</span>":"")+"</td><td>"+note+"</td>"+
       '<td><div class="row-actions">'+acts+"</div></td></tr>";
