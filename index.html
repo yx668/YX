@@ -5738,9 +5738,11 @@ function renderTimeline(container,date,compact,srcAppts){
   var SLOT=10; // 10 分钟一格
   // 每个时间槽 → 覆盖它的预约（同槽重叠正常被冲突校验禁止；异常时先到先显示）
   var bySlot={};
+  var pendAppts=[]; // 未定时间的预约（官网报名等）：单独列出，不占用 09:00 那一格
   appts.forEach(function(a){
     var m=memberById(a.memberId),sv=serviceById(a.serviceId);
     var label=(sv?sv.name:(a.kind==="site"?"官网报名":"预约"))+(m?"·"+m.name:"")+" "+a.client;
+    if(!a.time){pendAppts.push({id:a.id,label:label});return;}
     // 只点亮起始时刻那一格（9:00 预约只亮 9:00 格，不按项目时长扩展）
     var st=Math.max(minOf(a.time),s);
     if(st<e&&!bySlot[st])bySlot[st]={id:a.id,label:label,startT:st};
@@ -5761,7 +5763,16 @@ function renderTimeline(container,date,compact,srcAppts){
         '<div style="font-size:10px;color:var(--text-3)">可约</div></div>';
     }
   }
-  container.innerHTML='<div style="display:flex;flex-wrap:wrap;gap:8px;padding:14px;align-items:stretch">'+html+'</div>';
+  var pendHtml="";
+  if(pendAppts.length){
+    pendHtml='<div style="flex:0 0 100%;display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 10px;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px">'+
+      '<span style="font-size:11px;font-weight:800;color:#92400e">待排期 '+pendAppts.length+' 单</span>'+
+      pendAppts.map(function(p){
+        return '<button type="button" class="btn btn-ghost btn-sm" style="font-size:12px;border-color:#fcd34d;color:#92400e" onclick="openApptModal(\''+p.id+'\')" title="点击安排具体时间">'+esc(p.label)+' · 时间待定</button>';
+      }).join("")+
+      '</div>';
+  }
+  container.innerHTML='<div style="display:flex;flex-wrap:wrap;gap:8px;padding:14px;align-items:stretch">'+pendHtml+html+'</div>';
   void compact;
 }
 function quickNewSlot(date,time){
@@ -5924,7 +5935,7 @@ function renderList(){
        '<button class="btn btn-ghost-danger btn-xs" type="button" onclick="delAppt(\''+a.id+'\')">删除</button>'):
       ('<button class="btn btn-ghost btn-xs" type="button" onclick="openApptModal(\''+a.id+'\')">查看</button>');
     html+="<tr><td>"+(a.date===todayStr()?'<span class="tag tag-blue">今天</span> ':"")+a.date+"</td>"+
-      "<td>"+esc(a.time)+'</td><td><b>'+esc(a.client)+'</b>'+(a.kind==="direct"?' <span class="tag tag-warn" style="font-size:10px">直购</span>':(isRent?' <span class="tag tag-warn" style="font-size:10px">出租</span>':""))+(a.kind==="site"?' <span class="tag tag-blue" style="font-size:10px">官网</span>':"")+'<br><span class="hint">'+esc(a.phone||"")+"</span></td>"+
+      "<td>"+(a.time?esc(a.time):'<span class="tag tag-warn" style="font-size:10px">待排期</span>')+'</td><td><b>'+esc(a.client)+'</b>'+(a.kind==="direct"?' <span class="tag tag-warn" style="font-size:10px">直购</span>':(isRent?' <span class="tag tag-warn" style="font-size:10px">出租</span>':""))+(a.kind==="site"?' <span class="tag tag-blue" style="font-size:10px">官网</span>':"")+'<br><span class="hint">'+esc(a.phone||"")+"</span></td>"+
       "<td>"+(sv?esc(sv.name):(a.kind==="site"?'<span class="tag tag-blue" style="font-size:10px">官网报名</span>':'<span class="hint">-</span>'))+"</td>"+
       '<td>'+(m?'<div class="member-cell"><span class="avatar" style="background:'+esc(m.color)+'">'+esc(m.name[0])+"</span>"+esc(m.name)+"</div>":'<span class="hint">未分配</span>')+"</td>"+
       '<td><span class="tag '+stm[1]+'">'+stm[0]+"</span>"+(a.amount>0?' <span class="tag tag-green" title="'+esc(a.payMethod?PAY_METHODS[a.payMethod]||a.payMethod:"")+'">已收款 '+fmtMoney(a.amount)+"</span>":"")+"</td><td>"+note+"</td>"+
@@ -6414,10 +6425,18 @@ function delCustomer(id){
   if(!c)return;
   // 检查该客户是否为其他人的介绍人
   var refs=(DB.customers||[]).filter(function(x){return x.referrer===id;});
-  var tip=refs.length?("（还有 "+refs.length+" 位客户以其为介绍人，删除后这些客户的介绍人将被清空）"):"";
+  var cons=(DB.consumptions||[]).filter(function(x){return x.customer_id===id;});
+  var tip=(refs.length?("（还有 "+refs.length+" 位客户以其为介绍人，删除后这些客户的介绍人将被清空）"):"")
+    +(cons.length?("（该客户名下 "+cons.length+" 条消费台账会一并删除，统计报表同步更新）"):"");
   if(!confirm("确定删除客户「"+c.name+"」？"+tip))return;
 DB.customers=DB.customers.filter(function(x){return x.id!==id;});
   DB.customers.forEach(function(x){if(x.referrer===id)x.referrer="";});
+  // 台账同步清理：避免报表出现指向已删客户的孤儿记录
+  if(cons.length){
+    var consIds=cons.map(function(x){return x.id;});
+    DB.consumptions=DB.consumptions.filter(function(x){return consIds.indexOf(x.id)<0;});
+    if(cloudMode&&sess)cloudDeleteRows("consumptions",consIds).catch(function(e){toast("云端删除台账失败："+(e&&e.message?e.message:e),"err");});
+  }
   if(cloudMode&&sess){markDeleted("customers",id);cloudSoftDelete("customers",id).catch(function(e){toast("云端删除失败："+(e&&e.message?e.message:e),"err");});}
   saveDB();toast("客户已删除");
 }
@@ -7024,7 +7043,11 @@ function custPrice(sv,cust){
   return isSh&&sv.priceShareholder!=null? +sv.priceShareholder : +sv.price;
 }
 function isFreeGiftAppt(a){
-  return !!(a&&String(a.note||"").indexOf("领取一次免费洗脸")>=0);
+  var n=String(a&&a.note||"");
+  if(!n)return false;
+  if(n.indexOf("领取一次免费洗脸")>=0)return true;
+  // 兼容门店手动改写备注（如「领取免费洗脸」「官网 领取 免费洗脸」），避免漏判后误收款
+  return n.indexOf("领取")>=0&&n.indexOf("免费洗脸")>=0;
 }
 function openCheckout(id){
   if(!canEdit()){toast("仅管理员可以结账","err");return;}
