@@ -336,6 +336,8 @@ tr:hover td{background:#fafbfc}
       <button class="nav-item" data-view="customers" data-admin="1" type="button"><span class="ic">👤</span><span>客户档案</span></button>
       <button class="nav-item" data-view="members" data-admin="1" type="button"><span class="ic">👥</span><span>成员档案</span></button>
       <button class="nav-item" data-view="config" data-admin="1" type="button"><span class="ic">⚙️</span><span>项目与时段</span></button>
+      <div class="nav-group" id="ngSite">官网维护</div>
+      <button class="nav-item" data-view="site" data-admin="1" type="button"><span class="ic">🌐</span><span>官网内容</span></button>
       <div class="nav-group" id="ngData">数据管理</div>
       <button class="nav-item" data-view="data" data-admin="1" type="button"><span class="ic">💾</span><span>备份与恢复</span></button>
       <!-- 手机端登录/退出入口（桌面端隐藏） -->
@@ -606,6 +608,28 @@ tr:hover td{background:#fafbfc}
       </section>
 
       <!-- 数据 -->
+      <!-- 官网内容 -->
+      <section class="page" id="page-site">
+        <div class="section">
+          <div class="section-head"><div><h2>官网文字</h2><div class="desc">在这里改，点最下面「保存」后官网刷新即可看到；留空或恢复成默认值＝用官网自带文案</div></div><button class="btn btn-ghost btn-sm" type="button" onclick="loadSiteContent()">从云端重新读取</button></div>
+          <div class="section-body" id="siteTextForm"><div class="hint">正在读取云端内容…</div></div>
+        </div>
+        <div class="section">
+          <div class="section-head"><div><h2>官网图片</h2><div class="desc">点「选图并上传」换图，上传成功后再点下面「保存」才会生效；建议 JPG，宽 1200px、300KB 以内</div></div></div>
+          <div class="section-body" id="siteImgForm"></div>
+        </div>
+        <div class="section">
+          <div class="section-head"><div><h2>保存与预览</h2><div class="desc" id="siteSaveHint">尚未读取云端内容</div></div></div>
+          <div class="section-body">
+            <div style="display:flex;gap:10px;flex-wrap:wrap">
+              <button class="btn btn-primary" type="button" onclick="saveSiteContent()">保存到云端 · 官网生效</button>
+              <button class="btn btn-ghost" type="button" onclick="openSitePage()">打开官网看看</button>
+            </div>
+            <div class="hint" style="margin-top:12px;line-height:1.9">官网地址：<b>https://yx668.github.io/YX/site/</b>　改完保存后刷新官网即可看到最新内容（约 1 分钟内生效，手机上也一样）。价格表按「项目|周期|说明|普通价|共享股东价」每行一条填写</div>
+          </div>
+        </div>
+      </section>
+
       <section class="page" id="page-data">
         <div class="section">
           <div class="section-head"><div><h2>云端多设备同步</h2><div class="desc" id="cloudStateDesc">未配置云端（当前单机本地模式）</div></div></div>
@@ -4397,6 +4421,216 @@ function renderAll(){
   renderAuthUI();
 }
 
+/* ================= 官网内容（文字 + 图片，存云端 Supabase.site_content） ================= */
+var SITE_DEF={
+ "hero.eyebrow": "广西隆林 · 苗族文化美业",
+ "hero.title": "银绣\n智享",
+ "hero.sub": "苗衣租售 · 面部清洁 · 面部修复 · 胯部塑形",
+ "hero.desc": "把苗族的银与绣，做成一件能穿、能体验、能分享的事。到隆林，穿一次盛装，做一次护理，也可以把身边的人脉，变成一份长期收入。",
+ "about.lead": "一间开在德峨的店，一门从银与绣里长出来的手艺生意。",
+ "about.p1": "隆林银绣智享生物科技有限公司，是一家专注于女性由内至外变美的初创赋能型服务企业。公司扎根隆林德峨，以苗族文化为根基，以“苗裙租售+面部清洁修复+胯部塑形”为核心业务，通过创新的“免费共享股东”模式，助力隆林苗族家人实现居家0元创业，为乡村振兴贡献绵薄之力。",
+ "about.p2": "银绣，生于隆林德峨，源于苗族，承千年非遗，传民族之韵。",
+ "about.p3": "桂西隆林德峨，是苗族银绣文化的沃土。这里的苗绣银饰，是苗族没有文字的史书。苗族先民迁徙千年，把历史绣进衣袂，把信仰錾入银饰。无银无花不成姑娘，无绣无彩不成盛装，银与绣，早已是苗族人的精神图腾，是刻在骨子里的文化基因。",
+ "about.p4": "银绣，不只是一个品牌，更是苗族银绣文化的传承者、传播者、守护者。我们以银为媒，以绣为语，让千年非遗活起来，让匠心手艺火起来，让民族文化传下去，让每一件银绣作品都成为民族文化的鲜活载体，惊艳时光，温暖岁月。",
+ "services.lead": "从一件苗衣，到一次护理。四项服务，价格全部公开。",
+ "svc.title1": "苗衣租售",
+ "svc.t1": "只要我们还身处苗家，不管是我们去做客、吃酒做外婆舅娘、或者过年的时候，都需换上我们苗家的苗裙。",
+ "svc.t2": "前些年随随便便买一套新裙子，即便只穿一次也愿意花钱买。但现在赚钱一年比一年难，花六七百块去买一套新的，结果有的就只穿一两次就挂进衣柜，最后吃灰都是烧掉的，现在再让我们买一套新确实有一点舍不得了。",
+ "svc.t3": "但是人家去做一次客，换一套不一样的款式的时候，自己来来回回就是那两套，心里也不好受。我们也想像人家一样，去做一次客就可以换一套不一样的，或者大家穿一样的，你是不是也这样想过？",
+ "svc.title2": "面部清洁",
+ "svc.t4": "在我们偏远山区的女性，大多数都是在家带娃、在家做农活或者去工地干苦工。天天被太阳晒，回到家还要做饭给家里人吃，常年油烟熏在脸上，面部垃圾越积越多。",
+ "svc.t5": "长期的不得去清洁，就容易会出现黑点啊、色斑啊之类的，不管买多贵的护肤品皮肤都吸收不了，花了不少冤枉钱。你是否也有过这样的经历？",
+ "svc.title3": "面部修复",
+ "svc.t6": "修护精华配合手法导入，针对干燥、泛红、粗糙的肤况，约 40 分钟。方案按肤质当面定，不做医疗承诺。",
+ "svc.title4": "胯部塑形",
+ "svc.t7": "很多姐妹可能不一定知道，女性生育之后骨盆几乎都有不同程度变形和闭合不好，所以导致了我们盆底肌的损伤和松弛，然后就会出现妈妈臀、大象腿、小肚子突出、腹股沟瘀堵形成脂肪堆积，严重一点的甚至出现漏尿或者子宫脱垂的情况。很多人因为不重视，到老了就会造成更加严重的骨盆变形。",
+ "svc.t8": "也有的人想去修复嘛，去养生馆或者美容院修复一次，就需要花一两千块钱，又舍不得。",
+ "svc.t9": "你知道为什么有好多人，用了不少的减肥产品，但是都没有很好效果吗？其中一个原因就是骨盆闭合不好、腹股沟瘀堵造成的问题。",
+ "price.lead": "普通价与共享股东价都公开。价格以到店当日公示为准，不含产品另购。",
+ "price.note": "说明：以上为门店现行价目，如遇调整以到店当日公示为准；共享股东价仅限已完成登记的共享股东本人使用，不得转借。",
+ "holder.title": "共享股东|零投资加入",
+ "holder.d1": "我发现很多在家的人想赚到钱，其实比想象中难太多了。孩子读书需要接送，老人需要照顾，丢下孩子在家跟老人，又怕小孩以后不听话；去进厂或者去工地干苦工嘛，又苦又累又不得钱。",
+ "holder.d2": "想找一个把项目做，其他平台总部大多都在大城市，太远也去不了；而且大部分平台都是需要入门费，需要自己掏钱来囤货，风险太大，卖不出去自己又用不完，最后全部砸自己手里。",
+ "holder.d3": "我也发现，现在的兄弟姐妹不是没有能力、不是说不够努力，你只是缺少一个不用垫资、不用囤货、时间完全自由、有人手把手来带，0 投资，靠谱而且赚钱的机会。",
+ "holder.point1": "客户到店消费，按成交额的利润拿 30%–50% 提成，档位越高比例越高，当月结算。",
+ "holder.point2": "参与门店服务协作、带客到店协助，按协作内容另计。",
+ "holder.join": "先了解，\n再决定。",
+ "holder.side1": "公司将价值 20 万的店铺，免费共享给所有想要创业的人，成为店铺的老板之一，推广分享可以拿丰厚佣金。",
+ "holder.side2": "公司不用你投钱开房租，不用你囤货，不用你亲自来服务，让你轻轻松松也可以开启 0 投资的创业之路。",
+ "store.lead": "到隆林德峨，先看衣、再做护理。建议提前预约，避免等候。",
+ "store.mapcap": "德峨镇 · 苹果场 · G246 旁，地图定位搜「银绣智享德峨店」，旁边就是德峨镇牛马市场。",
+ "store.name": "隆林银绣智享 · 德峨店",
+ "store.addr": "广西百色市隆林各族自治县德峨镇苹果场",
+ "store.hours": "每天 09:00–20:00",
+ "store.book": "分享预约 / 微信",
+ "foot.motto": "客户第一，诚信至上，贴心服务，用心赋能，合作共赢",
+ "foot.copy": "© 2026 隆林银绣智享生物科技",
+ "foot.icp": "桂ICP备：待补充 · 网站备案信息以正式上线为准",
+ "price.rows": "苗衣出租|按天计|盛装 / 便装，含基础配饰，押金另计|¥29.90/天|¥19.90/天\n面部清洁|约 20 分钟|洁面 + 深层清洁 + 基础养护|¥29.90|免费\n面部修复|约 40 分钟|修护护理，按肤质到店调整|¥98.00|¥68.00\n胯部塑形|约 30 分钟|体态评估 + 舒缓护理，方案到店定|¥599.00|¥399.00"
+};
+var SITE_FIELDS=[
+{g:"首屏",k:"hero.eyebrow",l:"顶部小字（品牌定位）"},
+{g:"首屏",k:"hero.title",l:"大标题（第二行用换行分隔）"},
+{g:"首屏",k:"hero.sub",l:"副标题（服务项目一行）"},
+{g:"首屏",k:"hero.desc",l:"首屏介绍"},
+{g:"公司介绍",k:"about.lead",l:"介绍引言"},
+{g:"公司介绍",k:"about.p1",l:"企业定位"},
+{g:"公司介绍",k:"about.p2",l:"文化根脉 · 上"},
+{g:"公司介绍",k:"about.p3",l:"文化根脉 · 下"},
+{g:"公司介绍",k:"about.p4",l:"品牌使命"},
+{g:"服务",k:"services.lead",l:"服务区引言"},
+{g:"服务",k:"svc.title1",l:"服务一 · 标题"},
+{g:"服务",k:"svc.t1",l:"服务一 · 第1段"},
+{g:"服务",k:"svc.t2",l:"服务一 · 第2段"},
+{g:"服务",k:"svc.t3",l:"服务一 · 第3段"},
+{g:"服务",k:"svc.title2",l:"服务二 · 标题"},
+{g:"服务",k:"svc.t4",l:"服务二 · 第1段"},
+{g:"服务",k:"svc.t5",l:"服务二 · 第2段"},
+{g:"服务",k:"svc.title3",l:"服务三 · 标题"},
+{g:"服务",k:"svc.t6",l:"服务三 · 第1段"},
+{g:"服务",k:"svc.title4",l:"服务四 · 标题"},
+{g:"服务",k:"svc.t7",l:"服务四 · 第1段"},
+{g:"服务",k:"svc.t8",l:"服务四 · 第2段"},
+{g:"服务",k:"svc.t9",l:"服务四 · 第3段"},
+{g:"价目",k:"price.lead",l:"价目引言"},
+{g:"价目",k:"price.rows",l:"价目表（每行：项目|周期|说明|普通价|股东价）"},
+{g:"价目",k:"price.note",l:"价目下方说明"},
+{g:"共享股东",k:"holder.title",l:"标题（主标题|红色强调行）"},
+{g:"共享股东",k:"holder.d1",l:"招募文案 · 第1段"},
+{g:"共享股东",k:"holder.d2",l:"招募文案 · 第2段"},
+{g:"共享股东",k:"holder.d3",l:"招募文案 · 第3段"},
+{g:"共享股东",k:"holder.point1",l:"收益点一说明"},
+{g:"共享股东",k:"holder.point2",l:"收益点二说明"},
+{g:"共享股东",k:"holder.join",l:"右侧标题（两行用换行分隔）"},
+{g:"共享股东",k:"holder.side1",l:"右侧说明 · 第1段"},
+{g:"共享股东",k:"holder.side2",l:"右侧说明 · 第2段"},
+{g:"门店",k:"store.lead",l:"门店引言"},
+{g:"门店",k:"store.mapcap",l:"地图下方说明"},
+{g:"门店",k:"store.name",l:"门店名称"},
+{g:"门店",k:"store.addr",l:"地址"},
+{g:"门店",k:"store.hours",l:"营业时间"},
+{g:"门店",k:"store.book",l:"预约方式"},
+{g:"页脚",k:"foot.motto",l:"页脚标语"},
+{g:"页脚",k:"foot.copy",l:"版权行"},
+{g:"页脚",k:"foot.icp",l:"备案行"}
+];
+var SITE_IMG=[
+{k:"logo",l:"站点 logo（透明 PNG 最佳）",d:"assets/logo-mark-400.png"},
+{k:"hero",l:"首屏大图（苗族银饰）",d:"assets/hero-yinshi.jpg"},
+{k:"mao1",l:"苗衣展示（竖图）",d:"assets/miaozhuang.jpg"},
+{k:"mao2",l:"顾客上身照 1",d:"assets/miaoyi-1.jpg"},
+{k:"mao3",l:"顾客上身照 2",d:"assets/miaoyi-2.jpg"},
+{k:"care",l:"面部清洁配图",d:"assets/face-care.jpg"},
+{k:"repair",l:"面部修复配图",d:"assets/face-repair.jpg"},
+{k:"shape",l:"胯部塑形配图",d:"assets/body-shaping.jpg"},
+{k:"map",l:"门店地图截图",d:"assets/store-map.jpg"},
+{k:"wx",l:"微信二维码",d:"assets/wx-qr.jpg"}
+];
+var siteData={},siteLoaded=false,siteUpdatedAt="",siteImgs={},siteSavedTip="";
+function siteEsc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+function siteId(k){return "sc_"+k.replace(/\./g,"_");}
+function renderSiteForm(){
+  var host=$("siteTextForm");if(!host)return;
+  var cur={},k;
+  for(k in SITE_DEF)cur[k]=SITE_DEF[k];
+  if(siteLoaded){for(k in siteData){if(SITE_DEF.hasOwnProperty(k)&&siteData[k]!=null&&siteData[k]!=="")cur[k]=siteData[k];}}
+  var buf="",last="";
+  SITE_FIELDS.forEach(function(f){
+    if(f.g!==last){buf+='<div style="grid-column:1/-1;margin:20px 0 8px;font-weight:700;color:#0f766e;font-size:13px;border-left:3px solid #0f766e;padding-left:8px">'+siteEsc(f.g)+'</div>';last=f.g;}
+    var v=cur[f.k]==null?"":String(cur[f.k]);
+    var dft=String(SITE_DEF[f.k]||"");var long=(dft.length>36||v.length>36||dft.indexOf("\n")>=0||v.indexOf("\n")>=0);
+    buf+='<div class="form-item full" style="margin-bottom:10px">'
+      +'<label style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><span>'+siteEsc(f.l)+'</span><span style="font-weight:400;color:#94a3b8;font-size:11px">'+siteEsc(f.k)+'</span></label>'
+      +(long?'<textarea id="'+siteId(f.k)+'" rows="'+Math.min(9,Math.max(2,Math.ceil(v.length/52)))+'" style="width:100%;font-size:14px;line-height:1.65;padding:10px;border:1px solid #d0d7de;border-radius:8px;font-family:inherit;resize:vertical;box-sizing:border-box">'+siteEsc(v)+'</textarea>'
+            :'<input id="'+siteId(f.k)+'" value="'+siteEsc(v)+'" style="width:100%;font-size:14px;padding:9px 10px;border:1px solid #d0d7de;border-radius:8px;box-sizing:border-box">')
+      +'</div>';
+  });
+  host.innerHTML=buf;
+  renderSiteImgForm();
+  $("siteSaveHint").textContent=siteSavedTip||(siteLoaded?("已读取云端内容"+(siteUpdatedAt?" · 上次保存 "+siteUpdatedAt:"")):"云端暂无自定义内容，当前显示官网默认文案");
+}
+function renderSiteImgForm(){
+  var host=$("siteImgForm");if(!host)return;
+  var buf="";
+  SITE_IMG.forEach(function(f){
+    var cur=siteImgs[f.k]||(siteData["img."+f.k])||"";
+    buf+='<div style="display:flex;gap:14px;align-items:center;padding:12px 0;border-bottom:1px solid #eef2f4;flex-wrap:wrap">'
+      +'<div style="width:86px;height:86px;border-radius:8px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;overflow:hidden;flex:none" id="sipbox_'+f.k+'">'
+      +(cur?'<img id="sip_'+f.k+'" src="'+siteEsc(cur)+'" style="width:100%;height:100%;object-fit:cover">'
+           :'<img id="sip_'+f.k+'" alt="" style="display:none"><span style="font-size:11px;color:#94a3b8;text-align:center;line-height:1.4">官网<br>自带图</span>')
+      +'</div>'
+      +'<div style="flex:1;min-width:170px"><div style="font-weight:600;font-size:13px">'+siteEsc(f.l)+'</div>'
+      +'<div style="font-size:11px;color:#94a3b8;margin-top:3px">'+(cur?"已换成云端图片":"默认 "+siteEsc(f.d))+'</div></div>'
+      +'<input type="file" id="si_'+f.k+'" accept="image/*" style="display:none" onchange="uploadSiteImg(\''+f.k+'\')">'
+      +'<button class="btn btn-ghost btn-sm" type="button" onclick="document.getElementById(\'si_'+f.k+'\').click()">选图并上传</button>'
+      +'</div>';
+  });
+  host.innerHTML=buf;
+}
+function loadSiteContent(){
+  if(!cloudCfg||!cloudCfg.url){toast("先到「备份与恢复」配置云端地址与密钥","err");return Promise.resolve(false);}
+  toast("正在读取云端官网内容…");
+  return sFetch("/rest/v1/site_content?id=eq.1&select=data,updated_at").then(function(r){
+    if(!r.ok)throw new Error("HTTP "+r.status);
+    var arr=r.json||[];
+    siteData=(arr[0]&&arr[0].data)||{};
+    siteUpdatedAt=arr[0]&&arr[0].updated_at?String(arr[0].updated_at).replace("T"," ").slice(0,16):"";
+    siteLoaded=true;siteImgs={};siteSavedTip="";renderSiteForm();
+    toast("已读取云端内容");
+    return true;
+  }).catch(function(e){
+    siteLoaded=false;renderSiteForm();
+    toast("读取云端失败："+(e&&e.message||"请检查云端配置"),"err");
+    return false;
+  });
+}
+function saveSiteContent(){
+  if(!cloudCfg||!cloudCfg.url){toast("先到「备份与恢复」配置云端地址与密钥","err");return;}
+  var data={},n=0;
+  SITE_FIELDS.forEach(function(f){
+    var el=$(siteId(f.k));if(!el)return;
+    var v=el.value==null?"":String(el.value);
+    if(v!==String(SITE_DEF[f.k]||"")){data[f.k]=v;n++;}
+  });
+  SITE_IMG.forEach(function(f){if(siteImgs[f.k]){data["img."+f.k]=siteImgs[f.k];n++;}});
+  toast("正在保存…");
+  sFetch("/rest/v1/site_content?id=eq.1",{method:"PATCH",body:{data:data,updated_at:new Date().toISOString()},headers:{"Prefer":"return=minimal"}}).then(function(r){
+    if(!r.ok)throw new Error("HTTP "+r.status);
+    siteData=data;siteLoaded=true;siteImgs={};
+    siteUpdatedAt=new Date().toLocaleString("zh-CN",{hour12:false}).slice(0,16);
+    renderSiteForm();
+    siteSavedTip="已保存到云端 "+siteUpdatedAt+"（"+n+" 处自定义）· 刷新官网即可看到";
+    $("siteSaveHint").textContent=siteSavedTip;
+    toast("已保存（"+n+" 处自定义内容），刷新官网即可看到");
+  }).catch(function(e){
+    toast("保存失败："+(e&&e.message||e),'err');
+  });
+}
+function uploadSiteImg(k){
+  if(!cloudCfg||!cloudCfg.url){toast("先到「备份与恢复」配置云端地址与密钥","err");return;}
+  var inp=$("si_"+k);
+  if(!inp||!inp.files||!inp.files[0]){toast("先选一张图片","err");return;}
+  var f=inp.files[0];
+  if(f.size>6*1024*1024){toast("图片太大，请压到 6MB 以内再传","err");return;}
+  var ext=(f.name.indexOf(".")>=0?f.name.split(".").pop():"jpg").toLowerCase();
+  if(["jpg","jpeg","png","webp"].indexOf(ext)<0)ext="jpg";
+  var name=k+"-"+Date.now()+"."+ext;
+  var hd={"apikey":cloudCfg.anonKey,"Authorization":"Bearer "+cloudCfg.anonKey,"Content-Type":f.type||"image/jpeg","x-upsert":"true"};
+  toast("正在上传图片…");
+  fetch(cBase()+"/storage/v1/object/site-assets/"+name,{method:"POST",headers:hd,body:f}).then(function(r){
+    if(!r.ok)throw new Error("HTTP "+r.status);
+    var pub=cBase()+"/storage/v1/object/public/site-assets/"+name;
+    siteImgs[k]=pub;
+    var pv=$("sip_"+k);
+    if(pv){pv.src=pub;pv.style.display="";}
+    renderSiteImgForm();
+    toast("图片已上传，点「保存到云端」后官网生效");
+  }).catch(function(e){
+    toast("上传失败："+(e&&e.message||e)+"，可换小一点的图再试","err");
+  }).then(function(){try{inp.value="";}catch(e){}});
+}
+function openSitePage(){window.open("https://yx668.github.io/YX/site/","_blank");}
+
 function renderNav(){
   var shareMode=!!shareSess;
   var locked=!isAdmin();
@@ -4417,23 +4651,25 @@ function renderNav(){
   }
   $("ngBase").classList.toggle("hidden",locked||shareMode);
   $("ngData").classList.toggle("hidden",locked||shareMode);
+  $("ngSite").classList.toggle("hidden",locked||shareMode);
   $("ngStat").classList.toggle("hidden",locked||shareMode);
   $("ngCash").classList.toggle("hidden",locked||shareMode);
   document.querySelectorAll("[data-admin]").forEach(function(el){el.style.display=(locked||shareMode)?"none":"";});
   if(shareMode)currentView="share";
-  else if(locked&&["customers","members","config","data","report","buy"].indexOf(currentView)>=0)currentView="dashboard";
-  var titles={dashboard:"工作台",calendar:"预约日历",list:"预约列表",buy:"直接购买",customers:"客户档案",members:"成员档案",config:"项目与时段",data:"备份与恢复",report:"统计报表",share:"我的共享板块"};
+  else if(locked&&["customers","members","config","data","report","buy","site"].indexOf(currentView)>=0)currentView="dashboard";
+  var titles={dashboard:"工作台",calendar:"预约日历",list:"预约列表",buy:"直接购买",customers:"客户档案",members:"成员档案",config:"项目与时段",data:"备份与恢复",report:"统计报表",share:"我的共享板块",site:"官网内容"};
   $("pageTitle").textContent=titles[currentView]||"";
-  ["dashboard","calendar","list","buy","customers","members","config","data","report","share"].forEach(function(v){
+  ["dashboard","calendar","list","buy","customers","members","config","data","report","share","site"].forEach(function(v){
     $("page-"+v).classList.toggle("active",v===currentView);
   });
   if(currentView==="share")renderShareBoard();
   if(currentView==="report")renderReports();
   if(currentView==="config")renderSchedule();
+  if(currentView==="site"){ if(siteLoaded)renderSiteForm(); else loadSiteContent(); }
 }
 function switchView(v){
   if(shareSess&&v!=="share"){toast("共享股东仅可查看自己的共享板块","err");return;}
-  if(!isAdmin()&&["customers","members","config","data","report","buy"].indexOf(v)>=0){toast("普通用户仅可查看与新建预约","err");return;}
+  if(!isAdmin()&&["customers","members","config","data","report","buy","site"].indexOf(v)>=0){toast("普通用户仅可查看与新建预约","err");return;}
   currentView=v;
   try{localStorage.setItem("bkgbook_view",v);}catch(e){}
   renderNav();
