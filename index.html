@@ -491,7 +491,7 @@ tr:hover td{background:#fafbfc}
           <div class="section-head"><div><h2>苗衣出租登记</h2><div class="desc">出租项目（如苗衣）按天租出：登记租期与租金，归还时结算收款</div></div></div>
           <div class="section-body">
             <div class="form-grid">
-              <div class="form-item full"><label>客户档案（可选）</label><select id="rentCustPick" onchange="onRentCustPick()"></select><div class="hint">已建档客户自动带出身份与介绍人；不选则按散客处理（不计佣金）。</div></div>
+              <div class="form-item full"><label>客户档案（可选）</label><select id="rentCustPick" onchange="onRentCustPick()"></select><div class="hint">选择共享股东或普通客户后，姓名与电话自动带出；只有选「散客」才需手动填写。</div></div>
               <div class="form-item"><label>客户姓名 *</label><input id="rentClient" placeholder="租借人姓名"></div>
               <div class="form-item"><label>联系电话</label><input id="rentPhone" placeholder="选填"></div>
               <div class="form-item"><label>出租项目 *</label><select id="rentService" onchange="onRentServicePick()"></select></div>
@@ -7492,10 +7492,27 @@ function renderRent(){
   rs.innerHTML='<option value="">（选择出租项目）</option>'+rsOpts.map(function(s){return '<option value="'+s.id+'">'+esc(s.name)+"（租期 "+Math.max(1,parseInt(s.rentDays,10)||1)+" 天 / "+fmtMoney(s.price)+"）</option>";}).join("");
   if(rentSvid)rs.value=rentSvid;
   if(!$("rentDate").value)$("rentDate").value=todayStr();
+  syncRentClient();
   updateRentFee();
 }
 function rentCust(){return rentCustId?customerById(rentCustId):null;}
-function onRentCustPick(){rentCustId=$("rentCustPick").value;updateRentFee();}
+/* 客户档案选择了共享/普通客户 → 姓名电话自动带出并锁定；选（散客）才需手填 */
+function syncRentClient(){
+  var c=rentCust(),nm=$("rentClient"),ph=$("rentPhone");
+  if(!nm||!ph)return;
+  if(c){
+    nm.value=c.name||"";ph.value=c.phone||"";
+    nm.readOnly=true;ph.readOnly=true;
+    nm.style.background="#f3f4f6";ph.style.background="#f3f4f6";
+    nm.title="已按客户档案自动带出";ph.title="已按客户档案自动带出";
+  }else{
+    nm.readOnly=false;ph.readOnly=false;
+    nm.style.background="";ph.style.background="";
+    nm.title="";ph.title="";
+    nm.value="";ph.value="";
+  }
+}
+function onRentCustPick(){rentCustId=$("rentCustPick").value;syncRentClient();updateRentFee();}
 function onRentServicePick(){
   rentSvid=$("rentService").value;
   var s=rentSvid?serviceById(rentSvid):null;
