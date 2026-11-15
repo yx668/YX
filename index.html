@@ -930,14 +930,14 @@ tr:hover td{background:#fafbfc}
 <!-- 模态框：登录 / 注册 -->
 <div class="mask" id="loginMask">
   <div class="modal" style="max-width:430px">
-    <div class="modal-head"><h3 id="loginTitle">登录</h3></div>
+    <div class="modal-head"><h3 id="loginTitle" onclick="tapLoginTitle()" style="cursor:default;-webkit-user-select:none;user-select:none">登录</h3></div>
     <div class="modal-body">
       <div id="lgNoCfgTip" style="display:none;background:#fff7ed;border:1px solid #fdba74;color:#b45309;border-radius:8px;padding:9px 12px;font-size:12.5px;line-height:1.7;margin-bottom:12px">⚠️ <b>新设备首次使用：请先配置云端才能登录。</b><br>让门店管理员在电脑端「备份与恢复 → 云端多设备同步」生成二维码，用手机扫码自动配置；或手动填入云端地址与密钥后即可正常登录。</div>
-      <div style="display:flex;gap:8px;margin-bottom:12px">
+      <div id="lgTabs" style="display:none;gap:8px;margin-bottom:12px">
         <button class="btn btn-ghost btn-sm" type="button" id="lgTabShare" onclick="switchLoginTab('share')" style="flex:1">共享股东登录</button>
         <button class="btn btn-primary btn-sm" type="button" id="lgTabAdmin" onclick="switchLoginTab('admin')" style="flex:1">管理员 / 云端账号</button>
       </div>
-      <div id="lgShareBox" style="display:none">
+      <div id="lgShareBox">
         <div class="login-tip">共享股东请使用<b>手机号 + 密码</b>登录，登录后可查看自己名下的预约、消费与佣金。</div>
         <div id="lgSharePwdBox">
           <div class="form-item" style="margin-top:14px"><label>手机号（登录账号）</label><input id="lgShareMob" type="tel" autocomplete="username" placeholder="管理员分配的手机号"></div>
@@ -947,7 +947,7 @@ tr:hover td{background:#fafbfc}
         </div>
         <div class="hint" style="margin-top:10px;line-height:1.6">没有账号？请让门店管理员在「客户档案」中为您开通登录账号。<br>门店日常管理请切换到「管理员 / 云端账号」登录。</div>
       </div>
-      <div id="lgAdminBox">
+      <div id="lgAdminBox" style="display:none">
         <div class="login-tip" id="loginTip"></div>
         <div class="form-item" style="margin-top:14px"><label>邮箱</label><input id="lgEmail" type="email" autocomplete="email" placeholder="you@example.com"></div>
         <div class="form-item" style="margin-top:10px"><label>密码</label><input id="lgPass" type="password" autocomplete="current-password" placeholder="至少 6 位"></div>
@@ -4838,7 +4838,7 @@ function updateStorageTag(){
 
 /* ---------- 登录 / 账号 UI ---------- */
 var loginMode="signin";
-var loginTab="admin";
+var loginTab="share";
 var SHARE_PWD_KEY="yxzs_init_pwd_v1";
 var SHARE_SESS_KEY="yxzs_share_sess_v1";
 var shareSess=null;
@@ -4854,12 +4854,24 @@ function switchLoginTab(t){
   loginTab=t;
   $("lgTabShare").className="btn btn-sm "+(t==="share"?"btn-primary":"btn-ghost");
   $("lgTabAdmin").className="btn btn-sm "+(t==="admin"?"btn-primary":"btn-ghost");
+  var tabs=$("lgTabs"); if(tabs)tabs.style.display=(t==="admin")?"flex":"none";
   $("lgShareBox").style.display=t==="share"?"":"none";
   $("lgAdminBox").style.display=t==="admin"?"":"none";
   $("lgSwitchBtn").style.display=t==="admin"?"":"none";
   $("lgSubmitBtn").style.display=t==="admin"?"":"none";
   $("loginTitle").textContent=t==="share"?"共享股东登录":"管理员 / 云端账号登录";
   $("lgErr").style.display="none";$("lgShareErr").style.display="none";
+}
+/* 管理员入口隐蔽：在登录弹窗标题上连续点 3 下（1.2 秒内）才切到管理员登录 */
+var __lgTap=0,__lgTapT=null;
+function tapLoginTitle(){
+  __lgTap++;
+  if(__lgTapT)clearTimeout(__lgTapT);
+  __lgTapT=setTimeout(function(){__lgTap=0;},1200);
+  if(__lgTap>=3){
+    __lgTap=0;if(__lgTapT)clearTimeout(__lgTapT);
+    switchLoginTab("admin");
+  }
 }
 /* 拉取共享股东云端数据（登录与定时刷新共用）：优先 RPC load_share_data，缺失时 REST 直查回退 */
 function fetchShareData(mob,hp){
@@ -5189,7 +5201,7 @@ function doShareLogout(){
   toast("已退出共享股东账号"+(nm?"（"+nm+"）":""));
 }
 function openLogin(tab){
-  loginMode="signin";renderLoginUI();showModal("loginMask");switchLoginTab(tab===undefined?"admin":tab);
+  loginMode="signin";renderLoginUI();showModal("loginMask");switchLoginTab(tab===undefined?"share":tab);
   // 未配置云端（新设备）：登录弹窗顶部显示醒目配置引导
   var tip=$("lgNoCfgTip");
   if(tip)tip.style.display=(cloudCfg&&cloudCfg.url&&cloudCfg.anonKey)?"none":"";
