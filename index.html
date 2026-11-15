@@ -4529,8 +4529,10 @@ var SITE_IMG=[
 var siteData={},siteLoaded=false,siteUpdatedAt="",siteImgs={},siteSavedTip="";
 function siteEsc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
 function siteId(k){return "sc_"+k.replace(/\./g,"_");}
-function renderSiteForm(){
+function renderSiteForm(force){
   var host=$("siteTextForm");if(!host)return;
+  /* 用户正在编辑（有未保存修改）时，定时同步不得重绘，否则输入会被云端/默认值覆盖 */
+  if(!force&&host.getAttribute("data-dirty")==="1"&&host.querySelectorAll("textarea,input").length)return;
   var cur={},k;
   for(k in SITE_DEF)cur[k]=SITE_DEF[k];
   if(siteLoaded){for(k in siteData){if(SITE_DEF.hasOwnProperty(k)&&siteData[k]!=null&&siteData[k]!=="")cur[k]=siteData[k];}}
@@ -4546,6 +4548,9 @@ function renderSiteForm(){
       +'</div>';
   });
   host.innerHTML=buf;
+  host.setAttribute("data-dirty","0");
+  host.oninput=function(){host.setAttribute("data-dirty","1");};
+  host.onchange=function(){host.setAttribute("data-dirty","1");};
   renderSiteImgForm();
   $("siteSaveHint").textContent=siteSavedTip||(siteLoaded?("已读取云端内容"+(siteUpdatedAt?" · 上次保存 "+siteUpdatedAt:"")):"云端暂无自定义内容，当前显示官网默认文案");
 }
@@ -4567,19 +4572,24 @@ function renderSiteImgForm(){
   });
   host.innerHTML=buf;
 }
+var siteLoading=false;
 function loadSiteContent(){
+  if(siteLoading)return Promise.resolve(false);
   if(!cloudCfg||!cloudCfg.url){toast("先到「备份与恢复」配置云端地址与密钥","err");return Promise.resolve(false);}
+  siteLoading=true;
   toast("正在读取云端官网内容…");
   return sFetch("/rest/v1/site_content?id=eq.1&select=data,updated_at").then(function(r){
     if(!r.ok)throw new Error("HTTP "+r.status);
     var arr=r.json||[];
     siteData=(arr[0]&&arr[0].data)||{};
     siteUpdatedAt=arr[0]&&arr[0].updated_at?String(arr[0].updated_at).replace("T"," ").slice(0,16):"";
-    siteLoaded=true;siteImgs={};siteSavedTip="";renderSiteForm();
+    siteLoaded=true;siteImgs={};siteSavedTip="";renderSiteForm(true);
+    siteLoading=false;
     toast("已读取云端内容");
     return true;
   }).catch(function(e){
-    siteLoaded=false;renderSiteForm();
+    siteLoading=false;
+    siteLoaded=false;renderSiteForm(true);
     toast("读取云端失败："+(e&&e.message||"请检查云端配置"),"err");
     return false;
   });
@@ -4598,7 +4608,7 @@ function saveSiteContent(){
     if(!r.ok)throw new Error("HTTP "+r.status);
     siteData=data;siteLoaded=true;siteImgs={};
     siteUpdatedAt=new Date().toLocaleString("zh-CN",{hour12:false}).slice(0,16);
-    renderSiteForm();
+    renderSiteForm(true);
     siteSavedTip="已保存到云端 "+siteUpdatedAt+"（"+n+" 处自定义）· 刷新官网即可看到";
     $("siteSaveHint").textContent=siteSavedTip;
     toast("已保存（"+n+" 处自定义内容），刷新官网即可看到");
