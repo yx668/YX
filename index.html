@@ -3964,33 +3964,43 @@ document.addEventListener("visibilitychange",function(){
 var DB_KEY="bkgbook_v1";
 function defaultData(){
   return {
-    members:[
-      {id:"m1",name:"张伟",role:"理发师",phone:"13800000001",status:"active",color:"#2563eb"},
-      {id:"m2",name:"李娜",role:"设计师",phone:"13800000002",status:"active",color:"#db2777"},
-      {id:"m3",name:"王强",role:"技师",phone:"13800000003",status:"active",color:"#16a34a"},
-      {id:"m4",name:"赵敏",role:"顾问",phone:"13800000004",status:"leave",color:"#d97706"}
-    ],
-    services:[
-      {id:"s1",name:"剪发",duration:45,price:45,priceShareholder:38,cost:8,color:"#2563eb"},
-      {id:"s2",name:"染发",duration:120,price:150,priceShareholder:128,cost:45,color:"#7c3aed"},
-      {id:"s3",name:"护理",duration:60,price:80,priceShareholder:68,cost:20,color:"#db2777"},
-      {id:"s4",name:"会议室预约",duration:60,price:120,priceShareholder:108,cost:30,color:"#16a34a"},
-      {id:"s5",name:"一对一咨询",duration:30,price:99,priceShareholder:88,cost:10,color:"#0891b2"}
-    ],
+    members:[],
+    services:[],
     schedule:{start:"09:00",end:"20:00"},
-    customers:[
-      {id:"c1",name:"王晓彤",phone:"13700001001",type:"shareholder",referrer:"",account_email:"",note:"共享股东本人",color:"#d97706"},
-      {id:"c2",name:"李梦琪",phone:"13700001002",type:"shareholder",referrer:"",account_email:"",note:"共享股东本人",color:"#db2777"},
-      {id:"c3",name:"刘雨桐",phone:"13700001003",type:"normal",referrer:"c1",account_email:"",note:"王晓彤一级客户",color:"#2563eb"},
-      {id:"c4",name:"何佳怡",phone:"13700001004",type:"normal",referrer:"c3",account_email:"",note:"刘雨桐二级客户",color:"#16a34a"},
-      {id:"c5",name:"散客示例",phone:"13700001005",type:"normal",referrer:"",account_email:"",note:"未登记散客",color:"#6b7280"}
-    ],
+    customers:[],
     appointments:[],
     withdrawals:[],
     consumptions:[]
   };
 }
 var DB={members:[],services:[],schedule:{start:"09:00",end:"20:00"},customers:[],appointments:[],withdrawals:[],consumptions:[],packages:[],packageBuys:[]};
+/* 一次性清理：旧版本内置的美发店演示人员/客户（张伟、王晓彤等）不该出现在真实门店。
+   只删除"姓名 + 演示手机号"同时命中的记录，避免误删真实客户；删除写墓碑并同步删云端，之后不会复活。 */
+function purgeDemoPeople(){
+  var MEM={"张伟":"13800000001","李娜":"13800000002","王强":"13800000003","赵敏":"13800000004"};
+  var CUS={"王晓彤":"13700001001","李梦琪":"13700001002","刘雨桐":"13700001003","何佳怡":"13700001004","散客示例":"13700001005"};
+  var changed=false,goneM=[],goneC=[];
+  (DB.members||[]).slice().forEach(function(m){
+    if(m&&m.id&&MEM[m.name]&&String(m.phone||"")===MEM[m.name]){
+      markDeleted("members",m.id);goneM.push(m.id);
+      DB.members=DB.members.filter(function(x){return x.id!==m.id;});changed=true;
+    }
+  });
+  (DB.customers||[]).slice().forEach(function(c){
+    if(c&&c.id&&CUS[c.name]&&String(c.phone||"")===CUS[c.name]){
+      markDeleted("customers",c.id);goneC.push(c.id);
+      DB.customers=DB.customers.filter(function(x){return x.id!==c.id;});changed=true;
+    }
+  });
+  if(changed){
+    saveDB();
+    if(cloudMode&&sess){
+      if(goneM.length)cloudDeleteRows("members",goneM).catch(function(){});
+      if(goneC.length)cloudDeleteRows("customers",goneC).catch(function(){});
+    }
+  }
+  return changed;
+}
 var storageOK=false;
 
 // 短 ID→UUID 本地迁移：老版本/示例数据使用 m1/s1/c1 等短 ID，云端主键是 UUID（22P02 拒绝）。
@@ -7986,6 +7996,7 @@ if(cloudCfg&&cloudCfg.url&&cloudCfg.anonKey){
 }
 initSectionFolds();
 renderSchedule();
+try{purgeDemoPeople();}catch(e){}
 
 /* ================= 统一客户消费管理中心 ================= */
 var ccManagerTargetId=null,ccManagerFilter="",ccManagerScope="all";
