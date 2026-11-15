@@ -1162,18 +1162,6 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
 
   document.querySelectorAll('[data-share]').forEach(function(btn){
     btn.addEventListener('click', function(){
-      // 演示态（尚未接真实分享后端）：朋友点开人数无法真实统计，直接进领取流程，避免客户永远卡在「还差 N 人」
-      if(!shareReal){
-        closeModals();
-        var sel=document.getElementById('f-service'), note=document.getElementById('f-note');
-        var lock=document.getElementById('svcLock'), bm=document.getElementById('bookingModal');
-        if(sel){ sel.value='面部清洁'; sel.disabled=true; }
-        if(lock){ lock.textContent='已锁定「面部清洁」，这是免费领取的洗脸项目。'; }
-        if(note && !note.value.trim()){ note.value='领取一次免费洗脸'; }
-        if(bm){ bm.classList.add('on'); }
-        toast('已填好「面部清洁」，备注写了：领取一次免费洗脸');
-        return;
-      }
       if(shareModal){ shareModal.classList.add('on'); renderShare(); }
     });
   });
