@@ -1446,8 +1446,10 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
           el.innerHTML=esc(v).split("\n").join("<br>");
         } else if(k==="hero.slogan"){
           var sl=String(v).split("\n");
+          var l3=esc(sl[2]||"");
+          l3=l3.replace(/隆林第一家/g,"<b>隆林第一家</b>").replace(/唯一一家/g,"<b>唯一一家</b>");
           el.innerHTML=esc(sl[0]||"")+"<span>"+esc(sl[1]||"")+"</span>"
-            +(sl[2]?'<span class="hero-claim">'+esc(sl[2])+"</span>":"");
+            +(sl[2]?'<span class="hero-claim">'+l3+"</span>":"");
         } else if(k==="holder.title"){
           var p=String(v).split("|");
           el.innerHTML=esc(p[0]||"")+(p[1]?"<br><em>"+esc(p[1])+"</em>":"");
