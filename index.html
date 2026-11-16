@@ -4545,7 +4545,7 @@ function renderSiteForm(force){
     var dft=String(SITE_DEF[f.k]||"");var long=(dft.length>36||v.length>36||dft.indexOf("\n")>=0||v.indexOf("\n")>=0);
     buf+='<div class="form-item full" style="margin-bottom:10px">'
       +'<label style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><span>'+siteEsc(f.l)+'</span><span style="font-weight:400;color:#94a3b8;font-size:11px">'+siteEsc(f.k)+'</span></label>'
-      +(long?'<textarea id="'+siteId(f.k)+'" rows="'+Math.min(9,Math.max(2,Math.ceil(v.length/52)))+'" style="width:100%;font-size:14px;line-height:1.65;padding:10px;border:1px solid #d0d7de;border-radius:8px;font-family:inherit;resize:vertical;box-sizing:border-box">'+siteEsc(v)+'</textarea>'
+      +(long?'<textarea id="'+siteId(f.k)+'" rows="'+Math.min(9,Math.max(2,Math.max(String(v).split("\n").length,Math.ceil(v.length/52))))+'" style="width:100%;font-size:14px;line-height:1.65;padding:10px;border:1px solid #d0d7de;border-radius:8px;font-family:inherit;resize:vertical;box-sizing:border-box">'+siteEsc(v)+'</textarea>'
             :'<input id="'+siteId(f.k)+'" value="'+siteEsc(v)+'" style="width:100%;font-size:14px;padding:9px 10px;border:1px solid #d0d7de;border-radius:8px;box-sizing:border-box">')
       +'</div>';
   });
