@@ -853,7 +853,12 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
   // ===== 分享获洗脸：3 位朋友点开才解锁预约 =====
   // 上线前只改这一行：url 填 Supabase 项目地址（形如 https://xxxx.supabase.co），key 填 anon public key。
   // 两项都留空 = 本机演示模式（数据只在本浏览器里，门店看不到）。
-  var SHARE = { url: '', key: '', threshold: 3, storeKey: 'sy_demo_share' };
+  var SHARE = {
+    url: 'https://ryubnhwyqzicpvnrvgcn.supabase.co',
+    key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ5dWJuaHd5cXppY3B2bnJ2Z2NuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTExNjIwMjIsImV4cCI6MjEwNjczODAyMn0.NtcRy9tAc1xe5VyoFmn-fA5cttMHPAx0Rh_eue24050',
+    threshold: 3,
+    storeKey: 'sy_demo_share'
+  };
   var shareReal = !!(SHARE.url && SHARE.key);
 
   // ===== 网站浏览量（今日 / 累计）：与管理系统同一个后端，数据表 site_visits =====
