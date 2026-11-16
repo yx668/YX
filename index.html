@@ -6040,8 +6040,14 @@ function renderReports(){
   var appts=DB.appointments.filter(function(a){return a.date>=R.s&&a.date<=R.e;});
   // ---- 收入 / 利润 ----
   var paid=appts.filter(isPaidAppt);
-  var income=paid.reduce(function(s,a){return s+(+a.amount||0);},0);
-  var cost=paid.reduce(function(s,a){return s+apptProfit(a).cost;},0);
+  /* 已删除预约、但台账仍在的结算记录：照常计入统计，保证「删预约不影响统计报表」 */
+  var orphanCon=(DB.consumptions||[]).filter(function(c){
+    if(!c.apptId||c.kind==="buy")return false;
+    return !DB.appointments.some(function(a){return a.id===c.apptId;});
+  });
+  var paidCount=paid.length+orphanCon.length;
+  var income=paid.reduce(function(s,a){return s+(+a.amount||0);},0)+orphanCon.reduce(function(s,c){return s+(+c.amount||0);},0);
+  var cost=paid.reduce(function(s,a){return s+apptProfit(a).cost;},0)+orphanCon.reduce(function(s,c){return s+(+c.cost||0);},0);
   // 佣金：范围内已收款记录逐条核算——客户为某共享股东一级客户时，按该股东当月佣金比例计提
   var commission=calcCommission(paid);
   var profit=Math.round((income-cost-commission)*100)/100;
@@ -6050,12 +6056,13 @@ function renderReports(){
     if(!isPaidAppt(a))return s;
     var ds=(a.kind==="rent"?((a.returnedAt||"").slice(0,10)):(a.date||""));
     return ds===today?s+(+a.amount||0):s;
-  },0);
+  },0)+orphanCon.reduce(function(s,c){return (c.date===today)?s+(+c.amount||0):s;},0);
   var mStart=R.s.slice(0,7)+"-01";
   var mo=DB.appointments.filter(function(a){return a.date>=mStart&&a.date<=today;});
   var moPaid=mo.filter(isPaidAppt);
-  var moInc=moPaid.reduce(function(s,a){return s+(+a.amount||0);},0);
-  var moCost=moPaid.reduce(function(s,a){return s+apptProfit(a).cost;},0);
+  var moOrphan=orphanCon.filter(function(c){return (c.date||"")>=mStart&&(c.date||"")<=today;});
+  var moInc=moPaid.reduce(function(s,a){return s+(+a.amount||0);},0)+moOrphan.reduce(function(s,c){return s+(+c.amount||0);},0);
+  var moCost=moPaid.reduce(function(s,a){return s+apptProfit(a).cost;},0)+moOrphan.reduce(function(s,c){return s+(+c.cost||0);},0);
   var moProf=Math.round((moInc-moCost-calcCommission(moPaid))*100)/100;
   var pmd=prevMonthDays(),pmPrev=DB.appointments.filter(function(a){return a.date>=pmd.s&&a.date<=pmd.e;});
   var pmInc=pmPrev.reduce(function(s,a){return s+(isPaidAppt(a)?(+a.amount||0):0);},0);
@@ -6063,7 +6070,7 @@ function renderReports(){
   var refunds=(DB.refunds||[]).filter(function(r){return r.date>=R.s&&r.date<=R.e;});
   var refundTotal=refunds.reduce(function(s,r){return s+(+r.amount||0);},0);
   $("rpIncome").innerHTML=
-    '<div class="stat"><div class="label">'+R.label+'总收入</div><div class="value" style="font-size:24px">'+fmtMoney(income)+'</div><div class="sub">已收款 '+paid.length+" 单</div></div>"+
+    '<div class="stat"><div class="label">'+R.label+'总收入</div><div class="value" style="font-size:24px">'+fmtMoney(income)+'</div><div class="sub">已收款 '+paidCount+" 单</div></div>"+
     '<div class="stat"><div class="label">'+R.label+'总利润</div><div class="value" style="font-size:24px;color:var(--ok)">'+fmtMoney(profit)+'</div><div class="sub">营收 '+fmtMoney(income)+" · 成本 "+fmtMoney(cost)+" · 佣金 "+fmtMoney(commission)+"</div></div>"+
     '<div class="stat"><div class="label">当日营收额（今日已收款）</div><div class="value" style="font-size:24px">'+fmtMoney(todayInc)+'</div><div class="sub">截止当前时刻的今日收款合计</div></div>'+
     '<div class="stat"><div class="label">本月累计（截至今日）</div><div class="value" style="font-size:24px">'+fmtMoney(moInc)+'</div><div class="sub">本月利润 '+fmtMoney(moProf)+" · 上月 "+fmtMoney(pmInc)+"</div></div>"+
@@ -6942,14 +6949,10 @@ function delAppt(id){
   if(!canEdit()){toast("普通用户不能删除预约","err");return;}
   var a=DB.appointments.find(function(x){return x.id===id;});
   if(!a)return;
-  if(!confirm("确定删除 "+(a.date+" "+a.time)+" "+(a.client)+" 的这条预约？"))return;
+  if(!confirm("确定删除 "+(a.date+" "+a.time)+" "+(a.client)+" 的这条预约？\n\n统计报表里的这笔结算记录会保留，不受影响。"))return;
 DB.appointments=DB.appointments.filter(function(x){return x.id!==id;});
-  // 同步删除关联消费台账（apptId 关联），保证统计报表/客户档案全视图一致
-  var relCons=(DB.consumptions||[]).filter(function(c){return c.apptId===id;}).map(function(c){return c.id;});
-  if(relCons.length){
-    DB.consumptions=DB.consumptions.filter(function(c){return relCons.indexOf(c.id)<0;});
-    if(cloudMode&&sess)cloudDeleteRows("consumptions",relCons).catch(function(e){toast("云端删除台账失败："+(e&&e.message?e.message:e),"err");});
-  }
+  /* 单向联动：删除预约不影响统计报表，消费台账（结算记录）继续保留；
+     反向由 delConsumption 负责——删除统计报表里的结算记录时同步删除对应预约。 */
   if(cloudMode&&sess){markDeleted("appointments",id);cloudDeleteRows("appointments",[id]).catch(function(e){toast("云端删除失败："+(e&&e.message?e.message:e),"err");});}
   saveDB();toast("预约已删除");
   renderAll(); // 同步刷新工作台 / 日历 / 统计报表 / 共享板块 / 客户详情数据源
@@ -7560,12 +7563,13 @@ function upsertConsumptionFromAppt(a,kind){
   if(found){
     found.date=a.date;found.customer_id=(a.customer_id&&isValidUUID(a.customer_id))?a.customer_id:"";found.customer=a.client||"";
     found.item=itemName;found.amount=amt;found.method=a.payMethod||"";found.kind=kind;
+    found.cost=Math.round((apptProfit(a).cost||0)*100)/100;
     found.pkgBuy=isPkgBuy?true:(found.pkgBuy||false);
     found.note=(kind==="buy"?"直接购买":"预约结账")+(a.note?(" · "+a.note):"");
   }else{
     DB.consumptions.push({
       id:uid(),date:a.date,customer_id:(a.customer_id&&isValidUUID(a.customer_id))?a.customer_id:"",customer:a.client||"",
-      item:itemName,amount:amt,method:a.payMethod||"",kind:kind,
+      item:itemName,amount:amt,method:a.payMethod||"",kind:kind,cost:Math.round((apptProfit(a).cost||0)*100)/100,
       note:(kind==="buy"?"直接购买":"预约结账")+(a.note?(" · "+a.note):""),
       apptId:a.id,pkgBuy:isPkgBuy?true:false
     });
@@ -7585,7 +7589,7 @@ function consumptionRowsHtml(rows){
       '<td style="text-align:right"><button class="btn btn-ghost btn-xs" type="button" data-id="'+r.id+'" onclick="openConById(this)">编辑</button> '+
       '<button class="btn btn-danger btn-xs" type="button" data-id="'+r.id+'" onclick="delConById(this)">删除</button></td></tr>';
   });
-  h+='<tr><td colspan="7" style="font-size:12px;color:var(--text-3);padding:8px 14px">删除某条消费记录时，其关联的预约会同步删除（股东「我预约的项目」中相应记录同时消失）。</td></tr>';
+  h+='<tr><td colspan="7" style="font-size:12px;color:var(--text-3);padding:8px 14px">删除某条消费记录时，其关联的预约会同步删除（股东「我预约的项目」中相应记录同时消失）；删除预约不会删除本台账，统计记录照常保留。</td></tr>';
   h+="</table>";
   return h;
 }
