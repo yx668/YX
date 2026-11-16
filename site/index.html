@@ -351,7 +351,7 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
       <h1 class="hero-title" data-c="hero.title">银绣<br>智享</h1>
       <p class="hero-sub" data-c="hero.sub">苗衣租售 · 面部清洁 · 面部修复 · 胯部塑形</p>
       <p class="hero-desc" data-c="hero.desc">把苗族的银与绣，做成一件能穿、能体验、能分享的事。到隆林，穿一次盛装，做一次护理，也可以把身边的人脉，变成一份长期收入。</p>
-      <p class="hero-slogan">想变美找银绣，想创业还是找银绣<span>苗族同胞的创业基地</span><span class="hero-claim"><b>隆林第一家</b>，也是<b>唯一一家</b> 0 投资的创业平台</span></p>
+      <p class="hero-slogan" data-c="hero.slogan">想变美找银绣，想创业还是找银绣<span>苗族同胞的创业基地</span><span class="hero-claim"><b>隆林第一家</b>，也是<b>唯一一家</b> 0 投资的创业平台</span></p>
       <div class="hero-actions">
         <button class="btn btn-red" data-share>领取一次免费洗脸</button>
         <button class="btn btn-ghost" data-goto="#holder">在线注册共享股东</button>
@@ -1444,6 +1444,10 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
         var el=nodes[j];
         if(k==="hero.title"||k==="holder.join"){
           el.innerHTML=esc(v).split("\n").join("<br>");
+        } else if(k==="hero.slogan"){
+          var sl=String(v).split("\n");
+          el.innerHTML=esc(sl[0]||"")+"<span>"+esc(sl[1]||"")+"</span>"
+            +(sl[2]?'<span class="hero-claim">'+esc(sl[2])+"</span>":"");
         } else if(k==="holder.title"){
           var p=String(v).split("|");
           el.innerHTML=esc(p[0]||"")+(p[1]?"<br><em>"+esc(p[1])+"</em>":"");
