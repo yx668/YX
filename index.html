@@ -7048,8 +7048,8 @@ function isFreeGiftAppt(a){
   var n=String(a&&a.note||"");
   if(!n)return false;
   if(n.indexOf("领取一次免费洗脸")>=0)return true;
-  // 兼容门店手动改写备注（如「领取免费洗脸」「官网 领取 免费洗脸」），避免漏判后误收款
-  return n.indexOf("领取")>=0&&n.indexOf("免费洗脸")>=0;
+  // 「某某股东赠送的免费洗脸」也是股东送的名额，不能误收款
+  if(n.indexOf("免费洗脸")>=0&&(n.indexOf("赠送")>=0||n.indexOf("领取")>=0))return true;
 }
 function openCheckout(id){
   if(!canEdit()){toast("仅管理员可以结账","err");return;}
@@ -8222,15 +8222,39 @@ function notifyAppt(title,body){
 function speakNotifyText(text){
   try{
     if(!("speechSynthesis" in window))return;
-    var u=new SpeechSynthesisUtterance(text);
-    u.lang="zh-CN";
-    u.rate=1.0;
-    u.pitch=1.0;
-    u.volume=1.0;
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(u);
+    var say=function(){
+      var u=new SpeechSynthesisUtterance(text);
+      u.lang="zh-CN";
+      u.rate=1.0;
+      u.pitch=1.0;
+      u.volume=1.0;
+      try{window.speechSynthesis.resume();}catch(e){}
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(u);
+    };
+    // 语音包尚未加载完就直接 speak 会静默失败：等 voices 就绪再播，最多等 1.2 秒
+    if(window.speechSynthesis.getVoices().length){ say(); return; }
+    var fired=false;
+    var go=function(){
+      if(fired)return; fired=true;
+      try{window.speechSynthesis.removeEventListener("voiceschanged",go);}catch(e){}
+      say();
+    };
+    try{window.speechSynthesis.addEventListener("voiceschanged",go);}catch(e){}
+    setTimeout(go,1200);
   }catch(e){}
 }
+/* 浏览器要求页面有过一次用户交互才允许发声：首次点击/触摸时预热一次语音引擎 */
+(function(){
+  if(!("speechSynthesis" in window))return;
+  var warm=function(){
+    try{ window.speechSynthesis.getVoices(); }catch(e){}
+    document.removeEventListener("pointerdown",warm);
+    document.removeEventListener("keydown",warm);
+  };
+  document.addEventListener("pointerdown",warm);
+  document.addEventListener("keydown",warm);
+})();
 /* 共享股东：通过 RPC 推送单条预约到云端（绕过 sess 与 RLS 限制） */
 function pushShareAppt(data){
   if(!cloudMode||!cloudCfg){toast("预约暂未上传到总部：未配置云端","err");return;}
@@ -8898,11 +8922,33 @@ function openConsumptionModalFromCC(){
       var base = c.url + '/rest/v1';
       var nowIso = new Date().toISOString();
 
-      fetch(base + '/customers?phone=eq.' + encodeURIComponent(phone) + '&select=id,referrer', { headers: hdr })
+      // 先取股东姓名，用于备注「某某股东赠送的免费洗脸」
+      var refName = '';
+      var refNameReady = REF
+        ? fetch(base + '/customers?id=eq.' + encodeURIComponent(REF) + '&select=name', { headers: hdr })
+            .then(function(r){ return r.ok ? r.json() : []; })
+            .then(function(rows){
+              var n = rows && rows[0] ? String(rows[0].name || '') : '';
+              if(n.indexOf('__DEL__') !== 0) refName = n;
+              return true;
+            })
+            .catch(function(){ return true; })
+        : Promise.resolve(true);
+
+      refNameReady.then(function(){
+        return fetch(base + '/customers?phone=eq.' + encodeURIComponent(phone) + '&select=id,name,referrer', { headers: hdr });
+      })
         .then(function(r){ return r.ok ? r.json() : []; })
         .then(function(rows){
           if(rows && rows.length){
             var a = rows[0];
+            // 之前删过同号码客户会留下墓碑行（name=__DEL__…）：恢复真实姓名再挂到本次股东名下
+            if(String(a.name || '').indexOf('__DEL__') === 0){
+              return fetch(base + '/customers?id=eq.' + encodeURIComponent(a.id), {
+                method: 'PATCH', headers: hdrJson,
+                body: JSON.stringify({ name: name, type: 'normal', referrer: REF || null, updated_at: nowIso })
+              }).then(function(x){ return x.ok ? a.id : null; });
+            }
             if(!a.referrer && REF){
               return fetch(base + '/customers?id=eq.' + encodeURIComponent(a.id), {
                 method: 'PATCH', headers: hdrJson,
@@ -8926,7 +8972,7 @@ function openConsumptionModalFromCC(){
             date: nowIso.slice(0, 10),
             time: '', duration: null, service_id: '52ee8a1e-e7dc-4b88-b387-96e25d8665fa', member_id: null,
             client: name, phone: phone,
-            note: '领取一次免费洗脸；项目：面部清洁',
+            note: (refName ? refName + '赠送的免费洗脸' : '领取一次免费洗脸') + '；项目：面部清洁',
             status: 'pending', amount: null, pay_method: null, paid_at: null,
             customer_id: cid || null, kind: 'site', referrer: REF || null,
             items: null, updated_at: nowIso
