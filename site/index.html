@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>银绣智享 · 隆林苗族文化美业</title>
-<meta name="description" content="隆林银绣智享生物科技：苗衣出租出售、面部清洁、面部修复、胯部塑形，领取一次免费洗脸，共享股东在线注册。">
+<meta name="description" content="隆林银绣智享生物科技：苗衣出租出售、面部清洁、面部修复、胯部塑形，分享领取一次免费洗脸，共享股东在线注册。">
 <link rel="preconnect" href="https://miaoda.feishu.cn">
 <link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=Noto+Serif+SC:wght@400;600;700;900&family=Noto+Sans+SC:wght@300;400;500;700&display=swap">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%230B1A26'/%3E%3Cpath d='M32 7 C39 15 45 18 54 19 C46 24 40 27 32 34 C24 27 18 24 10 19 C19 18 25 15 32 7 Z' fill='none' stroke='%23C9A24B' stroke-width='2'/%3E%3Ccircle cx='31' cy='36' r='16' fill='none' stroke='%23C9A24B' stroke-width='2.2'/%3E%3Crect x='43' y='19' width='10' height='14' rx='2' fill='%23B02A2E'/%3E%3C/svg%3E">
@@ -194,9 +194,9 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
 .holder-side p{font-size:13px;color:var(--silver-dim);line-height:1.9;margin-top:12px}
 .holder-cta{margin-top:24px;width:100%}
 @media(min-width:900px){
-  .holder-in{grid-template-columns:1fr 360px}
-  .holder-main{padding:96px 56px 96px 0;border-bottom:0;border-right:1px solid var(--line)}
-  .holder-side{padding:56px 32px;border-bottom:0;align-self:start}
+  .holder-in{grid-template-columns:360px 1fr}
+  .holder-main{padding:96px 0 96px 56px;border-bottom:0}
+  .holder-side{padding:56px 32px;border-bottom:0;border-right:1px solid var(--line);align-self:start}
 }
 
 /* ---------- 门店 ---------- */
@@ -338,7 +338,7 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
     </nav>
     <div class="nav-right">
       <button class="nav-login" type="button" data-login>股东登录</button>
-      <button class="nav-cta" type="button" data-share>领取一次免费洗脸</button>
+      <button class="nav-cta" type="button" data-share>分享领取一次免费洗脸</button>
     </div>
   </div>
 </header>
@@ -353,7 +353,7 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
       <p class="hero-desc" data-c="hero.desc">把苗族的银与绣，做成一件能穿、能体验、能分享的事。到隆林，穿一次盛装，做一次护理，也可以把身边的人脉，变成一份长期收入。</p>
       <p class="hero-slogan" data-c="hero.slogan">想变美找银绣，想创业还是找银绣<span>苗族同胞的创业基地</span><span class="hero-claim"><b>隆林第一家</b>，也是<b>唯一一家</b> 0 投资的创业平台</span></p>
       <div class="hero-actions">
-        <button class="btn btn-red" data-share>领取一次免费洗脸</button>
+        <button class="btn btn-red" data-share>分享领取一次免费洗脸</button>
         <button class="btn btn-ghost" data-goto="#holder">在线注册共享股东</button>
       </div>
     </div>
@@ -531,7 +531,15 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
 <!-- ===== 股东招募 ===== -->
 <section class="holder" id="holder">
   <div class="wrap holder-in">
-    <div class="holder-main">
+    <aside class="holder-side">
+      <span class="eyebrow">HOW TO JOIN</span>
+      <h3 data-c="holder.join">先了解，<br>再决定。</h3>
+      <p data-c="holder.side1">公司将价值 20 万的店铺，免费共享给所有想要创业的人，成为店铺的老板之一，推广分享可以拿丰厚佣金。</p>
+      <p style="margin-top:16px" data-c="holder.side2">公司不用你投钱开房租，不用你囤货，不用你亲自来服务，让你轻轻松松也可以开启 0 投资的创业之路。</p>
+      <button class="btn btn-red holder-cta" data-apply>报名了解</button>
+      <p class="holder-login"><button class="link-login" type="button" data-login>已开通账号？点此登录系统</button></p>
+      <p style="margin-top:14px;font-size:11px;color:rgba(169,180,184,.7)">具体权益与结算以到店签署的书面协议为准。</p>
+    </aside>    <div class="holder-main">
       <span class="eyebrow">SHARED SHAREHOLDER</span>
       <h2 class="holder-title" data-c="holder.title">共享股东<br><em>零投资</em>加入</h2>
       <p class="holder-desc" data-c="holder.d1">我发现很多在家的人想赚到钱，其实比想象中难太多了。孩子读书需要接送，老人需要照顾，丢下孩子在家跟老人，又怕小孩以后不听话；去进厂或者去工地干苦工嘛，又苦又累又不得钱。</p>
@@ -552,15 +560,6 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
         </div>
       </div>
     </div>
-    <aside class="holder-side">
-      <span class="eyebrow">HOW TO JOIN</span>
-      <h3 data-c="holder.join">先了解，<br>再决定。</h3>
-      <p data-c="holder.side1">公司将价值 20 万的店铺，免费共享给所有想要创业的人，成为店铺的老板之一，推广分享可以拿丰厚佣金。</p>
-      <p style="margin-top:16px" data-c="holder.side2">公司不用你投钱开房租，不用你囤货，不用你亲自来服务，让你轻轻松松也可以开启 0 投资的创业之路。</p>
-      <button class="btn btn-red holder-cta" data-apply>报名了解</button>
-      <p class="holder-login"><button class="link-login" type="button" data-login>已开通账号？点此登录系统</button></p>
-      <p style="margin-top:14px;font-size:11px;color:rgba(169,180,184,.7)">具体权益与结算以到店签署的书面协议为准。</p>
-    </aside>
   </div>
 </section>
 
@@ -699,7 +698,7 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
 <div class="modal" id="shareModal" role="dialog" aria-modal="true" aria-labelledby="shareTitle">
   <div class="modal-box">
     <button class="modal-close" data-close aria-label="关闭">&times;</button>
-    <h4 id="shareTitle">领取免费洗脸<br>发给 3 位朋友</h4>
+    <h4 id="shareTitle">分享领取免费洗脸<br>发给 3 位朋友</h4>
     <p>发到微信好友或朋友圈，<strong>3 位朋友点开</strong>就能预约。</p>
     <div class="share-card">
       <img id="shareCardImg" alt="我的专属分享二维码">
@@ -1280,7 +1279,7 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
       var lock = document.getElementById('svcLock');
       var bm = document.getElementById('bookingModal');
       if(sel){ sel.value = '面部清洁'; sel.disabled = true; }
-      if(lock){ lock.textContent = '股东邀您领取一次免费洗脸，已锁定「面部清洁」。'; }
+      if(lock){ lock.textContent = '股东邀您分享领取一次免费洗脸，已锁定「面部清洁」。'; }
       if(note){ note.value = '领取一次免费洗脸'; }
       if(bm){ bm.classList.add('on'); }
     }catch(e){}
@@ -1290,7 +1289,7 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
     if(document.querySelector('.ref-claim')) return;
     var bar = document.createElement('div');
     bar.className = 'ref-claim';
-    bar.innerHTML = '<b>股东邀您领取一次免费洗脸</b><span>点右边登记，到店核对手机号</span>'
+    bar.innerHTML = '<b>股东邀您分享领取一次免费洗脸</b><span>点右边登记，到店核对手机号</span>'
       + '<button type="button" data-claim>立即领取</button>'
       + '<button type="button" class="x" data-close aria-label="关闭">&times;</button>';
     document.body.appendChild(bar);
@@ -1303,6 +1302,23 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
   if(SITE_REF){
     if(document.readyState === 'complete'){ showRefClaim(); }
     else { window.addEventListener('load', showRefClaim); }
+  }
+
+  // 免费洗脸查重：同一个手机号只能领一次（云端函数只回答有没有领过）
+  function siteGiftCheck(phone){
+    if(!BOOK.on) return Promise.resolve(false);
+    return fetch(BOOK.url.replace(/\/+$/, '') + '/rest/v1/rpc/site_gift_check', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': BOOK.key,
+        'Authorization': 'Bearer ' + BOOK.key
+      },
+      body: JSON.stringify({ p_phone: phone })
+    })
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(j){ return !!(j && j.claimed); })
+      .catch(function(){ return false; });
   }
 
   // 客户档案：查重 / 墓碑恢复 / 建档都在云端函数里完成（官网不再匿名读整张客户表）
@@ -1334,9 +1350,12 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
       },
       body: JSON.stringify([row])
     }).then(function(r){
-      if(!r.ok){ console.warn('预约入库失败：' + r.status); }
-      return r.ok;
-    }).catch(function(e){ console.warn('预约入库失败：' + (e && e.message)); return false; });
+      return r.text().then(function(tx){
+        var dup = String(tx || '').indexOf('dup_free_claim') >= 0;
+        if(!r.ok){ console.warn('预约入库失败：' + r.status + ' ' + tx); }
+        return { ok: r.ok, dup: dup };
+      });
+    }).catch(function(e){ console.warn('预约入库失败：' + (e && e.message)); return { ok: false, dup: false }; });
   }
 
   // 表单提交：配好云端就入库，没配就按演示跑
@@ -1374,10 +1393,19 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
       toast('正在提交…');
       var pushNow = function(cid){
         row.customer_id = cid || null;
-        pushAppointment(row).then(function(ok){
-          toast(ok ? okMsg : '提交没成功，请加微信或到店登记，门店人工记下');
+        pushAppointment(row).then(function(res){
+          if(res.dup){ toast('这个手机号已经领取过免费洗脸了，每人只能领一次'); return; }
+          toast(res.ok ? okMsg : '提交没成功，请加微信或到店登记，门店人工记下');
         });
       };
+      // 免费洗脸：同一个手机号只能领一次（先查云端，数据库还有兜底拦截）
+      if(note && note.indexOf('免费洗脸') >= 0){
+        siteGiftCheck(phone).then(function(claimed){
+          if(claimed){ toast('这个手机号已经领取过免费洗脸了，每人只能领一次'); return; }
+          ensureCustomer(name, phone, SITE_REF).then(pushNow, function(){ pushNow(null); });
+        });
+        return;
+      }
       ensureCustomer(name, phone, SITE_REF).then(pushNow, function(){ pushNow(null); });
     } else {
       toast('演示提交成功：' + name + ' · ' + svc + '。门店会另行通知时间，到店核对手机号。');
