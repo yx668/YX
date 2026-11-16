@@ -8995,7 +8995,17 @@ function openConsumptionModalFromCC(){
         })
         .catch(function(){ return null; });
 
-      guestReady
+      // 每个手机号只能领取一次免费洗脸（先查云端，数据库还有兜底拦截）
+      var giftChk = fetch(base + '/rpc/site_gift_check', { method: 'POST', headers: hdrJson, body: JSON.stringify({ p_phone: phone }) })
+        .then(function(r){ return r.ok ? r.json() : null; })
+        .then(function(j){ return !!(j && j.claimed); })
+        .catch(function(){ return false; });
+
+      giftChk
+        .then(function(claimed){
+          if(claimed){ throw new Error('dup'); }
+          return guestReady;
+        })
         .then(function(cid){
           var row = {
             id: uuid4(),
@@ -9007,15 +9017,23 @@ function openConsumptionModalFromCC(){
             customer_id: cid || null, kind: 'site', referrer: REF || null,
             items: null, updated_at: nowIso
           };
-          return fetch(base + '/appointments', { method: 'POST', headers: hdrJson, body: JSON.stringify([row]) });
+          return fetch(base + '/appointments', { method: 'POST', headers: hdrJson, body: JSON.stringify([row]) })
+            .then(function(r){
+              return r.text().then(function(tx){
+                var dup = String(tx || '').indexOf('dup_free_claim') >= 0;
+                if(!r.ok || dup){ throw new Error(dup ? 'dup' : ('写入失败 ' + r.status)); }
+                return true;
+              });
+            });
         })
-        .then(function(r){
-          if(!r || !r.ok){ throw new Error('写入失败 ' + (r && r.status)); }
-          done(name, phone);
-        })
+        .then(function(){ done(name, phone); })
         .catch(function(e){
           btn.disabled = false; btn.style.opacity = '1'; btn.textContent = '立即领取';
-          msg.textContent = '提交没成功，请稍后再试或微信联系门店';
+          if(String(e && e.message) === 'dup'){
+            msg.textContent = '这个手机号已经领取过免费洗脸了，每人只能领一次';
+          } else {
+            msg.textContent = '提交没成功，请稍后再试或微信联系门店';
+          }
           if(window.console) console.warn(e);
         });
     };
