@@ -8604,7 +8604,7 @@ function openConsumptionModalFromCC(){
    股东生成带 ?ref=<股东ID> 的二维码 → 客户扫码打开官网 → 领取一次免费洗脸并预约
    → 官网把该预约的 referrer 写成股东ID、并在客户档案里建一条该股东名下的普通客户 */
 (function(){
-  var BASE = 'https://yx668.github.io/YX/';   /* 系统线上地址（GitHub Pages 根），上线后改这里 */
+  var BASE = 'https://yx668.github.io/YX/site/';   /* 官网地址：客户扫码先看官网，页面底部领取条点一下才填表 */
   var SESS_KEY = 'yxzs_share_sess_v1';
 
   function me(){
@@ -8718,7 +8718,7 @@ function openConsumptionModalFromCC(){
           '</div>' +
           '<div style="flex:1;min-width:220px">' +
             '<div style="font-size:15px;font-weight:600;margin-bottom:8px">' + esc(s.name || '') + ' 的专属邀请图</div>' +
-            '<div class="hint" style="margin-bottom:12px">发朋友圈或直接发给客户：对方扫码就填姓名手机号领取，提交后自动挂到您名下。</div>' +
+            '<div class="hint" style="margin-bottom:12px">发朋友圈或直接发给客户：对方扫码先打开官网，页面最底部点「立即领取」就填姓名手机号，提交后自动挂到您名下。</div>' +
             '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
               '<button class="btn btn-primary btn-sm" type="button" id="msSave">保存图片</button>' +
               '<button class="btn btn-ghost btn-sm" type="button" id="msCopy">复制链接</button>' +
