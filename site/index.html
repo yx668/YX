@@ -1316,11 +1316,18 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
       'Authorization': 'Bearer ' + BOOK.key,
       'Prefer': 'return=minimal'
     };
-    return fetch(base + '?phone=eq.' + encodeURIComponent(phone) + '&select=id,referrer,type', { headers: hdr })
+    return fetch(base + '?phone=eq.' + encodeURIComponent(phone) + '&select=id,name,referrer,type', { headers: hdr })
       .then(function(r){ return r.ok ? r.json() : []; })
       .then(function(rows){
         if(rows && rows.length){
           var a = rows[0];
+          // 之前删过同号码客户留下的墓碑行（name=__DEL__…）：恢复成真实姓名并挂到本次股东名下
+          if(String(a.name || '').indexOf('__DEL__') === 0){
+            return fetch(base + '?id=eq.' + encodeURIComponent(a.id), {
+              method: 'PATCH', headers: hdrJson,
+              body: JSON.stringify({ name: name, type: 'normal', referrer: ref || null, updated_at: new Date().toISOString() })
+            }).then(function(x){ return x.ok ? a.id : null; });
+          }
           if(a.referrer) return a.id;          // 已有归属，不抢
           if(!ref) return a.id;                // 散客：档案已存在就不用动
           return fetch(base + '?id=eq.' + encodeURIComponent(a.id), {
