@@ -5150,17 +5150,17 @@ function fetchShareData(mob,hp){
   return sFetch("/rest/v1/rpc/load_share_data",{method:"POST",body:{phone_input:mob,pwd_hash:hp}}).then(function(r){
     // RPC 返回的 me 是已删除墓碑账号时视为无效，继续走 REST 兜底（防旧版 SQL 命中墓碑）
     if(r&&r.ok&&r.json&&r.json.me&&String(r.json.me.name||"").indexOf("__DEL__")!==0){
-      // RPC 成功后再补拉套餐定义与套餐卡（云端表 packagebuys 小写），保证股东能看到自己购买的套餐卡；退款记录用于退款后的消费/佣金调整
-      return sFetch("/rest/v1/packages?select=*").then(function(rp){
-        return sFetch("/rest/v1/packagebuys?select=*").then(function(rb){
-          return sFetch("/rest/v1/refunds?select=*").then(function(rr){
-            var d=r.json;
-            d.packages=(rp.ok&&rp.json)?rp.json:[];
-            d.packageBuys=(rb.ok&&rb.json)?rb.json:[];
-            d.refunds=(rr.ok&&rr.json)?rr.json:undefined;
-            return d;
-          });
-        });
+      // 套餐定义、本人及名下客户的套餐卡、退款记录：由云端函数按身份返回（不再匿名读整表）
+      return sFetch("/rest/v1/rpc/share_pkg_buys",{method:"POST",body:{phone_input:mob,pwd_hash:hp}}).then(function(rp){
+        var d=r.json;
+        if(rp&&rp.ok&&rp.json&&rp.json.ok){
+          d.packages=rp.json.packages||[];
+          d.packageBuys=rp.json.packageBuys||[];
+          if(rp.json.refunds)d.refunds=rp.json.refunds||[];
+        }else{
+          d.packages=[];d.packageBuys=[];
+        }
+        return d;
       });
     }
     // RPC 不存在（未建函数）或返回墓碑 → REST 直查 customers 表验证：login_enabled 且 login_pwd 匹配（排除已删除墓碑记录）
@@ -8976,50 +8976,21 @@ function openConsumptionModalFromCC(){
       var base = c.url + '/rest/v1';
       var nowIso = new Date().toISOString();
 
-      // 先取股东姓名，用于备注「某某股东赠送的免费洗脸」
+      // 客户档案与股东姓名一次取回：查重 / 墓碑恢复 / 建档全部在云端函数里完成，不再匿名读整表
       var refName = '';
-      var refNameReady = REF
-        ? fetch(base + '/customers?id=eq.' + encodeURIComponent(REF) + '&select=name', { headers: hdr })
-            .then(function(r){ return r.ok ? r.json() : []; })
-            .then(function(rows){
-              var n = rows && rows[0] ? String(rows[0].name || '') : '';
-              if(n.indexOf('__DEL__') !== 0) refName = n;
-              return true;
-            })
-            .catch(function(){ return true; })
-        : Promise.resolve(true);
-
-      refNameReady.then(function(){
-        return fetch(base + '/customers?phone=eq.' + encodeURIComponent(phone) + '&select=id,name,referrer', { headers: hdr });
+      var guestReady = fetch(base + '/rpc/site_guest_ensure', {
+        method: 'POST', headers: hdrJson,
+        body: JSON.stringify({ p_name: name, p_phone: phone, p_referrer: REF || '' })
       })
-        .then(function(r){ return r.ok ? r.json() : []; })
-        .then(function(rows){
-          if(rows && rows.length){
-            var a = rows[0];
-            // 之前删过同号码客户会留下墓碑行（name=__DEL__…）：恢复真实姓名再挂到本次股东名下
-            if(String(a.name || '').indexOf('__DEL__') === 0){
-              return fetch(base + '/customers?id=eq.' + encodeURIComponent(a.id), {
-                method: 'PATCH', headers: hdrJson,
-                body: JSON.stringify({ name: name, type: 'normal', referrer: REF || null, updated_at: nowIso })
-              }).then(function(x){ return x.ok ? a.id : null; });
-            }
-            if(!a.referrer && REF){
-              return fetch(base + '/customers?id=eq.' + encodeURIComponent(a.id), {
-                method: 'PATCH', headers: hdrJson,
-                body: JSON.stringify({ referrer: REF, updated_at: nowIso })
-              }).then(function(){ return a.id; });
-            }
-            return a.id;
-          }
-          var cid = uuid4();
-          return fetch(base + '/customers', {
-            method: 'POST', headers: hdrJson,
-            body: JSON.stringify([{
-              id: cid, name: name, phone: phone, type: 'normal',
-              referrer: REF || null, wx: '', login_enabled: false, updated_at: nowIso
-            }])
-          }).then(function(x){ return x.ok ? cid : null; });
+        .then(function(r){ return r.ok ? r.json() : null; })
+        .then(function(j){
+          if(!j || j.ok !== true) return null;
+          refName = String(j.refname || '');
+          return j.id || null;
         })
+        .catch(function(){ return null; });
+
+      guestReady
         .then(function(cid){
           var row = {
             id: uuid4(),
