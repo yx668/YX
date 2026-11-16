@@ -6468,7 +6468,10 @@ DB.customers=DB.customers.filter(function(x){return x.id!==id;});
   var apptIds=appts.map(function(a){return a.id;});
   if(apptIds.length){
     DB.appointments=DB.appointments.filter(function(a){return apptIds.indexOf(a.id)<0;});
-    if(cloudMode&&sess)cloudDeleteRows("appointments",apptIds).catch(function(e){toast("云端删除预约失败："+(e&&e.message?e.message:e),"err");});
+    if(cloudMode&&sess){
+      apptIds.forEach(function(x){markDeleted("appointments",x);});
+      cloudDeleteRows("appointments",apptIds).catch(function(e){toast("云端删除预约失败："+(e&&e.message?e.message:e),"err");});
+    }
   }
   // 台账同步清理：既清该客户的台账，也清上面这些预约带出的台账，避免报表出现孤儿记录
   var consIds=cons.map(function(x){return x.id;});
@@ -6477,7 +6480,10 @@ DB.customers=DB.customers.filter(function(x){return x.id!==id;});
   });
   if(consIds.length){
     DB.consumptions=DB.consumptions.filter(function(x){return consIds.indexOf(x.id)<0;});
-    if(cloudMode&&sess)cloudDeleteRows("consumptions",consIds).catch(function(e){toast("云端删除台账失败："+(e&&e.message?e.message:e),"err");});
+    if(cloudMode&&sess){
+      consIds.forEach(function(x){markDeleted("consumptions",x);});
+      cloudDeleteRows("consumptions",consIds).catch(function(e){toast("云端删除台账失败："+(e&&e.message?e.message:e),"err");});
+    }
   }
   if(cloudMode&&sess){markDeleted("customers",id);cloudSoftDelete("customers",id).catch(function(e){toast("云端删除失败："+(e&&e.message?e.message:e),"err");});}
   saveDB();toast("客户已删除");
