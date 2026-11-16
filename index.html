@@ -8305,8 +8305,9 @@ function speakNotifyText(text){
 function pushShareAppt(data){
   if(!cloudMode||!cloudCfg){toast("预约暂未上传到总部：未配置云端","err");return;}
   if(!navigator.onLine){toast("预约暂未上传到总部：网络已断开","err");return;}
+  if(!shareSess||!shareSess.phone||!shareSess.pwdHash){toast("请先用股东账号登录后再预约","err");return;}
   var row=apptToCloudRow(data,new Date().toISOString());
-  authReq("/rest/v1/rpc/save_shareholder_appt",{appt:row})
+  authReq("/rest/v1/rpc/share_appt_push",{appt:row,p_phone:shareSess.phone,p_pwd:shareSess.pwdHash})
     .then(function(r){
       var ok=false,msg="未知错误";
       if(r&&r.ok&&r.json){
