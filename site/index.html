@@ -1400,7 +1400,7 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
 (function(){
   var U="https://ryubnhwyqzicpvnrvgcn.supabase.co";
   var K="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ5dWJuaHd5cXppY3B2bnJ2Z2NuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTExNjIwMjIsImV4cCI6MjEwNjczODAyMn0.NtcRy9tAc1xe5VyoFmn-fA5cttMHPAx0Rh_eue24050";
-  function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+  function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];});}
   function buildPrice(txt){
     var tb=document.querySelector('tbody[data-c="price.rows"]');
     if(!tb)return;
