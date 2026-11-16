@@ -3400,6 +3400,14 @@ var cloudMode=false,cloudConnected=false,cloudTimer=null,pushTimer=null,syncBusy
 /* 删除墓碑：本地删除后记录 id，云端删除成功才清除；pull 合并时过滤墓碑行，
    避免「云端删除请求往返期间恰逢周期拉取，把已删行拉回后又被全量推回」的复活竞态 */
 var TOMB_KEY="bkgbook_tomb_v1";
+/* 管理员侧隐藏的客户（挂在股东名下的客户被管理员删除时，只在管理员列表隐藏：
+   不写云端删除标记、不动消费台账，共享股东端照旧能看到这位客户） */
+var HIDECUST_KEY="bkgbook_admin_hide_cust_v1";
+var adminHideCust=[];
+function loadHideCust(){try{var v=JSON.parse(localStorage.getItem(HIDECUST_KEY)||"[]");adminHideCust=Array.isArray(v)?v:[];}catch(e){adminHideCust=[];}}
+function saveHideCust(){try{localStorage.setItem(HIDECUST_KEY,JSON.stringify(adminHideCust));}catch(e){}}
+function hideCustAdmin(id){if(adminHideCust.indexOf(id)<0){adminHideCust.push(id);saveHideCust();}}
+function restoreHiddenCust(){adminHideCust=[];saveHideCust();renderAll();toast("已恢复显示全部隐藏的客户");}
 var tomb={};
 function loadTomb(){try{var v=localStorage.getItem(TOMB_KEY);if(v)tomb=JSON.parse(v);}catch(e){tomb={};}if(!tomb||typeof tomb!=="object")tomb={};}
 function saveTomb(){try{localStorage.setItem(TOMB_KEY,JSON.stringify(tomb));}catch(e){}}
@@ -6289,6 +6297,8 @@ function renderCustomers(){
   var q=($("custSearch").value||"").trim().toLowerCase();
   var tf=$("custTypeF").value;
   var list=(DB.customers||[]).slice().filter(function(c){
+    // 管理员侧隐藏：只影响管理员自己的列表，共享股东端照旧显示
+    if(isAdmin()&&adminHideCust.indexOf(c.id)>=0)return false;
     if(q){
       var ref=c.referrer?referrerName(c.referrer):"";
       if((c.name+" "+c.phone+" "+ref+" "+(c.note||"")).toLowerCase().indexOf(q)<0)return false;
@@ -6298,11 +6308,15 @@ function renderCustomers(){
     if(tf==="norefer"&&(c.type==="shareholder"||c.referrer))return false;
     return true;
   });
+  var hideTip="";
+  if(isAdmin()&&adminHideCust.length){
+    hideTip='<div style="background:#fff7e6;border:1px solid #f2d9a6;border-radius:10px;padding:10px 12px;margin-bottom:10px;font-size:13px;line-height:1.7;color:#7a5a12">已隐藏 '+adminHideCust.length+' 位客户：只在你这边的列表隐藏，共享股东端照常能看到 <button class="btn btn-ghost btn-xs" type="button" onclick="restoreHiddenCust()">恢复显示</button></div>';
+  }
   if(!list.length){
-    el.innerHTML='<div class="empty"><div class="big">👤</div><h3>没有匹配的客户</h3><p>点击右上角「新增客户」建立客户档案，或在新建预约时登记客户并绑定介绍人</p></div>';
+    el.innerHTML=hideTip+'<div class="empty"><div class="big">👤</div><h3>没有匹配的客户</h3><p>点击右上角「新增客户」建立客户档案，或在新建预约时登记客户并绑定介绍人</p></div>';
     return;
   }
-  var html="<table><tr><th class=\"tip\" title=\"点击查看客户详情\">客户</th><th>身份</th><th>归属介绍人</th><th>联系电话</th><th style=\"text-align:right\">操作</th></tr>";
+  var html=hideTip+"<table><tr><th class=\"tip\" title=\"点击查看客户详情\">客户</th><th>身份</th><th>归属介绍人</th><th>联系电话</th><th style=\"text-align:right\">操作</th></tr>";
   list.forEach(function(c){
     var cnt=DB.appointments.filter(function(a){return (a.customer_id&&a.customer_id===c.id)||((!a.customer_id)&&a.client===c.name);}).length;
     var spentC=DB.appointments.reduce(function(s,a){return s+((a.customer_id&&a.customer_id===c.id&&isPaidAppt(a))?(+a.amount||0):0);},0);
@@ -6425,6 +6439,14 @@ function delCustomer(id){
   if(!canEdit()){toast("无权限操作客户档案","err");return;}
   var c=customerById(id);
   if(!c)return;
+  // 挂在股东名下的客户：管理员删除只隐藏自己的列表，不写云端删除标记、不动台账，股东端照旧可见
+  if(c.referrer){
+    if(!confirm("确定从管理员列表隐藏「"+c.name+"」？\n\n这位客户挂在股东名下：隐藏后你这边的客户列表不再显示，但共享股东端照常能看到，消费台账和业绩都不受影响。"))return;
+    hideCustAdmin(id);
+    renderAll();
+    toast("已从管理员客户列表隐藏，共享股东端仍可见","ok");
+    return;
+  }
   // 检查该客户是否为其他人的介绍人
   var refs=(DB.customers||[]).filter(function(x){return x.referrer===id;});
   var cons=(DB.consumptions||[]).filter(function(x){return x.customer_id===id;});
@@ -8301,6 +8323,7 @@ loadCloudCfg();
 applyCloudHash();
 loadSess();
 loadTomb();
+loadHideCust();
 loadDB();
 // 股东会话对应的客户档案已被删除（软删除墓碑）时自动失效，避免用已删除账号继续登录
 if(shareSess&&(DB.customers||[]).some(function(c){return c.id===shareSess.cid&&String(c.name||"").indexOf("__DEL__")===0;})){
