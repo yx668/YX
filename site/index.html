@@ -1294,7 +1294,10 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
       + '<button type="button" data-claim>立即领取</button>'
       + '<button type="button" class="x" data-close aria-label="关闭">&times;</button>';
     document.body.appendChild(bar);
-    bar.querySelector('[data-claim]').addEventListener('click', function(){ openFreeForRef(); bar.remove(); });
+    bar.querySelector('[data-claim]').addEventListener('click', function(){
+      // 点「立即领取」跳到系统里的整页领取表单（填完提交会按 ref 绑定到该股东名下）
+      location.href = 'https://yx668.github.io/YX/?book=free&ref=' + encodeURIComponent(SITE_REF);
+    });
     bar.querySelector('[data-close]').addEventListener('click', function(){ bar.remove(); });
   }
   if(SITE_REF){
