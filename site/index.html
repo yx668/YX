@@ -659,9 +659,9 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
             <option>3 人及以上</option>
           </select>
         </div>
-        <div class="field full">
+        <div class="field full" id="timeField">
           <label>预约时间</label>
-          <p class="note-line">不用自己选。提交后门店按排班定时间，微信或短信通知你，避免撞单。</p>
+          <p class="note-line" id="timeNote">不用自己选。提交后门店按排班定时间，微信或短信通知你，避免撞单。</p>
         </div>
         <div class="field full">
           <label for="f-note">备注</label>
@@ -740,11 +740,18 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
 
   // 服务卡 -> 打开预约弹窗并预选服务
   var bookingModal = document.getElementById('bookingModal');
+  function showBookingExtras(){
+    var tf = document.getElementById('timeField');
+    var lk = document.getElementById('svcLock');
+    if(tf){ tf.style.display = ''; }
+    if(lk){ lk.style.display = ''; }
+  }
   document.querySelectorAll('[data-book]').forEach(function(btn){
     btn.addEventListener('click', function(){
       var name = btn.getAttribute('data-book');
       var sel = document.getElementById('f-service');
       var lock = document.getElementById('svcLock');
+      showBookingExtras();
       if(sel){ sel.value = name; sel.disabled = true; }
       if(lock){ lock.textContent = '已锁定「' + name + '」，本入口只约看衣。'; }
       if(bookingModal){ bookingModal.classList.add('on'); }
@@ -758,8 +765,11 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
       var sel = document.getElementById('f-service');
       var lock = document.getElementById('svcLock');
       var note = document.getElementById('f-note');
+      var tf = document.getElementById('timeField');
+      showBookingExtras();
       if(sel){ sel.value = '共享股东'; sel.disabled = true; }
-      if(lock){ lock.textContent = '已锁定「共享股东」，留个电话，门店把规则和结算方式当面讲清楚。'; }
+      if(lock){ lock.textContent = ''; lock.style.display = 'none'; }
+      if(tf){ tf.style.display = 'none'; }
       if(note && !note.value.trim()){ note.value = '想了解共享股东，方便的话先加微信发资料'; }
       if(bookingModal){ bookingModal.classList.add('on'); }
       toast('留个电话，门店会联系你，先了解不签约');
@@ -1224,6 +1234,7 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
   // 领取免费洗脸的预约框（锁定面部清洁 + 备注）
   function openGiftBooking(){
     closeModals();
+    showBookingExtras();
     var sel = document.getElementById('f-service');
     var note = document.getElementById('f-note');
     var lock = document.getElementById('svcLock');
@@ -1263,6 +1274,7 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
   var openFreeForRef = function(){
     if(!SITE_REF) return;
     try{
+      showBookingExtras();
       var sel = document.getElementById('f-service');
       var note = document.getElementById('f-note');
       var lock = document.getElementById('svcLock');
