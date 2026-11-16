@@ -4647,18 +4647,22 @@ function uploadSiteImg(k){
   var ext=(f.name.indexOf(".")>=0?f.name.split(".").pop():"jpg").toLowerCase();
   if(["jpg","jpeg","png","webp"].indexOf(ext)<0)ext="jpg";
   var name=k+"-"+Date.now()+"."+ext;
-  var hd={"apikey":cloudCfg.anonKey,"Authorization":"Bearer "+cloudCfg.anonKey,"Content-Type":f.type||"image/jpeg","x-upsert":"true"};
   toast("正在上传图片…");
-  fetch(cBase()+"/storage/v1/object/site-assets/"+name,{method:"POST",headers:hd,body:f}).then(function(r){
-    if(!r.ok)throw new Error("HTTP "+r.status);
-    var pub=cBase()+"/storage/v1/object/public/site-assets/"+name;
-    siteImgs[k]=pub;
-    var pv=$("sip_"+k);
-    if(pv){pv.src=pub;pv.style.display="";}
-    renderSiteImgForm();
-    toast("图片已上传，点「保存到云端」后官网生效");
+  // 图片桶只允许登录账号写入：上传改用登录令牌，公开密钥只能读
+  tokenReady().then(function(ok){
+    if(!ok){toast("请先用管理员账号登录后再上传图片","err");return null;}
+    var hd={"apikey":cloudCfg.anonKey,"Authorization":"Bearer "+sess.access_token,"Content-Type":f.type||"image/jpeg","x-upsert":"true"};
+    return fetch(cBase()+"/storage/v1/object/site-assets/"+name,{method:"POST",headers:hd,body:f}).then(function(r){
+      if(!r.ok)throw new Error("HTTP "+r.status);
+      var pub=cBase()+"/storage/v1/object/public/site-assets/"+name;
+      siteImgs[k]=pub;
+      var pv=$("sip_"+k);
+      if(pv){pv.src=pub;pv.style.display="";}
+      renderSiteImgForm();
+      toast("图片已上传，点「保存到云端」后官网生效");
+    });
   }).catch(function(e){
-    toast("上传失败："+(e&&e.message||e)+"，可换小一点的图再试","err");
+    toast("上传失败："+(e&&e.message||e)+"，请确认已登录管理员账号、图片不超过 6MB","err");
   }).then(function(){try{inp.value="";}catch(e){}});
 }
 function openSitePage(){window.open("https://yx668.github.io/YX/site/","_blank");}
@@ -6453,14 +6457,25 @@ function delCustomer(id){
   // 检查该客户是否为其他人的介绍人
   var refs=(DB.customers||[]).filter(function(x){return x.referrer===id;});
   var cons=(DB.consumptions||[]).filter(function(x){return x.customer_id===id;});
+  var appts=(DB.appointments||[]).filter(function(a){return a.customer_id===id;});
   var tip=(refs.length?("（还有 "+refs.length+" 位客户以其为介绍人，删除后这些客户的介绍人将被清空）"):"")
-    +(cons.length?("（该客户名下 "+cons.length+" 条消费台账会一并删除，统计报表同步更新）"):"");
+    +(cons.length?("（该客户名下 "+cons.length+" 条消费台账会一并删除，统计报表同步更新）"):"")
+    +(appts.length?("（该客户名下 "+appts.length+" 条预约会一并删除，预约日历同步更新）"):"");
   if(!confirm("确定删除客户「"+c.name+"」？"+tip))return;
 DB.customers=DB.customers.filter(function(x){return x.id!==id;});
   DB.customers.forEach(function(x){if(x.referrer===id)x.referrer="";});
-  // 台账同步清理：避免报表出现指向已删客户的孤儿记录
-  if(cons.length){
-    var consIds=cons.map(function(x){return x.id;});
+  // 预约同步清理：删客户后其名下预约不再留在日历里（避免出现已删客户的空预约）
+  var apptIds=appts.map(function(a){return a.id;});
+  if(apptIds.length){
+    DB.appointments=DB.appointments.filter(function(a){return apptIds.indexOf(a.id)<0;});
+    if(cloudMode&&sess)cloudDeleteRows("appointments",apptIds).catch(function(e){toast("云端删除预约失败："+(e&&e.message?e.message:e),"err");});
+  }
+  // 台账同步清理：既清该客户的台账，也清上面这些预约带出的台账，避免报表出现孤儿记录
+  var consIds=cons.map(function(x){return x.id;});
+  (DB.consumptions||[]).forEach(function(o){
+    if(o&&o.apptId&&apptIds.indexOf(o.apptId)>=0&&consIds.indexOf(o.id)<0)consIds.push(o.id);
+  });
+  if(consIds.length){
     DB.consumptions=DB.consumptions.filter(function(x){return consIds.indexOf(x.id)<0;});
     if(cloudMode&&sess)cloudDeleteRows("consumptions",consIds).catch(function(e){toast("云端删除台账失败："+(e&&e.message?e.message:e),"err");});
   }
@@ -8884,6 +8899,11 @@ function openConsumptionModalFromCC(){
     var btn = ov.querySelector('#fbSubmit');
     var msg = ov.querySelector('#fbMsg');
 
+    function escHtml(v){
+      return String(v == null ? '' : v).replace(/[&<>"']/g, function(ch){
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
+      });
+    }
     function done(name, phone, localOnly){
       var tip = '<div style="background:rgba(198,169,106,.12);border:1px solid rgba(198,169,106,.45);border-radius:10px;padding:12px 14px;margin-top:18px;font-size:14px;line-height:1.7;color:#e4d3ab;text-align:left">本次免费洗脸名额有效时间为一周，请尽快到店核销资格。</div>';
       var proof = '';
@@ -8893,7 +8913,7 @@ function openConsumptionModalFromCC(){
         proof =
           '<div style="background:#132430;border:1px solid rgba(214,222,234,.2);border-radius:12px;padding:16px;margin-top:16px;text-align:left">' +
             '<div style="font-size:12px;letter-spacing:.14em;color:#8b939d;margin-bottom:10px">领取凭证</div>' +
-            '<div style="font-size:14px;color:#f4f1ea;line-height:2">姓名：' + name + '<br>手机：' + phone + '<br>时间：' + ts + '</div>' +
+            '<div style="font-size:14px;color:#f4f1ea;line-height:2">姓名：' + escHtml(name) + '<br>手机：' + escHtml(phone) + '<br>时间：' + ts + '</div>' +
             '<button id="fbCopy" type="button" style="width:100%;margin-top:12px;padding:11px;border:0;border-radius:8px;background:#b02a2e;color:#fff;font-size:15px;font-weight:600;cursor:pointer">把这条信息发给店主</button>' +
             '<div style="font-size:12px;color:#8b939d;margin-top:8px;line-height:1.7">门店端还没开通云端同步，这条先存在您手机上。发给店主或到店出示本页都能核对。</div>' +
           '</div>';
@@ -8904,7 +8924,7 @@ function openConsumptionModalFromCC(){
             '<div style="width:64px;height:64px;margin:0 auto 20px;border-radius:50%;background:#2f7d55;display:flex;align-items:center;justify-content:center">' +
               '<svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="#fff" stroke-width="2.4"><path d="M5 12.5l4.5 4.5L19 7"/></svg></div>' +
             '<h2 style="font-size:24px;color:#f4f1ea;margin:0 0 10px">领取成功</h2>' +
-            '<p style="color:#c9cdd3;font-size:15px;line-height:1.8;margin:0">' + (name ? name + '，' : '') + '门店会尽快联系您确认到店时间。</p>' +
+            '<p style="color:#c9cdd3;font-size:15px;line-height:1.8;margin:0">' + (name ? escHtml(name) + '，' : '') + '门店会尽快联系您确认到店时间。</p>' +
           '</div>' +
           tip + proof +
           '<div style="text-align:center;margin-top:22px"><a href="https://yx668.github.io/YX/site/" style="display:inline-block;padding:12px 28px;border:1px solid rgba(198,169,106,.55);border-radius:10px;background:rgba(198,169,106,.1);color:#e4d3ab;font-size:15px;font-weight:600;text-decoration:none">返回官网主页</a></div>' +
