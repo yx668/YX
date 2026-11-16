@@ -5299,7 +5299,12 @@ if(a.due_date!=null){a.dueDate=a.due_date;delete a.due_date;}
   (d.customers||[]).forEach(function(c){
     if(c.wx==null)c.wx="";
   });
-  DB.customers=mergeRows((d.customers||[]).filter(function(c){return String(c.name||"").indexOf("__DEL__")!==0;}),DB.customers);
+  // 股东端删除跟随：以云端返回的可见客户为准，管理员删掉的客户在手机端同步消失（不再保留本地缓存）
+  if(d.customers&&d.customers.length){
+    DB.customers=d.customers.filter(function(c){return c&&c.id&&String(c.name||"").indexOf("__DEL__")!==0;});
+  }else{
+    DB.customers=(DB.customers||[]).filter(function(c){return String(c.name||"").indexOf("__DEL__")!==0&&!isDeletedLocal("customers",c.id);});
+  }
   if(d.members&&d.members.length)DB.members=mergeRows(d.members.filter(function(m){return String(m.name||"").indexOf("__DEL__")!==0;}),DB.members);
   if(d.schedule&&d.schedule[0]){
     var sc=d.schedule[0];
