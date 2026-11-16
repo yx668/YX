@@ -1305,46 +1305,21 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
     else { window.addEventListener('load', showRefClaim); }
   }
 
-  // 客户档案：登记的客户若还不存在，就在云端建一条，挂在该股东名下
+  // 客户档案：查重 / 墓碑恢复 / 建档都在云端函数里完成（官网不再匿名读整张客户表）
   function ensureCustomer(name, phone, ref){
     if(!BOOK.on) return Promise.resolve(false);
-    var base = BOOK.url.replace(/\/+$/, '') + '/rest/v1/customers';
-    var hdr = { 'apikey': BOOK.key, 'Authorization': 'Bearer ' + BOOK.key };
-    var hdrJson = {
-      'Content-Type': 'application/json',
-      'apikey': BOOK.key,
-      'Authorization': 'Bearer ' + BOOK.key,
-      'Prefer': 'return=minimal'
-    };
-    return fetch(base + '?phone=eq.' + encodeURIComponent(phone) + '&select=id,name,referrer,type', { headers: hdr })
-      .then(function(r){ return r.ok ? r.json() : []; })
-      .then(function(rows){
-        if(rows && rows.length){
-          var a = rows[0];
-          // 之前删过同号码客户留下的墓碑行（name=__DEL__…）：恢复成真实姓名并挂到本次股东名下
-          if(String(a.name || '').indexOf('__DEL__') === 0){
-            return fetch(base + '?id=eq.' + encodeURIComponent(a.id), {
-              method: 'PATCH', headers: hdrJson,
-              body: JSON.stringify({ name: name, type: 'normal', referrer: ref || null, updated_at: new Date().toISOString() })
-            }).then(function(x){ return x.ok ? a.id : null; });
-          }
-          if(a.referrer) return a.id;          // 已有归属，不抢
-          if(!ref) return a.id;                // 散客：档案已存在就不用动
-          return fetch(base + '?id=eq.' + encodeURIComponent(a.id), {
-            method: 'PATCH', headers: hdrJson,
-            body: JSON.stringify({ referrer: ref, updated_at: new Date().toISOString() })
-          }).then(function(x){ return x.ok ? a.id : null; });
-        }
-        var cid = uuid4();
-        return fetch(base, {
-          method: 'POST', headers: hdrJson,
-          body: JSON.stringify([{
-            id: cid, name: name, phone: phone, type: 'normal',
-            referrer: ref || null, wx: '', login_enabled: false,
-            updated_at: new Date().toISOString()
-          }])
-        }).then(function(x){ return x.ok ? cid : null; });
-      })
+    var url = BOOK.url.replace(/\/+$/, '') + '/rest/v1/rpc/site_guest_ensure';
+    return fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': BOOK.key,
+        'Authorization': 'Bearer ' + BOOK.key
+      },
+      body: JSON.stringify({ p_name: name, p_phone: phone, p_referrer: ref || '' })
+    })
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(j){ return (j && j.ok === true) ? (j.id || null) : null; })
       .catch(function(e){ console.warn('建档失败：' + (e && e.message)); return null; });
   }
 
