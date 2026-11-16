@@ -297,7 +297,6 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
 .share-progress p{font-size:11px;color:var(--silver-dim);margin-top:9px;line-height:1.7}
 .share-linkbox{margin-top:10px;padding:10px 12px;border:1px dashed var(--line-strong);font-size:11px;line-height:1.65;word-break:break-all;color:var(--silver-dim);text-align:left}
 .share-linkbox.has{color:var(--silver);border-color:var(--red)}
-.share-demo-btn{display:none;margin:8px 0 0;padding:0;font-size:11px;color:var(--red);text-decoration:underline;background:none;border:0;cursor:pointer}
 .share-card{margin-top:12px;padding:8px;border:1px solid var(--line);background:rgba(237,232,223,.03);display:flex;justify-content:center;align-items:center}
 .share-card img{width:190px;max-width:100%;display:none}
 .share-card-ph{width:190px;height:253px;display:flex;align-items:center;justify-content:center;border:1px dashed var(--line-strong);font-size:11px;line-height:1.9;color:var(--silver-dim);text-align:center}
@@ -306,6 +305,16 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
 .note-line{font-size:13px;line-height:1.75;color:var(--silver-dim);margin-top:6px}
 .lock-note{font-size:12px;line-height:1.7;color:var(--red);margin-top:6px}
 .modal-form select:disabled{opacity:.9;color:var(--silver);cursor:default;background:rgba(237,232,223,.04)}
+
+/* 股东分享码进来时的领取入口条（不自动弹窗，客户先看官网） */
+.ref-claim{position:fixed;left:50%;transform:translateX(-50%);bottom:16px;z-index:70;display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:center;max-width:calc(100% - 28px);padding:12px 14px;background:rgba(18,33,58,.97);border:1px solid rgba(198,169,106,.55);box-shadow:0 14px 34px rgba(0,0,0,.5);backdrop-filter:blur(8px)}
+.ref-claim b{font-size:14px;font-weight:600;color:var(--cream);letter-spacing:.02em}
+.ref-claim span{font-size:12px;color:var(--silver-dim)}
+.ref-claim button{padding:8px 14px;font-size:13px;color:var(--cream);background:var(--red);border:0;cursor:pointer;letter-spacing:.04em}
+.ref-claim button:hover{background:#c8402f}
+.ref-claim .x{width:24px;height:24px;display:flex;align-items:center;justify-content:center;color:var(--silver-dim);background:none;border:0;cursor:pointer;font-size:16px;line-height:1}
+.ref-claim .x:hover{color:var(--cream)}
+@media(max-width:560px){.ref-claim{left:10px;right:10px;transform:none;max-width:none;gap:8px;padding:10px 12px}.ref-claim b{font-size:13px}.ref-claim span{display:none}}
 
 /* 焦点可见 */
 :focus-visible{outline:2px solid var(--gold);outline-offset:3px}
@@ -702,7 +711,6 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
       <div class="share-bar"><i id="shareBar"></i></div>
       <p id="shareHint">复制链接发出去，3 位朋友点开后可预约。</p>
     </div>
-    <button class="share-demo-btn" id="demoHit" type="button">演示用：模拟 1 位朋友点开</button>
     <div class="share-acts">
       <button class="btn btn-red" type="button" data-copylink>复制我的专属链接</button>
       <button class="btn btn-ghost" type="button" data-shared>我已分享，去填预约</button>
@@ -977,9 +985,13 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
   }
   function demoSave(d){ localStorage.setItem(SHARE.storeKey, JSON.stringify(d)); }
 
-  // 朋友带 ?ref 打开时激活
+  // 朋友带 ?c=<分享码> 打开时激活计数（老链接的 ?ref=8位码也认）
   (function(){
-    var ref = shareParam('ref');
+    var ref = shareParam('c');
+    if(!ref){
+      var old = shareParam('ref');
+      if(old && /^[A-Za-z0-9]{8}$/.test(old)){ ref = old.toUpperCase(); }
+    }
     if(!ref) return;
     if(ref === localStorage.getItem('sy_share_code')) return;
     if(shareReal){
@@ -1016,7 +1028,7 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
   }
   function shareUrl(code){
     var base = location.protocol === 'file:' ? location.href.split('?')[0].split('#')[0] : location.origin + location.pathname;
-    return encodeURI(base) + '?ref=' + encodeURIComponent(code);
+    return encodeURI(base) + '?c=' + encodeURIComponent(code);
   }
   function displayUrl(url){
     if(url.length <= 52){ return url; }
@@ -1124,8 +1136,6 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
     var cnt = document.getElementById('shareCount');
     var bar = document.getElementById('shareBar');
     var hint = document.getElementById('shareHint');
-    var demo = document.getElementById('demoHit');
-    if(demo){ demo.style.display = shareReal ? 'none' : 'inline-block'; }
     var code = localStorage.getItem('sy_share_code');
     if(!code){
       if(img){ img.style.display = 'none'; img.removeAttribute('src'); }
@@ -1196,17 +1206,6 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
       }
     });
   }
-  var demoHitBtn = document.getElementById('demoHit');
-  if(demoHitBtn){
-    demoHitBtn.addEventListener('click', function(){
-      var d = demoState();
-      d.visitors = d.visitors || [];
-      d.visitors.push('fake' + Math.random().toString(36).slice(2, 8));
-      demoSave(d);
-      renderShare();
-      toast('演示：模拟 1 位朋友点开，上线后按真实人数计算');
-    });
-  }
   document.querySelectorAll('[data-shared]').forEach(function(btn){
     btn.addEventListener('click', function(){
       myProgress().then(function(p){
@@ -1216,24 +1215,48 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
           renderShare();
           return;
         }
-        closeModals();
-        var sel = document.getElementById('f-service');
-        var note = document.getElementById('f-note');
-        var lock = document.getElementById('svcLock');
-        if(sel){ sel.value = '面部清洁'; sel.disabled = true; }
-        if(lock){ lock.textContent = '已锁定「面部清洁」，这是免费领取的洗脸项目。'; }
-        if(note){ note.value = '领取一次免费洗脸'; }
-        if(bookingModal){ bookingModal.classList.add('on'); }
+        openGiftBooking();
         toast('已填好「面部清洁」，备注写了：领取一次免费洗脸');
       });
     });
   });
 
+  // 领取免费洗脸的预约框（锁定面部清洁 + 备注）
+  function openGiftBooking(){
+    closeModals();
+    var sel = document.getElementById('f-service');
+    var note = document.getElementById('f-note');
+    var lock = document.getElementById('svcLock');
+    if(sel){ sel.value = '面部清洁'; sel.disabled = true; }
+    if(lock){ lock.textContent = '已锁定「面部清洁」，这是免费领取的洗脸项目。'; }
+    if(note){ note.value = '领取一次免费洗脸'; }
+    if(bookingModal){ bookingModal.classList.add('on'); }
+  }
+
+  // 满 3 人后自动弹出领取预约框（每张码只自动弹一次，只对分享者本人）
+  (function(){
+    if(!shareReal) return;
+    setInterval(function(){
+      var c = localStorage.getItem('sy_share_code');
+      if(!c) return;
+      if(localStorage.getItem('sy_unlocked_' + c)) return;
+      myProgress().then(function(p){
+        if(!p || !p.count || p.count < SHARE.threshold || p.booked) return;
+        if(localStorage.getItem('sy_unlocked_' + c)) return;
+        localStorage.setItem('sy_unlocked_' + c, '1');
+        openGiftBooking();
+        toast('已够 ' + SHARE.threshold + ' 人点开，可以填领取信息了');
+      });
+    }, 10000);
+  })();
+
   // 记录到云端 appointments 表（系统每 15 秒拉取，门店后台就能看见并核销）
   // 股东专属分享码：链接形如 ?ref=<股东ID>，由系统「我的专属分享码」生成
   var SITE_REF = (function(){
     var m = /[?&]ref=([^&#]*)/.exec(location.search);
-    return m ? decodeURIComponent(m[1]) : '';
+    var v = m ? decodeURIComponent(m[1]) : '';
+    if(/^[A-Za-z0-9]{8}$/.test(v)){ return ''; }   // 8 位是助力分享码，不是股东码，客户点开不弹领取窗
+    return v;
   })();
 
   // 股东码进来 = 直接送一次免费洗脸：自动打开预约弹窗并锁好项目
@@ -1250,9 +1273,21 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
       if(bm){ bm.classList.add('on'); }
     }catch(e){}
   };
+  // 股东码进来：不自动弹预约窗（客户先看到官网首页），只在底部给一条领取入口，点了才进预约框
+  function showRefClaim(){
+    if(document.querySelector('.ref-claim')) return;
+    var bar = document.createElement('div');
+    bar.className = 'ref-claim';
+    bar.innerHTML = '<b>股东邀您领取一次免费洗脸</b><span>点右边登记，到店核对手机号</span>'
+      + '<button type="button" data-claim>立即领取</button>'
+      + '<button type="button" class="x" data-close aria-label="关闭">&times;</button>';
+    document.body.appendChild(bar);
+    bar.querySelector('[data-claim]').addEventListener('click', function(){ openFreeForRef(); bar.remove(); });
+    bar.querySelector('[data-close]').addEventListener('click', function(){ bar.remove(); });
+  }
   if(SITE_REF){
-    if(document.readyState === 'complete'){ openFreeForRef(); }
-    else { window.addEventListener('load', openFreeForRef); }
+    if(document.readyState === 'complete'){ showRefClaim(); }
+    else { window.addEventListener('load', showRefClaim); }
   }
 
   // 客户档案：登记的客户若还不存在，就在云端建一条，挂在该股东名下
