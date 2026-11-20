@@ -346,7 +346,7 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
 .deals-note{margin-top:14px;font-size:11px;letter-spacing:.08em;color:var(--silver-dim);opacity:.7}
 /* ---------- 访客动态（页面末尾） ---------- */
 .visitor-list{position:relative;overflow:hidden;border:1px solid var(--line);background:rgba(20,36,47,.55)}
-.visitor-list::before,.visitor-list::after{content:"";position:absolute;left:0;right:0;height:44px;z-index:2;pointer-events:none}
+.visitor-list::before,.visitor-list::after{content:"";position:absolute;left:0;right:0;height:20px;z-index:2;pointer-events:none}
 .visitor-list::before{top:0;background:linear-gradient(180deg,var(--ink) 0%,rgba(13,24,32,0) 100%)}
 .visitor-list::after{bottom:0;background:linear-gradient(0deg,var(--ink) 0%,rgba(13,24,32,0) 100%)}
 .visitor-track{animation:visitorUp linear infinite;will-change:transform}
@@ -1069,7 +1069,7 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
   function visitorsRender(){
     var box = document.getElementById('visitorList');
     if(!box || !STATS.url || !STATS.key) return;
-    var since = new Date(Date.now() - 3 * 3600 * 1000).toISOString();
+    var since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
     fetch(STATS.url + '/rest/v1/' + STATS.table + '?select=created_at,city,path&created_at=gte.' + encodeURIComponent(since) + '&order=created_at.desc&limit=80', { headers: viewsHeaders() })
       .then(function(r){ return r.ok ? r.json() : []; })
       .then(function(rows){
@@ -1087,7 +1087,7 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
           box.innerHTML = '<div class="visitor"><span class="dot"></span><b>暂无访客动态</b><span>欢迎成为第一位访客</span><time></time></div>';
           return;
         }
-        var html = list.slice(0, 8).map(function(v){
+        var html = list.slice(0, 12).map(function(v){
           return '<div class="visitor"><span class="dot"></span><b>' + v.area + '</b><span>' + v.kind + '</span><time>' + timeAgo(v.t) + '</time></div>';
         }).join('');
         var grp = '<div class="visitor-grp">' + html + '</div>';
