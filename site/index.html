@@ -305,14 +305,11 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
 .modal-form select:disabled{opacity:.9;color:var(--silver);cursor:default;background:rgba(237,232,223,.04)}
 
 /* 股东分享码进来时的领取入口条（不自动弹窗，客户先看官网） */
-.ref-claim{position:fixed;left:50%;transform:translateX(-50%);bottom:16px;z-index:70;display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:center;max-width:calc(100% - 28px);padding:12px 14px;background:rgba(18,33,58,.97);border:1px solid rgba(198,169,106,.55);box-shadow:0 14px 34px rgba(0,0,0,.5);backdrop-filter:blur(8px)}
-.ref-claim b{font-size:14px;font-weight:600;color:var(--cream);letter-spacing:.02em}
-.ref-claim span{font-size:12px;color:var(--silver-dim)}
-.ref-claim button{padding:8px 14px;font-size:13px;color:var(--cream);background:var(--red);border:0;cursor:pointer;letter-spacing:.04em}
-.ref-claim button:hover{background:#c8402f}
+.ref-claim{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:70;display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:center;max-width:calc(100% - 28px);padding:16px 18px;background:rgba(18,33,58,.97);border:1px solid rgba(198,169,106,.55);border-radius:12px;box-shadow:0 14px 34px rgba(0,0,0,.5);backdrop-filter:blur(8px);text-align:center}
+.ref-claim b{font-size:15px;font-weight:600;color:var(--cream);letter-spacing:.02em}
 .ref-claim .x{width:24px;height:24px;display:flex;align-items:center;justify-content:center;color:var(--silver-dim);background:none;border:0;cursor:pointer;font-size:16px;line-height:1}
 .ref-claim .x:hover{color:var(--cream)}
-@media(max-width:560px){.ref-claim{left:10px;right:10px;transform:none;max-width:none;gap:8px;padding:10px 12px}.ref-claim b{font-size:13px}.ref-claim span{display:none}}
+@media(max-width:560px){.ref-claim{left:10px;right:10px;transform:translate(-50%,-50%);max-width:none;gap:8px;padding:12px 14px}.ref-claim b{font-size:14px}}
 
 /* 焦点可见 */
 :focus-visible{outline:2px solid var(--gold);outline-offset:3px}
@@ -1457,15 +1454,22 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
     if(document.querySelector('.ref-claim')) return;
     var bar = document.createElement('div');
     bar.className = 'ref-claim';
-    bar.innerHTML = '<b>股东邀您分享领取一次免费洗脸</b><span>点右边登记，到店核对手机号</span>'
-      + '<button type="button" data-claim>立即领取</button>'
+    bar.innerHTML = '<b>股东·邀请您免费洗脸一次</b>'
       + '<button type="button" class="x" data-close aria-label="关闭">&times;</button>';
     document.body.appendChild(bar);
-    bar.querySelector('[data-claim]').addEventListener('click', function(){
-      // 点「立即领取」跳到系统里的整页领取表单（填完提交会按 ref 绑定到该股东名下）
-      location.href = 'https://yx668.github.io/YX/?book=free&ref=' + encodeURIComponent(SITE_REF);
-    });
     bar.querySelector('[data-close]').addEventListener('click', function(){ bar.remove(); });
+    // 异步取邀请股东名字，取到就替换称谓；取不到保持「股东」统称
+    if(SITE_REF && BOOK.on){
+      fetch(BOOK.url.replace(/\/+$/, '') + '/rest/v1/rpc/site_ref_name', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': BOOK.key, 'Authorization': 'Bearer ' + BOOK.key },
+        body: JSON.stringify({ p_ref: SITE_REF })
+      }).then(function(r){ return r.ok ? r.json() : null; })
+        .then(function(j){
+          var nm = j && j.name ? String(j.name).replace(/^__DEL__/, '') : '';
+          if(nm){ bar.querySelector('b').textContent = nm + '·邀请您免费洗脸一次'; }
+        }).catch(function(){});
+    }
   }
   if(SITE_REF){
     if(document.readyState === 'complete'){ showRefClaim(); }
