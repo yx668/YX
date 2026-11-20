@@ -183,7 +183,7 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
 .holder-title em{font-style:normal;color:var(--red)}
 .holder-desc{margin-top:20px;color:var(--silver-dim);font-size:15px;line-height:1.95;max-width:34em}
 .holder-desc+.holder-desc{margin-top:14px}
-.holder-points{margin-top:38px;border-top:1px solid var(--line)}
+.holder-points{padding-top:32px;border-top:1px solid var(--line)}
 .point{display:grid;grid-template-columns:44px 1fr;gap:14px;padding:20px 0;border-bottom:1px solid var(--line)}
 .point-ico{width:44px;height:44px;border:1px solid var(--line-strong);display:flex;align-items:center;justify-content:center;color:var(--gold)}
 .point-ico svg{width:20px;height:20px}
@@ -581,7 +581,8 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
 
 <!-- ===== 股东招募 ===== -->
 <section class="holder" id="holder">
-  <div class="wrap holder-in">
+  <div class="wrap">
+    <div class="holder-in">
     <aside class="holder-side">
       <span class="eyebrow">HOW TO JOIN</span>
       <h3 data-c="holder.join">先了解，<br>再决定。</h3>
@@ -596,19 +597,20 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
       <p class="holder-desc" data-c="holder.d1">我发现很多在家的人想赚到钱，其实比想象中难太多了。孩子读书需要接送，老人需要照顾，丢下孩子在家跟老人，又怕小孩以后不听话；去进厂或者去工地干苦工嘛，又苦又累又不得钱。</p>
       <p class="holder-desc" data-c="holder.d2">想找一个把项目做，其他平台总部大多都在大城市，太远也去不了；而且大部分平台都是需要入门费，需要自己掏钱来囤货，风险太大，卖不出去自己又用不完，最后全部砸自己手里。</p>
       <p class="holder-desc" data-c="holder.d3">我也发现，现在的兄弟姐妹不是没有能力、不是说不够努力，你只是缺少一个不用垫资、不用囤货、时间完全自由、有人手把手来带，0 投资，靠谱而且赚钱的机会。</p>
-      <div class="holder-points">
-        <div class="point">
-          <div class="point-ico" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 18 V10 M10 18 V6 M16 18 V13 M22 18 V4"/><path d="M2 20 H22"/></svg>
-          </div>
-          <div><h4>阶梯佣金</h4><p data-c="holder.point1">客户到店消费，按成交额的利润拿 <strong>30%–50%</strong> 提成，档位越高比例越高，当月结算。</p></div>
+    </div>
+  </div>
+          <div class="holder-points">
+      <div class="point">
+        <div class="point-ico" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 18 V10 M10 18 V6 M16 18 V13 M22 18 V4"/><path d="M2 20 H22"/></svg>
         </div>
-        <div class="point">
-          <div class="point-ico" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="8" r="3.2"/><circle cx="17" cy="10" r="2.4"/><path d="M3 20 C3 15.6 6 13.6 9 13.6 C12 13.6 15 15.6 15 20"/><path d="M15.5 13.2 C18.5 13.2 21 15 21 19"/></svg>
-          </div>
-          <div><h4>服务协作费</h4><p data-c="holder.point2">参与门店服务协作、带客到店协助，按协作内容另计。</p></div>
+        <div><h4>阶梯佣金</h4><p data-c="holder.point1">客户到店消费，按成交额的利润拿 <strong>30%–50%</strong> 提成，档位越高比例越高，当月结算。</p></div>
+      </div>
+      <div class="point">
+        <div class="point-ico" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="8" r="3.2"/><circle cx="17" cy="10" r="2.4"/><path d="M3 20 C3 15.6 6 13.6 9 13.6 C12 13.6 15 15.6 15 20"/><path d="M15.5 13.2 C18.5 13.2 21 15 21 19"/></svg>
         </div>
+        <div><h4>服务协作费</h4><p data-c="holder.point2">参与门店服务协作、带客到店协助，按协作内容另计。</p></div>
       </div>
     </div>
   </div>
