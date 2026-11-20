@@ -8300,13 +8300,22 @@ function visitPageName(p){
   if(p.indexOf("file:")>=0||p.indexOf("/C:/")>=0)return "本地预览";
   return p.slice(0,52);
 }
+function visitFetchRows(){
+  if(!(cloudCfg&&cloudCfg.url&&cloudCfg.anonKey))return Promise.reject(new Error("未配置云端地址与密钥"));
+  var u=cBase()+"/rest/v1/site_visits?select=created_at,day,path,ref,visitor,city,ip&order=created_at.desc&limit=500";
+  return fetch(u,{headers:{apikey:cloudCfg.anonKey,Authorization:"Bearer "+cloudCfg.anonKey}}).then(function(r){
+    if(!r.ok)return r.text().then(function(t){throw new Error("HTTP "+r.status+" "+(t||"").slice(0,120));});
+    return r.json();
+  });
+}
 function renderVisit(force){
   var box=$("visitListBox"); if(!box)return;
   var sel=$("visitRange"); var hours=sel?parseInt(sel.value||"24",10):24;
   if(!force&&VISIT_ROWS.length){visitPaint(hours);return;}
   box.innerHTML='<div class="hint" style="padding:18px">正在读取云端访客记录…</div>';
   var note=$("visitBrief"); if(note)note.textContent=hours>0?("统计范围：最近 "+hours+" 小时"):"统计范围：全部记录";
-  cloudSelect("site_visits?select=created_at,day,path,ref,visitor,city,ip&order=created_at.desc&limit=500").then(function(rows){
+  var q="site_visits?select=created_at,day,path,ref,visitor,city,ip&order=created_at.desc&limit=500";
+  cloudSelect(q).catch(function(){return visitFetchRows();}).then(function(rows){
     VISIT_ROWS=rows||[];visitPaint(hours);
   }).catch(function(e){
     box.innerHTML='<div class="hint" style="padding:18px;color:var(--danger)">读取失败：'+vEsc(e&&e.message?e.message:"请检查云端连接与管理员登录状态")+'</div>';
