@@ -3423,7 +3423,7 @@ function flushHiddenCustToCloud(){
 var tomb={};
 function loadTomb(){try{var v=localStorage.getItem(TOMB_KEY);if(v)tomb=JSON.parse(v);}catch(e){tomb={};}if(!tomb||typeof tomb!=="object")tomb={};}
 function saveTomb(){try{localStorage.setItem(TOMB_KEY,JSON.stringify(tomb));}catch(e){}}
-function markDeleted(table,id){if(!tomb[table])tomb[table]={};tomb[table][id]=1;saveTomb();}
+function markDeleted(table,id){if(!tomb[table])tomb[table]={};tomb[table][id]=Date.now();saveTomb();}
 function unmarkDeleted(table,id){if(tomb[table]){delete tomb[table][id];saveTomb();}}
 /* 延迟清除墓碑：云端删除已确认成功，但删除前发出的周期拉取快照可能仍在途；
    若在快照返回前就清除墓碑，该行会被合并回本地并经 queuePush 补推回云端，造成"删了又复活"。
@@ -3433,7 +3433,11 @@ function isDeletedLocal(table,id){return !!(tomb[table]&&tomb[table][id]);}
 /* pull 时若发现墓碑 id 在云端仍存在（上次删除请求失败/断网），自动补删直到成功 */
 function retryDeleted(table,cloudRows){
   if(!tomb[table])return;
+  var _now=Date.now(),_LIM=20*60*1000;
   Object.keys(tomb[table]).forEach(function(id){
+    var _ts=Number(tomb[table][id])||0;
+    /* 墓碑超过20分钟不再补删：避免残留旧删除名单把人工恢复的数据反复抹掉 */
+    if(!_ts||_now-_ts>_LIM){unmarkDeleted(table,id);return;}
     var row=(cloudRows||[]).find(function(r){return r&&r.id===id;});
     if(!row){unmarkDeleted(table,id);return;}
     if(row.name&&String(row.name).indexOf("__DEL__")===0){unmarkDeleted(table,id);return;}
@@ -8202,7 +8206,7 @@ function clearTestData(){
         if(ids.length){
           // 先写墓碑再删：防止删除请求往返期间在途的拉取快照把已删行合并回本地
           if(!tomb[tb])tomb[tb]={};
-          ids.forEach(function(id){tomb[tb][id]=1;});
+          ids.forEach(function(id){tomb[tb][id]=Date.now();});
           saveTomb();
           return cloudDeleteRows(tb,ids);
         }
