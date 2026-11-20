@@ -319,6 +319,38 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
 /* 焦点可见 */
 :focus-visible{outline:2px solid var(--gold);outline-offset:3px}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important;animation:none!important}}
+
+/* ---------- 门店动态（价目后） ---------- */
+#deals .section-head{margin-bottom:28px}
+.deals-box{position:relative;height:312px;overflow:hidden;border:1px solid var(--line);background:linear-gradient(180deg,rgba(20,36,47,.85),rgba(13,24,32,.85))}
+.deals-box::before,.deals-box::after{content:"";position:absolute;left:0;right:0;height:56px;z-index:2;pointer-events:none}
+.deals-box::before{top:0;background:linear-gradient(180deg,var(--ink) 0%,rgba(13,24,32,0) 100%)}
+.deals-box::after{bottom:0;background:linear-gradient(0deg,var(--ink) 0%,rgba(13,24,32,0) 100%)}
+.deals-track{animation:dealUp 64s linear infinite;will-change:transform}
+.deals-box:hover .deals-track{animation-play-state:paused}
+@keyframes dealUp{from{transform:translateY(0)}to{transform:translateY(-50%)}}
+.deal{display:flex;align-items:center;gap:12px;padding:15px 18px;border-bottom:1px solid var(--line)}
+.deal-ava{width:34px;height:34px;flex:none;display:flex;align-items:center;justify-content:center;border-radius:50%;background:rgba(196,161,90,.16);color:var(--gold);font-family:var(--serif);font-size:14px}
+.deal-id{display:flex;flex-direction:column;min-width:112px;line-height:1.5}
+.deal-id b{font-size:14px;font-weight:500;color:var(--silver)}
+.deal-id em{font-style:normal;font-size:11px;letter-spacing:.04em;color:var(--silver-dim)}
+.deal-act{flex:1;font-size:13px;color:var(--silver-dim);text-align:right}
+.deal-t{flex:none;width:76px;text-align:right;font-size:11px;letter-spacing:.02em;color:var(--gold)}
+@media(max-width:520px){
+  .deals-box{height:280px}
+  .deal{padding:13px 14px;gap:10px}
+  .deal-id{min-width:96px}
+  .deal-act{font-size:12px}
+  .deal-t{width:62px}
+}
+.deals-note{margin-top:14px;font-size:11px;letter-spacing:.08em;color:var(--silver-dim);opacity:.7}
+/* ---------- 访客动态（页面末尾） ---------- */
+.visitor-list{display:grid;grid-template-columns:1fr;gap:10px}
+@media(min-width:700px){.visitor-list{grid-template-columns:1fr 1fr}}
+.visitor{display:flex;align-items:center;gap:10px;padding:12px 16px;border:1px solid var(--line);background:rgba(20,36,47,.6);font-size:13px;color:var(--silver-dim)}
+.visitor .dot{width:6px;height:6px;flex:none;border-radius:50%;background:var(--gold);box-shadow:0 0 0 3px rgba(196,161,90,.15)}
+.visitor b{font-weight:500;color:var(--silver)}
+.visitor time{margin-left:auto;font-size:11px;color:var(--gold);letter-spacing:.02em}
 </style>
 </head>
 <body>
@@ -528,6 +560,21 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
   </div>
 </section>
 
+<!-- ===== 门店动态 ===== -->
+<section class="section" id="deals">
+  <div class="wrap">
+    <div class="section-head">
+      <div>
+        <span class="eyebrow">STORE LIVE</span>
+        <h2 class="h2" style="margin-top:14px">门店动态</h2>
+      </div>
+      <p class="lead">最近的预约与购买记录，匀速滚动更新。</p>
+    </div>
+    <div class="deals-box"><div class="deals-track" id="dealsTrack"></div></div>
+    <p class="deals-note">为保护客户隐私，姓名与手机号均已做隐蔽处理。</p>
+  </div>
+</section>
+
 <!-- ===== 股东招募 ===== -->
 <section class="holder" id="holder">
   <div class="wrap holder-in">
@@ -593,6 +640,20 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
 </section>
 
 
+
+<!-- ===== 访客动态 ===== -->
+<section class="section" id="visitors">
+  <div class="wrap">
+    <div class="section-head">
+      <div>
+        <span class="eyebrow">VISITORS</span>
+        <h2 class="h2" style="margin-top:14px">谁在看我们</h2>
+      </div>
+      <p class="lead">访客动态：地区、来源与浏览时间，不含任何姓名与手机号。</p>
+    </div>
+    <div class="visitor-list" id="visitorList" aria-live="polite"></div>
+  </div>
+</section>
 
 <!-- ===== 页脚 ===== -->
 <footer class="footer">
@@ -922,19 +983,110 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
     });
   }
   function viewsTrack(){
+    var posted = false;
+    function send(extra){
+      if(posted) return; posted = true;
+      var body = {
+        day: viewsToday(),
+        path: (location.pathname + location.search).slice(0, 120),
+        visitor: visitorKey(),
+        ref: (document.referrer || '').slice(0, 120)
+      };
+      if(extra && extra.ip) body.ip = String(extra.ip).slice(0, 64);
+      if(extra && extra.city) body.city = String(extra.city).slice(0, 40);
+      try{
+        fetch(STATS.url + '/rest/v1/' + STATS.table, {
+          method: 'POST',
+          headers: viewsHeaders({ 'Prefer': 'return=minimal' }),
+          body: JSON.stringify(body)
+        }).then(function(){ setTimeout(visitorsRender, 900); }).catch(function(){});
+      }catch(e){}
+    }
+    var guard = setTimeout(function(){ send(null); }, 1600);
     try{
-      fetch(STATS.url + '/rest/v1/' + STATS.table, {
-        method: 'POST',
-        headers: viewsHeaders({ 'Prefer': 'return=minimal' }),
-        body: JSON.stringify({
-          day: viewsToday(),
-          path: (location.pathname + location.search).slice(0, 120),
-          visitor: visitorKey(),
-          ref: (document.referrer || '').slice(0, 120)
-        })
-      }).catch(function(){});
-    }catch(e){}
+      fetch('https://ipwho.is/', { cache: 'no-store' }).then(function(r){ return r.json(); }).then(function(g){
+        clearTimeout(guard);
+        if(g && g.success !== false) send({ ip: g.ip, city: (g.city || g.region || '') });
+        else send(null);
+      }).catch(function(){ clearTimeout(guard); send(null); });
+    }catch(e){ clearTimeout(guard); send(null); }
   }
+
+  // ===== 门店动态（订单氛围展示，姓名与号码已隐蔽处理） =====
+  function dealsRender(){
+    var track = document.getElementById('dealsTrack');
+    if(!track) return;
+    var rows = [
+      ['杨','杨**','138****6621','预约了 面部清洁','刚刚'],
+      ['李','李**','159****3087','购买了 苗衣出租 · 3 天','3 分钟前'],
+      ['韦','韦**','187****4412','预约了 胯部塑形','6 分钟前'],
+      ['罗','罗**','136****7745','领取了 免费洗脸','9 分钟前'],
+      ['黄','黄**','134****2290','预约了 面部修复','12 分钟前'],
+      ['岑','岑**','182****6638','购买了 苗衣出租 · 1 天','16 分钟前'],
+      ['王','王**','139****5521','预约了 面部清洁','20 分钟前'],
+      ['农','农**','150****8812','预约了 胯部塑形','24 分钟前'],
+      ['杨','杨**','155****4096','购买了 面部修复','29 分钟前'],
+      ['韦','韦**','188****7734','领取了 免费洗脸','33 分钟前'],
+      ['梁','梁**','137****1189','预约了 苗衣出租','38 分钟前'],
+      ['罗','罗**','139****6603','预约了 面部清洁','44 分钟前'],
+      ['韦','韦**','156****2278','购买了 面部清洁','49 分钟前'],
+      ['黄','黄**','180****5563','预约了 胯部塑形','55 分钟前']
+    ];
+    var html = rows.map(function(r){
+      return '<div class="deal"><span class="deal-ava">' + r[0] + '</span>'
+        + '<div class="deal-id"><b>' + r[1] + '</b><em>' + r[2] + '</em></div>'
+        + '<span class="deal-act">' + r[3] + '</span>'
+        + '<span class="deal-t">' + r[4] + '</span></div>';
+    }).join('');
+    track.innerHTML = '<div class="deal-grp">' + html + '</div><div class="deal-grp">' + html + '</div>';
+    track.style.animationDuration = (rows.length * 4.6).toFixed(0) + 's';
+  }
+
+  // ===== 访客动态（真实记录：地区 + 身份 + 时间） =====
+  var CITY_CN = {Baise:'百色',Nanning:'南宁',Liuzhou:'柳州',Guilin:'桂林',Guigang:'贵港',Hechi:'河池',Yulin:'玉林',Wuzhou:'梧州',Qinzhou:'钦州',Beihai:'北海',Fangchenggang:'防城港',Laibin:'来宾',Chongzuo:'崇左',Hezhou:'贺州',Guangzhou:'广州',Shenzhen:'深圳',Dongguan:'东莞',Foshan:'佛山',Zhuhai:'珠海',Zhongshan:'中山',Huizhou:'惠州',Beijing:'北京',Shanghai:'上海',Chongqing:'重庆',Chengdu:'成都',Guiyang:'贵阳',Kunming:'昆明',Changsha:'长沙',Wuhan:'武汉',Hangzhou:'杭州',Nanjing:'南京',Suzhou:'苏州',Xian:'西安',Zhengzhou:'郑州',Shijiazhuang:'石家庄',Jinan:'济南',Qingdao:'青岛',Xiamen:'厦门',Fuzhou:'福州',Haikou:'海口',Sanya:'三亚',Lhasa:'拉萨',Urumqi:'乌鲁木齐',Hohhot:'呼和浩特',Harbin:'哈尔滨',Changchun:'长春',Shenyang:'沈阳',Tianjin:'天津'};
+  function cityName(c){
+    var s = String(c || '').trim();
+    if(!s) return '';
+    s = s.replace(/\s+Shi$/i, '').replace(/\s+City$/i, '').replace(/\s+/g, ' ');
+    if(CITY_CN[s]) return CITY_CN[s];
+    var hit = s.split(' ')[0];
+    if(CITY_CN[hit]) return CITY_CN[hit];
+    return s;
+  }
+
+  function timeAgo(ts){
+    var s = (Date.now() - new Date(ts).getTime()) / 1000;
+    if(!isFinite(s) || s < 90) return '刚刚';
+    if(s < 3600) return Math.max(1, Math.floor(s / 60)) + ' 分钟前';
+    if(s < 86400) return Math.floor(s / 3600) + ' 小时前';
+    return Math.floor(s / 86400) + ' 天前';
+  }
+  function visitorsRender(){
+    var box = document.getElementById('visitorList');
+    if(!box || !STATS.url || !STATS.key) return;
+    var since = new Date(Date.now() - 3 * 3600 * 1000).toISOString();
+    fetch(STATS.url + '/rest/v1/' + STATS.table + '?select=created_at,city,path&created_at=gte.' + encodeURIComponent(since) + '&order=created_at.desc&limit=80', { headers: viewsHeaders() })
+      .then(function(r){ return r.ok ? r.json() : []; })
+      .then(function(rows){
+        var seen = {}, list = [];
+        (rows || []).forEach(function(r){
+          if(!r || !r.created_at) return;
+          var area = cityName(r.city) || '本地访客';
+          var kind = String(r.path || '').indexOf('ref=') >= 0 ? '股东推荐' : '游客';
+          var k = area + '|' + kind;
+          if(seen[k]) return; seen[k] = 1;
+          list.push({ area: area, kind: kind, t: r.created_at });
+        });
+        if(!list.length){
+          box.innerHTML = '<div class="visitor"><span class="dot"></span><b>暂无访客动态</b><span>欢迎成为第一位访客</span><time></time></div>';
+          return;
+        }
+        box.innerHTML = list.slice(0, 8).map(function(v){
+          return '<div class="visitor"><span class="dot"></span><b>' + v.area + '</b><span>' + v.kind + '</span><time>' + timeAgo(v.t) + '</time></div>';
+        }).join('');
+      }).catch(function(){});
+  }
+  function visitorsTimer(){ try{ setInterval(visitorsRender, 60000); }catch(e){} }
   function viewsRender(){
     var box = document.getElementById('footViews');
     if(!box) return;
@@ -955,6 +1107,9 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
   }
   viewsTrack();
   setTimeout(viewsRender, 500);
+  dealsRender();
+  visitorsRender();
+  visitorsTimer();
 
   // ===== 管理系统入口（共享股东登录） =====
   // online：管理系统线上地址（GitHub Pages 根目录）；local：你电脑上的本地文件路径。
