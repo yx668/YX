@@ -259,6 +259,8 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
 /* ---------- 浮层 / toast ---------- */
 .toast{position:fixed;left:50%;bottom:28px;transform:translate(-50%,20px);z-index:90;background:var(--ink3);border:1px solid var(--line-strong);border-left:3px solid var(--gold);padding:14px 20px;font-size:13px;color:var(--silver);max-width:88vw;opacity:0;pointer-events:none;transition:.28s;box-shadow:0 12px 40px rgba(0,0,0,.45)}
 .toast.on{opacity:1;transform:translate(-50%,0)}
+.toast.center{top:50%;bottom:auto;transform:translate(-50%,-50%)}
+.toast.center.on{transform:translate(-50%,-50%)}
 .modal{position:fixed;inset:0;z-index:70;background:rgba(6,12,16,.82);display:none;align-items:flex-start;justify-content:center;padding:12px;overflow-y:auto}
 .modal.on{display:flex}
 .modal-box{background:var(--ink2);border:1px solid var(--line-strong);max-width:360px;width:100%;padding:26px 24px;text-align:center;position:relative;margin:auto}
@@ -784,8 +786,9 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
 (function(){
   var toastEl = document.getElementById('toast');
   var toastTimer = null;
-  function toast(msg){
+  function toast(msg, center){
     toastEl.textContent = msg;
+    toastEl.classList.toggle('center', !!center);
     toastEl.classList.add('on');
     clearTimeout(toastTimer);
     toastTimer = setTimeout(function(){ toastEl.classList.remove('on'); }, 3200);
@@ -1385,7 +1388,7 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
       myProgress().then(function(p){
         if(p.booked){ toast('这张分享码已经用过了，每人一次'); return; }
         if(p.count < SHARE.threshold){
-          toast('还差 ' + (SHARE.threshold - p.count) + ' 人点开你的链接，先多发几个');
+          toast('还差 ' + (SHARE.threshold - p.count) + ' 人点开你的链接，先多发几个', true);
           renderShare();
           return;
         }
