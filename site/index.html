@@ -50,7 +50,7 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
 /* ---------- Hero ---------- */
 .hero{border-bottom:1px solid var(--line)}
 .hero-grid{display:grid;grid-template-columns:1fr;gap:0}
-.hero-copy{padding:44px 0 34px;position:relative}
+.hero-copy{padding:36px 0 28px;position:relative}
 .hero-copy .eyebrow{display:block;margin-bottom:22px}
 .hero-title{font-family:var(--serif);font-weight:900;font-size:clamp(46px,10vw,104px);line-height:.98;letter-spacing:.03em;color:var(--silver)}
 .hero-sub{margin-top:20px;font-size:clamp(14px,2.4vw,17px);letter-spacing:.14em;color:var(--gold);font-weight:400}
@@ -71,7 +71,7 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
 .hero-note{position:absolute;left:0;bottom:0;z-index:2;padding:14px 20px;font-size:11px;letter-spacing:.18em;color:var(--silver-dim);border-top:1px solid var(--line);background:rgba(13,24,32,.7)}
 @media(min-width:768px){
   .hero-grid{grid-template-columns:44% 56%;min-height:620px}
-  .hero-copy{padding:88px 40px 48px 0;display:flex;flex-direction:column;justify-content:center}
+  .hero-copy{padding:64px 40px 40px 0;display:flex;flex-direction:column;justify-content:center}
   .hero-visual{height:auto;max-height:none;border-top:0;border-left:1px solid var(--line)}
   .hero-note{display:none}
 }
@@ -81,12 +81,12 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
 .band svg{width:100%;height:20px;display:block}
 
 /* ---------- 服务 ---------- */
-.section{padding:64px 0}
-@media(min-width:768px){.section{padding:96px 0}}
-.section-head{display:flex;flex-direction:column;gap:16px;margin-bottom:38px}
-@media(min-width:768px){.section-head{flex-direction:row;align-items:flex-end;justify-content:space-between;margin-bottom:52px}}
+.section{padding:44px 0}
+@media(min-width:768px){.section{padding:64px 0}}
+.section-head{display:flex;flex-direction:column;gap:16px;margin-bottom:26px}
+@media(min-width:768px){.section-head{flex-direction:row;align-items:flex-end;justify-content:space-between;margin-bottom:34px}}
 /* ---------- 公司介绍 ---------- */
-.about-grid{display:grid;grid-template-columns:1fr;gap:34px;margin-top:34px}
+.about-grid{display:grid;grid-template-columns:1fr;gap:26px;margin-top:26px}
 .about-quote{border-left:1px solid var(--line-strong);padding-left:20px}
 .about-quote p{font-family:var(--serif);font-size:22px;line-height:1.75;color:var(--silver);letter-spacing:.02em}
 .about-quote span{display:block;margin-top:14px;font-size:11px;letter-spacing:.16em;color:var(--gold)}
@@ -177,8 +177,8 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
 /* ---------- 股东招募 ---------- */
 .holder{position:relative;background:var(--ink);border-top:1px solid var(--line)}
 .holder-in{display:grid;grid-template-columns:1fr;gap:0}
-.holder-main{padding:64px 0;border-bottom:1px solid var(--line)}
-.holder-side{background:var(--ink3);padding:40px 24px;border-bottom:1px solid var(--line)}
+.holder-main{padding:44px 0;border-bottom:1px solid var(--line)}
+.holder-side{background:var(--ink3);padding:32px 24px;border-bottom:1px solid var(--line)}
 .holder-title{font-family:var(--serif);font-weight:900;font-size:clamp(30px,5.6vw,52px);line-height:1.15;letter-spacing:.03em;margin-top:16px}
 .holder-title em{font-style:normal;color:var(--red)}
 .holder-desc{margin-top:20px;color:var(--silver-dim);font-size:15px;line-height:1.95;max-width:34em}
@@ -195,12 +195,12 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
 .holder-cta{margin-top:24px;width:100%}
 @media(min-width:900px){
   .holder-in{grid-template-columns:360px 1fr}
-  .holder-main{padding:96px 0 96px 56px;border-bottom:0}
-  .holder-side{padding:56px 32px;border-bottom:0;border-right:1px solid var(--line);align-self:start}
+  .holder-main{padding:60px 0 60px 48px;border-bottom:0}
+  .holder-side{padding:44px 32px;border-bottom:0;border-right:1px solid var(--line);align-self:start}
 }
 
 /* ---------- 门店 ---------- */
-.store-grid{display:grid;grid-template-columns:1fr;gap:32px}
+.store-grid{display:grid;grid-template-columns:1fr;gap:26px}
 .store-map{height:300px;border:1px solid var(--line);position:relative;overflow:hidden;background:var(--ink2)}
 .store-map img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 52%;filter:brightness(.72) saturate(.55) contrast(1.02)}
 .store-map::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(13,24,32,.62),rgba(13,24,32,.12) 34%,rgba(13,24,32,.5));pointer-events:none}
@@ -222,11 +222,11 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
 .wx-qr-wrap{margin:18px 0 6px;display:flex;justify-content:center}
 .wx-qr{width:100%;max-width:232px;height:auto;background:#fff;padding:7px;border:1px solid var(--line-strong);border-radius:2px}
 .wx-hint{margin-top:12px;font-size:12px;line-height:1.7;color:var(--silver-dim)}
-@media(min-width:768px){.store-grid{grid-template-columns:1.1fr .9fr;align-items:start;gap:52px}.store-map{height:380px}}
+@media(min-width:768px){.store-grid{grid-template-columns:1.1fr .9fr;align-items:start;gap:40px}.store-map{height:380px}}
 
 /* ---------- 预约 ---------- */
 .booking{background:var(--ink2);border-top:1px solid var(--line)}
-.booking-grid{display:grid;grid-template-columns:1fr;gap:36px}
+.booking-grid{display:grid;grid-template-columns:1fr;gap:28px}
 .form{display:grid;grid-template-columns:1fr;gap:16px;margin-top:8px}
 .field{display:flex;flex-direction:column;gap:8px}
 .field label{font-size:12px;letter-spacing:.12em;color:var(--silver-dim)}
@@ -240,10 +240,10 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
 .field select option{background:var(--ink2);color:var(--silver)}
 .form-foot{display:flex;flex-direction:column;gap:14px;margin-top:6px}
 .form-note{font-size:12px;color:var(--silver-dim);line-height:1.8}
-@media(min-width:768px){.form{grid-template-columns:1fr 1fr}.field.full,.form-foot{grid-column:1/-1}.booking-grid{grid-template-columns:1fr 1.15fr;align-items:start;gap:64px}}
+@media(min-width:768px){.form{grid-template-columns:1fr 1fr}.field.full,.form-foot{grid-column:1/-1}.booking-grid{grid-template-columns:1fr 1.15fr;align-items:start;gap:44px}}
 
 /* ---------- 页脚 ---------- */
-.footer{border-top:1px solid var(--line);padding:40px 0 32px;background:var(--ink)}
+.footer{border-top:1px solid var(--line);padding:32px 0 26px;background:var(--ink)}
 .foot-top{display:flex;flex-direction:column;gap:20px;padding-bottom:28px;border-bottom:1px solid var(--line)}
 .foot-brand{font-family:var(--serif);font-weight:700;font-size:17px;letter-spacing:.1em}
 .foot-id{display:flex;flex-direction:column;gap:8px}
@@ -343,7 +343,6 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
   .deal-act{font-size:12px}
   .deal-t{width:62px}
 }
-.deals-note{margin-top:14px;font-size:11px;letter-spacing:.08em;color:var(--silver-dim);opacity:.7}
 /* ---------- 访客动态（页面末尾） ---------- */
 .visitor-list{position:relative;overflow:hidden;border:1px solid var(--line);background:rgba(20,36,47,.55)}
 .visitor-list::before,.visitor-list::after{content:"";position:absolute;left:0;right:0;height:20px;z-index:2;pointer-events:none}
@@ -575,7 +574,6 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
       </div>
     </div>
     <div class="deals-box"><div class="deals-track" id="dealsTrack"></div></div>
-    <p class="deals-note">姓名与号码已打码</p>
   </div>
 </section>
 
