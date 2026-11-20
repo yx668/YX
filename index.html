@@ -4356,6 +4356,7 @@ function repairPkgFlags(){
   });
   if(oriCards.length){
     DB.packageBuys=(DB.packageBuys||[]).filter(function(b){return oriCards.indexOf(b.id)<0;});
+    oriCards.forEach(function(id){markDeleted("packagebuys",id);});
     fixed+=oriCards.length;
     if(cloudMode&&sess&&typeof cloudDeleteRows==="function")cloudDeleteRows("packagebuys",oriCards);
   }
@@ -6524,8 +6525,8 @@ DB.customers=DB.customers.filter(function(x){return x.id!==id;});
   var apptIds=appts.map(function(a){return a.id;});
   if(apptIds.length){
     DB.appointments=DB.appointments.filter(function(a){return apptIds.indexOf(a.id)<0;});
+    apptIds.forEach(function(x){markDeleted("appointments",x);});
     if(cloudMode&&sess){
-      apptIds.forEach(function(x){markDeleted("appointments",x);});
       cloudDeleteRows("appointments",apptIds).catch(function(e){toast("云端删除预约失败："+(e&&e.message?e.message:e),"err");});
     }
   }
@@ -6536,12 +6537,13 @@ DB.customers=DB.customers.filter(function(x){return x.id!==id;});
   });
   if(consIds.length){
     DB.consumptions=DB.consumptions.filter(function(x){return consIds.indexOf(x.id)<0;});
+    consIds.forEach(function(x){markDeleted("consumptions",x);});
     if(cloudMode&&sess){
-      consIds.forEach(function(x){markDeleted("consumptions",x);});
       cloudDeleteRows("consumptions",consIds).catch(function(e){toast("云端删除台账失败："+(e&&e.message?e.message:e),"err");});
     }
   }
-  if(cloudMode&&sess){markDeleted("customers",id);cloudSoftDelete("customers",id).catch(function(e){toast("云端删除失败："+(e&&e.message?e.message:e),"err");});}
+  markDeleted("customers",id);
+  if(cloudMode&&sess){cloudSoftDelete("customers",id).catch(function(e){toast("云端删除失败："+(e&&e.message?e.message:e),"err");});}
   saveDB();toast("客户已删除");
 }
 function onCustPickChange(){
@@ -6625,7 +6627,8 @@ function delMember(id){
   if(!confirm("确定删除成员「"+m.name+"」？"+tip))return;
 DB.members=DB.members.filter(function(x){return x.id!==id;});
   DB.appointments.forEach(function(a){if(a.memberId===id)a.memberId="";});
-  if(cloudMode&&sess){markDeleted("members",id);cloudSoftDelete("members",id).catch(function(e){toast("云端删除失败："+(e&&e.message?e.message:e),"err");});}
+  markDeleted("members",id);
+  if(cloudMode&&sess){cloudSoftDelete("members",id).catch(function(e){toast("云端删除失败："+(e&&e.message?e.message:e),"err");});}
   saveDB();toast("成员已删除");
 }
 
@@ -6823,7 +6826,8 @@ function delService(id){
   if(!confirm("确定删除项目「"+s.name+"」？"+tip))return;
 DB.services=DB.services.filter(function(x){return x.id!==id;});
   DB.appointments.forEach(function(a){if(a.serviceId===id)a.serviceId="";});
-  if(cloudMode&&sess){markDeleted("services",id);cloudSoftDelete("services",id).catch(function(e){toast("云端删除失败："+(e&&e.message?e.message:e),"err");});}
+  markDeleted("services",id);
+  if(cloudMode&&sess){cloudSoftDelete("services",id).catch(function(e){toast("云端删除失败："+(e&&e.message?e.message:e),"err");});}
   saveDB();toast("项目已删除");
 }
 function renderSchedule(){
@@ -7002,7 +7006,8 @@ function delAppt(id){
 DB.appointments=DB.appointments.filter(function(x){return x.id!==id;});
   /* 单向联动：删除预约不影响统计报表，消费台账（结算记录）继续保留；
      反向由 delConsumption 负责——删除统计报表里的结算记录时同步删除对应预约。 */
-  if(cloudMode&&sess){markDeleted("appointments",id);cloudDeleteRows("appointments",[id]).catch(function(e){toast("云端删除失败："+(e&&e.message?e.message:e),"err");});}
+  markDeleted("appointments",id);
+  if(cloudMode&&sess){cloudDeleteRows("appointments",[id]).catch(function(e){toast("云端删除失败："+(e&&e.message?e.message:e),"err");});}
   saveDB();toast("预约已删除");
   renderAll(); // 同步刷新工作台 / 日历 / 统计报表 / 共享板块 / 客户详情数据源
 }
@@ -7740,8 +7745,9 @@ function delDirectAppt(btn){
   });
   if(cardIds.length)DB.packageBuys=(DB.packageBuys||[]).filter(function(b){return cardIds.indexOf(b.id)<0;});
   // 4) 云端墓碑同步删除（预约 + 本单创建的套餐卡）
+  markDeleted("appointments",id);
+  if(cardIds.length)cardIds.forEach(function(b){markDeleted("packagebuys",b);});
   if(cloudMode&&sess){
-    markDeleted("appointments",id);
     cloudDeleteRows("appointments",[id]).catch(function(e){toast("云端删除失败："+(e&&e.message?e.message:e),"err");});
     if(cardIds.length)cloudDeleteRows("packagebuys",cardIds).catch(function(e){toast("云端删除套餐卡失败："+(e&&e.message?e.message:e),"err");});
   }
@@ -7853,13 +7859,15 @@ function delConsumption(id){
       if(_cardIds.length)DB.packageBuys=(DB.packageBuys||[]).filter(function(b){return _cardIds.indexOf(b.id)<0;});
     }
     DB.appointments=DB.appointments.filter(function(x){return x.id!==r.apptId;});
+    markDeleted("appointments",r.apptId);
+    if(_cardIds.length)_cardIds.forEach(function(b){markDeleted("packagebuys",b);});
     if(cloudMode&&sess){
-      markDeleted("appointments",r.apptId);
       cloudDeleteRows("appointments",[r.apptId]).catch(function(e){toast("云端删除预约失败："+(e&&e.message?e.message:e),"err");});
       if(_cardIds.length)cloudDeleteRows("packagebuys",_cardIds).catch(function(e){toast("云端删除套餐卡失败："+(e&&e.message?e.message:e),"err");});
     }
   }
-  if(cloudMode&&sess){markDeleted("consumptions",id);cloudDeleteRows("consumptions",[id]).catch(function(e){toast("云端删除记录失败："+(e&&e.message?e.message:e),"err");});}
+  markDeleted("consumptions",id);
+  if(cloudMode&&sess){cloudDeleteRows("consumptions",[id]).catch(function(e){toast("云端删除记录失败："+(e&&e.message?e.message:e),"err");});}
   saveDB();
   toast("消费记录已删除"+(r.apptId?"（关联预约已同步删除）":""));
   renderAll(); // 同步刷新工作台 / 预约 / 统计报表 / 共享板块等所有视图
@@ -8768,13 +8776,15 @@ function deleteCCRecord(id,isAppt){
     if(!confirm(msg))return;
     DB.appointments=DB.appointments.filter(function(x){return x.id!==id;});
     if(DB.consumptions)DB.consumptions=DB.consumptions.filter(function(x){return x.apptId!==id;});
-    if(cloudMode&&sess){markDeleted("appointments",id);cloudDeleteRows("appointments",[id]).catch(function(e){});}
+    markDeleted("appointments",id);
+    if(cloudMode&&sess){cloudDeleteRows("appointments",[id]).catch(function(e){});}
   }else{
     var cn=(DB.consumptions||[]).find(function(x){return x.id===id;});
     if(cn)msg="确定删除 "+(cn.date||"")+" "+(cn.customer||"散客")+" 的消费记录（"+fmtMoney(cn.amount||0)+"）？";
     if(!confirm(msg))return;
     DB.consumptions=(DB.consumptions||[]).filter(function(x){return x.id!==id;});
-    if(cloudMode&&sess){markDeleted("consumptions",id);cloudDeleteRows("consumptions",[id]).catch(function(e){});}
+    markDeleted("consumptions",id);
+    if(cloudMode&&sess){cloudDeleteRows("consumptions",[id]).catch(function(e){});}
   }
   saveDB();renderCustomerConsumptionManager();toast("记录已删除");
 }
