@@ -296,6 +296,20 @@ tr:hover td{background:#fafbfc}
   .month-grid{font-size:12px}
   .month-cell{min-height:56px;padding:3px}
 }
+
+/* ===== 访客线索 ===== */
+.visit-row{display:grid;grid-template-columns:112px 96px 108px minmax(0,1fr) 76px;gap:10px;padding:11px 16px;border-bottom:1px solid var(--border);font-size:13px;align-items:center}
+.visit-row:nth-child(even){background:var(--bg-1)}
+.visit-row.head{font-weight:600;color:var(--text-2);background:var(--bg-2)}
+.visit-row .vpath{color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.visit-badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;border:1px solid var(--border);color:var(--text-2);white-space:nowrap}
+.visit-badge.hot{color:var(--danger);border-color:var(--danger-b);background:var(--danger-l)}
+.visit-badge.mid{color:var(--warn);border-color:#eadfc4;background:var(--warn-l)}
+@media(max-width:760px){
+  .visit-row{grid-template-columns:1fr 1fr;gap:4px 10px;padding:10px 14px}
+  .visit-row.head{display:none}
+  .visit-row .vpath{grid-column:1/3}
+}
 </style>
 <script>
 /* 云端配置迁移：浏览器里若还留着已失效的旧项目地址，自动换成当前生产库 */
@@ -333,6 +347,7 @@ tr:hover td{background:#fafbfc}
       <button class="nav-item" data-view="buy" data-admin="1" type="button"><span class="ic">🛒</span><span>直接购买</span></button>
       <div class="nav-group" id="ngStat">经营分析</div>
       <button class="nav-item" data-view="report" data-admin="1" type="button"><span class="ic">📈</span><span>统计报表</span></button>
+      <button class="nav-item" data-view="visit" data-admin="1" type="button"><span class="ic">👀</span><span>访客线索</span></button>
       <div class="nav-group" id="ngBase">基础档案</div>
       <button class="nav-item" data-view="customers" data-admin="1" type="button"><span class="ic">👤</span><span>客户档案</span></button>
       <button class="nav-item" data-view="members" data-admin="1" type="button"><span class="ic">👥</span><span>成员档案</span></button>
@@ -628,6 +643,35 @@ tr:hover td{background:#fafbfc}
             </div>
             <div class="hint" style="margin-top:12px;line-height:1.9">官网地址：<b>https://yx668.github.io/YX/site/</b>　改完保存后刷新官网即可看到最新内容（约 1 分钟内生效，手机上也一样）。价格表按「项目|周期|说明|普通价|共享股东价」每行一条填写</div>
           </div>
+        </div>
+      </section>
+
+      <section class="page" id="page-visit">
+        <div class="section">
+          <div class="section-head">
+            <div><h2>访客线索</h2><div class="desc">官网真实访客记录（匿名采集）。带「股东推荐」的是股东分享链接带进来的人，带「点了免费洗脸」的是点了免费领取按钮的高意向访客</div></div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <select id="visitRange" onchange="renderVisit(true)" style="padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:#fff">
+                <option value="24" selected>最近 24 小时</option>
+                <option value="72">最近 3 天</option>
+                <option value="168">最近 7 天</option>
+                <option value="0">全部</option>
+              </select>
+              <button class="btn btn-ghost btn-sm" type="button" onclick="renderVisit(true)">刷新</button>
+            </div>
+          </div>
+          <div class="section-body">
+            <div class="stats" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:0">
+              <div class="stat"><div class="label">访问次数</div><div class="value" id="visitTotal">0</div></div>
+              <div class="stat"><div class="label">独立访客</div><div class="value" id="visitUniq">0</div></div>
+              <div class="stat"><div class="label">股东带来</div><div class="value" id="visitShare">0</div></div>
+              <div class="stat"><div class="label">最近来访</div><div class="value" id="visitLast">—</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-head"><div><h2>访客明细</h2><div class="desc" id="visitBrief">统计范围：最近 24 小时</div></div></div>
+          <div class="section-body no-pad" id="visitListBox"><div class="hint" style="padding:18px">切到本页会自动读取云端访客记录</div></div>
         </div>
       </section>
 
@@ -4414,7 +4458,7 @@ function buildSample(){
 }
 
 /* ================= 渲染 ================= */
-var currentView=(function(){try{var v=localStorage.getItem("bkgbook_view");return (v&&["dashboard","calendar","list","buy","customers","members","config","data","report","share"].indexOf(v)>=0)?v:"dashboard";}catch(e){return "dashboard";}})(),calMode="month",calAnchor=todayStr(),editingMemberId=null,editingServiceId=null,editingApptId=null;
+var currentView=(function(){try{var v=localStorage.getItem("bkgbook_view");return (v&&["dashboard","calendar","list","buy","customers","members","config","data","report","share","visit"].indexOf(v)>=0)?v:"dashboard";}catch(e){return "dashboard";}})(),calMode="month",calAnchor=todayStr(),editingMemberId=null,editingServiceId=null,editingApptId=null;
 var PALETTE=["#2563eb","#7c3aed","#db2777","#ea580c","#16a34a","#0891b2","#ca8a04","#dc2626","#4f46e5","#059669"];
 
 function $(id){return document.getElementById(id);}
@@ -4696,20 +4740,21 @@ function renderNav(){
   $("ngCash").classList.toggle("hidden",locked||shareMode);
   document.querySelectorAll("[data-admin]").forEach(function(el){el.style.display=(locked||shareMode)?"none":"";});
   if(shareMode)currentView="share";
-  else if(locked&&["customers","members","config","data","report","buy","site"].indexOf(currentView)>=0)currentView="dashboard";
-  var titles={dashboard:"工作台",calendar:"预约日历",list:"预约列表",buy:"直接购买",customers:"客户档案",members:"成员档案",config:"项目与时段",data:"备份与恢复",report:"统计报表",share:"我的共享板块",site:"官网内容"};
+  else if(locked&&["customers","members","config","data","report","buy","site","visit"].indexOf(currentView)>=0)currentView="dashboard";
+  var titles={dashboard:"工作台",calendar:"预约日历",list:"预约列表",buy:"直接购买",customers:"客户档案",members:"成员档案",config:"项目与时段",data:"备份与恢复",report:"统计报表",share:"我的共享板块",site:"官网内容",visit:"访客线索"};
   $("pageTitle").textContent=titles[currentView]||"";
-  ["dashboard","calendar","list","buy","customers","members","config","data","report","share","site"].forEach(function(v){
+  ["dashboard","calendar","list","buy","customers","members","config","data","report","share","site","visit"].forEach(function(v){
     $("page-"+v).classList.toggle("active",v===currentView);
   });
   if(currentView==="share")renderShareBoard();
   if(currentView==="report")renderReports();
   if(currentView==="config")renderSchedule();
   if(currentView==="site"){ if(siteLoaded)renderSiteForm(); else loadSiteContent(); }
+  if(currentView==="visit")renderVisit();
 }
 function switchView(v){
   if(shareSess&&v!=="share"){toast("共享股东仅可查看自己的共享板块","err");return;}
-  if(!isAdmin()&&["customers","members","config","data","report","buy","site"].indexOf(v)>=0){toast("普通用户仅可查看与新建预约","err");return;}
+  if(!isAdmin()&&["customers","members","config","data","report","buy","site","visit"].indexOf(v)>=0){toast("普通用户仅可查看与新建预约","err");return;}
   currentView=v;
   try{localStorage.setItem("bkgbook_view",v);}catch(e){}
   renderNav();
@@ -8219,6 +8264,80 @@ function clearTestData(){
   }
   doLocal();
 }
+/* ================= 访客线索（官网 site_visits） ================= */
+var VISIT_ROWS=[];
+var VISIT_CITY_CN={Baise:"百色",Nanning:"南宁",Liuzhou:"柳州",Guilin:"桂林",Guigang:"贵港",Hechi:"河池",Yulin:"玉林",Wuzhou:"梧州",Qinzhou:"钦州",Beihai:"北海",Fangchenggang:"防城港",Laibin:"来宾",Chongzuo:"崇左",Hezhou:"贺州",Guangzhou:"广州",Shenzhen:"深圳",Dongguan:"东莞",Foshan:"佛山",Zhuhai:"珠海",Zhongshan:"中山",Huizhou:"惠州",Jieyang:"揭阳",Shantou:"汕头",Beijing:"北京",Shanghai:"上海",Tianjin:"天津",Chongqing:"重庆",Chengdu:"成都",Guiyang:"贵阳",Kunming:"昆明",Changsha:"长沙",Wuhan:"武汉",Hangzhou:"杭州",Nanjing:"南京",Suzhou:"苏州",Xian:"西安",Zhengzhou:"郑州",Jinan:"济南",Qingdao:"青岛",Xiamen:"厦门",Fuzhou:"福州",Haikou:"海口",Sanya:"三亚",Shenyang:"沈阳",Changchun:"长春",Harbin:"哈尔滨",Urumqi:"乌鲁木齐",Lhasa:"拉萨"};
+function vEsc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+function visitCityName(c){
+  var s=String(c||"").trim();
+  if(!s)return "本地 / 未知";
+  var base=s.replace(/\s+(Shi|City|Xian|County|Zhou)$/i,"").split(",")[0].trim();
+  var first=base.split(/\s+/)[0];
+  return VISIT_CITY_CN[first]||VISIT_CITY_CN[base]||base;
+}
+function visitWhen(ts){
+  try{
+    var d=new Date(ts);
+    return (d.getMonth()+1)+"-"+d.getDate()+" "+("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2);
+  }catch(e){return "";}
+}
+function visitAgo(ts){
+  var t=new Date(ts).getTime(), s=(Date.now()-t)/1000;
+  if(!isFinite(s)||s<60)return "刚刚";
+  if(s<3600)return Math.floor(s/60)+" 分钟前";
+  if(s<86400)return Math.floor(s/3600)+" 小时前";
+  return Math.floor(s/86400)+" 天前";
+}
+function visitKind(p){
+  p=String(p||"");
+  if(p.indexOf("book=free")>=0)return '<span class="visit-badge hot">点了免费洗脸</span>';
+  if(p.indexOf("ref=")>=0)return '<span class="visit-badge mid">股东推荐</span>';
+  return '<span class="visit-badge">浏览</span>';
+}
+function visitPageName(p){
+  p=String(p||"");
+  if(p.indexOf("/site/")>=0)return "官网首页";
+  if(p.indexOf("file:")>=0||p.indexOf("/C:/")>=0)return "本地预览";
+  return p.slice(0,52);
+}
+function renderVisit(force){
+  var box=$("visitListBox"); if(!box)return;
+  var sel=$("visitRange"); var hours=sel?parseInt(sel.value||"24",10):24;
+  if(!force&&VISIT_ROWS.length){visitPaint(hours);return;}
+  box.innerHTML='<div class="hint" style="padding:18px">正在读取云端访客记录…</div>';
+  var note=$("visitBrief"); if(note)note.textContent=hours>0?("统计范围：最近 "+hours+" 小时"):"统计范围：全部记录";
+  cloudSelect("site_visits?select=created_at,day,path,ref,visitor,city,ip&order=created_at.desc&limit=500").then(function(rows){
+    VISIT_ROWS=rows||[];visitPaint(hours);
+  }).catch(function(e){
+    box.innerHTML='<div class="hint" style="padding:18px;color:var(--danger)">读取失败：'+vEsc(e&&e.message?e.message:"请检查云端连接与管理员登录状态")+'</div>';
+  });
+}
+function visitPaint(hours){
+  var box=$("visitListBox"); if(!box)return;
+  var since=hours>0?Date.now()-hours*3600*1000:0;
+  var rows=VISIT_ROWS.filter(function(r){return r&&r.created_at&&(!since||new Date(r.created_at).getTime()>=since);});
+  var uniq={},uv=0,shareN=0,last="";
+  rows.forEach(function(r){
+    var vk=r.visitor||("ip:"+(r.ip||"")+"|"+r.created_at);
+    if(!uniq[vk]){uniq[vk]=1;uv++;}
+    if(String(r.path||"").indexOf("ref=")>=0)shareN++;
+    if(!last||new Date(r.created_at)>new Date(last))last=r.created_at;
+  });
+  var tot=$("visitTotal"),un=$("visitUniq"),sh=$("visitShare"),ls=$("visitLast");
+  if(tot)tot.textContent=rows.length;
+  if(un)un.textContent=uv;
+  if(sh)sh.textContent=shareN;
+  if(ls)ls.textContent=last?visitAgo(last):"—";
+  var html='<div class="visit-row head"><div>时间</div><div>地区</div><div>来源</div><div>页面 / IP</div><div>多久前</div></div>';
+  if(!rows.length)html+='<div class="hint" style="padding:18px">这段时间还没有访客记录。官网有人打开后，这里就会出现对应记录。</div>';
+  rows.slice(0,150).forEach(function(r){
+    html+='<div class="visit-row"><div>'+vEsc(visitWhen(r.created_at))+'</div><div>'+vEsc(visitCityName(r.city))+'</div><div>'+visitKind(r.path)+'</div><div class="vpath">'+vEsc(visitPageName(r.path))+(r.ip?' · '+vEsc(r.ip):'')+'</div><div>'+vEsc(visitAgo(r.created_at))+'</div></div>';
+  });
+  if(rows.length>150)html+='<div class="hint" style="padding:12px 16px">仅显示最近 150 条，共 '+rows.length+' 条；缩短时间范围可看更精确的明细。</div>';
+  box.innerHTML=html;
+  var note=$("visitBrief"); if(note)note.textContent=hours>0?("统计范围：最近 "+hours+" 小时"):"统计范围：全部记录";
+}
+
 function renderDataPage(){
   $("dDataMembers").textContent=DB.members.length;
   $("dDataServices").textContent=DB.services.length;
