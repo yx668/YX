@@ -345,9 +345,14 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
 }
 .deals-note{margin-top:14px;font-size:11px;letter-spacing:.08em;color:var(--silver-dim);opacity:.7}
 /* ---------- 访客动态（页面末尾） ---------- */
-.visitor-list{display:grid;grid-template-columns:1fr;gap:10px}
-@media(min-width:700px){.visitor-list{grid-template-columns:1fr 1fr}}
-.visitor{display:flex;align-items:center;gap:10px;padding:12px 16px;border:1px solid var(--line);background:rgba(20,36,47,.6);font-size:13px;color:var(--silver-dim)}
+.visitor-list{position:relative;overflow:hidden;border:1px solid var(--line);background:rgba(20,36,47,.55)}
+.visitor-list::before,.visitor-list::after{content:"";position:absolute;left:0;right:0;height:44px;z-index:2;pointer-events:none}
+.visitor-list::before{top:0;background:linear-gradient(180deg,var(--ink) 0%,rgba(13,24,32,0) 100%)}
+.visitor-list::after{bottom:0;background:linear-gradient(0deg,var(--ink) 0%,rgba(13,24,32,0) 100%)}
+.visitor-track{animation:visitorUp linear infinite;will-change:transform}
+.visitor-list:hover .visitor-track{animation-play-state:paused}
+@keyframes visitorUp{from{transform:translateY(0)}to{transform:translateY(-50%)}}
+.visitor{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line);font-size:13px;color:var(--silver-dim)}
 .visitor .dot{width:6px;height:6px;flex:none;border-radius:50%;background:var(--gold);box-shadow:0 0 0 3px rgba(196,161,90,.15)}
 .visitor b{font-weight:500;color:var(--silver)}
 .visitor time{margin-left:auto;font-size:11px;color:var(--gold);letter-spacing:.02em}
@@ -1078,12 +1083,21 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
           list.push({ area: area, kind: kind, t: r.created_at });
         });
         if(!list.length){
+          box.style.height = 'auto';
           box.innerHTML = '<div class="visitor"><span class="dot"></span><b>暂无访客动态</b><span>欢迎成为第一位访客</span><time></time></div>';
           return;
         }
-        box.innerHTML = list.slice(0, 8).map(function(v){
+        var html = list.slice(0, 8).map(function(v){
           return '<div class="visitor"><span class="dot"></span><b>' + v.area + '</b><span>' + v.kind + '</span><time>' + timeAgo(v.t) + '</time></div>';
         }).join('');
+        var grp = '<div class="visitor-grp">' + html + '</div>';
+        box.innerHTML = '<div class="visitor-track">' + grp + grp + '</div>';
+        var track = box.querySelector('.visitor-track');
+        var first = box.querySelector('.visitor-grp');
+        if(track && first){
+          box.style.height = Math.min(272, first.offsetHeight) + 'px';
+          track.style.animationDuration = (list.length * 5.4).toFixed(0) + 's';
+        }
       }).catch(function(){});
   }
   function visitorsTimer(){ try{ setInterval(visitorsRender, 60000); }catch(e){} }
