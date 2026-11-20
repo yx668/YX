@@ -94,23 +94,21 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
 .about-more{margin-top:0}
 .about-more-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:12px}
 .about-more-head b{font-family:var(--serif);font-size:16px;color:var(--paper);letter-spacing:.08em;font-weight:600}
-.about-more-hint{font-size:11px;letter-spacing:.12em;color:var(--gold);white-space:nowrap}
-.about-scroll{max-height:380px;overflow-y:auto;padding-right:16px;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:rgba(200,169,106,.5) rgba(216,212,204,.08);
-  -webkit-mask-image:linear-gradient(to bottom,#000 0,#000 calc(100% - 30px),rgba(0,0,0,.15) 100%);
-  mask-image:linear-gradient(to bottom,#000 0,#000 calc(100% - 30px),rgba(0,0,0,.15) 100%)}
-.about-scroll::-webkit-scrollbar{width:4px}
-.about-scroll::-webkit-scrollbar-track{background:rgba(216,212,204,.08)}
-.about-scroll::-webkit-scrollbar-thumb{background:rgba(200,169,106,.5)}
+.about-scroll{position:relative;height:200px;overflow:hidden}
+.about-scroll::before,.about-scroll::after{content:"";position:absolute;left:0;right:0;height:20px;z-index:2;pointer-events:none}
+.about-scroll::before{top:0;background:linear-gradient(180deg,var(--ink) 0%,rgba(13,24,32,0) 100%)}
+.about-scroll::after{bottom:0;background:linear-gradient(0deg,var(--ink) 0%,rgba(13,24,32,0) 100%)}
+.about-scroll-inner{animation:aboutUp 26s linear infinite;will-change:transform}
+.about-scroll:hover .about-scroll-inner{animation-play-state:paused}
+@keyframes aboutUp{from{transform:translateY(0)}to{transform:translateY(-50%)}}
 .about-scroll h4{font-family:var(--serif);font-size:12px;color:var(--gold);letter-spacing:.14em;margin:0 0 9px;font-weight:600}
-.about-scroll h4:not(:first-child){margin-top:20px}
+.about-copy h4:not(:first-child){margin-top:20px}
 .about-scroll p{font-size:13.5px;line-height:1.95;color:var(--silver-dim);margin:0 0 4px}
 @media(min-width:768px){
   .about-grid{grid-template-columns:.85fr 1.6fr;column-gap:60px;align-items:center}
   .about-quote{position:sticky;top:96px}
   .about-quote p{font-size:clamp(24px,2.2vw,30px)}
-  .about-more-hint{display:none}
-  .about-scroll{max-height:none;overflow:visible;padding-right:0;scrollbar-width:auto;
-    -webkit-mask-image:none;mask-image:none}
+  .about-scroll{height:240px}
   .about-body p{font-size:15px;line-height:2.05}
   .about-scroll p{font-size:14px;line-height:2.05}
 }
@@ -432,17 +430,20 @@ button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit
         <div class="about-more">
           <div class="about-more-head">
             <b>公司简介</b>
-            <span class="about-more-hint">上下滑动查看</span>
           </div>
-          <div class="about-scroll">
-            <h4>企业定位</h4>
+          <div class="about-scroll"><div class="about-scroll-inner"><div class="about-copy"><h4>企业定位</h4>
             <p data-c="about.p1">隆林银绣智享生物科技有限公司，是一家专注于女性由内至外变美的初创赋能型服务企业。公司扎根隆林德峨，以苗族文化为根基，以“苗裙租售+面部清洁修复+胯部塑形”为核心业务，通过创新的“免费共享股东”模式，助力隆林苗族家人实现居家0元创业，为乡村振兴贡献绵薄之力。</p>
             <h4>文化根脉</h4>
             <p data-c="about.p2">银绣，生于隆林德峨，源于苗族，承千年非遗，传民族之韵。</p>
             <p data-c="about.p3">桂西隆林德峨，是苗族银绣文化的沃土。这里的苗绣银饰，是苗族没有文字的史书。苗族先民迁徙千年，把历史绣进衣袂，把信仰錾入银饰。无银无花不成姑娘，无绣无彩不成盛装，银与绣，早已是苗族人的精神图腾，是刻在骨子里的文化基因。</p>
             <h4>品牌使命</h4>
-            <p data-c="about.p4">银绣，不只是一个品牌，更是苗族银绣文化的传承者、传播者、守护者。我们以银为媒，以绣为语，让千年非遗活起来，让匠心手艺火起来，让民族文化传下去，让每一件银绣作品都成为民族文化的鲜活载体，惊艳时光，温暖岁月。</p>
-          </div>
+            <p data-c="about.p4">银绣，不只是一个品牌，更是苗族银绣文化的传承者、传播者、守护者。我们以银为媒，以绣为语，让千年非遗活起来，让匠心手艺火起来，让民族文化传下去，让每一件银绣作品都成为民族文化的鲜活载体，惊艳时光，温暖岁月。</p></div><div class="about-copy"><h4>企业定位</h4>
+            <p data-c="about.p1">隆林银绣智享生物科技有限公司，是一家专注于女性由内至外变美的初创赋能型服务企业。公司扎根隆林德峨，以苗族文化为根基，以“苗裙租售+面部清洁修复+胯部塑形”为核心业务，通过创新的“免费共享股东”模式，助力隆林苗族家人实现居家0元创业，为乡村振兴贡献绵薄之力。</p>
+            <h4>文化根脉</h4>
+            <p data-c="about.p2">银绣，生于隆林德峨，源于苗族，承千年非遗，传民族之韵。</p>
+            <p data-c="about.p3">桂西隆林德峨，是苗族银绣文化的沃土。这里的苗绣银饰，是苗族没有文字的史书。苗族先民迁徙千年，把历史绣进衣袂，把信仰錾入银饰。无银无花不成姑娘，无绣无彩不成盛装，银与绣，早已是苗族人的精神图腾，是刻在骨子里的文化基因。</p>
+            <h4>品牌使命</h4>
+            <p data-c="about.p4">银绣，不只是一个品牌，更是苗族银绣文化的传承者、传播者、守护者。我们以银为媒，以绣为语，让千年非遗活起来，让匠心手艺火起来，让民族文化传下去，让每一件银绣作品都成为民族文化的鲜活载体，惊艳时光，温暖岁月。</p></div></div></div>
         </div>
       </div>
     </div>
