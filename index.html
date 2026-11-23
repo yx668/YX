@@ -5173,10 +5173,15 @@ function shareQuotaCall(fn,body){
   };
   // 串行 + 同一请求去重：避免页面加载瞬间并发多个跨域预检被网关拦掉
   var p=_sqChain.then(function(){
-    return once().then(function(j){
-      if(j)return j;
-      return new Promise(function(res){setTimeout(function(){res(once());},900);});
-    });
+    var delays=[0,1500,4000];
+    var attempt=function(i){
+      return once().then(function(j){
+        if(j)return j;
+        if(i>=delays.length-1)return null;
+        return new Promise(function(res){setTimeout(function(){res(attempt(i+1));},delays[i+1]);});
+      });
+    };
+    return attempt(0);
   });
   _sqChain=p.then(function(){},function(){});
   _sqInflight[key]=p;
@@ -5189,7 +5194,7 @@ function renderShareQuota(force){
   var box=$("shareQuota");
   if(!box||!shareSess)return;
   var paint=function(q){
-    if(!q||q.ok!==true){box.innerHTML='<div class="hint">额度读取失败，请点右上「刷新数据」重试。</div>';return;}
+    if(!q||q.ok!==true){box.innerHTML='<div class="hint">额度读取失败（网络或云端暂不可用）。<a href="javascript:;" onclick="renderShareQuota(true)" style="color:var(--primary);font-weight:700">点这里重试</a></div>';return;}
     var freeLeft=+q.free_left||0, base=+q.free_base||4, bonusLeft=+q.bonus_left||0, price=+q.price||19.9;
     var shareLeft=+q.remaining||0, limit=+q.limit||6, used=+q.used||0, total=freeLeft+bonusLeft;
     box.innerHTML=
