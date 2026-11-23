@@ -5169,7 +5169,7 @@ function shareQuotaCall(fn,body){
   var key=fn+"|"+JSON.stringify(body||{});
   if(_sqInflight[key])return _sqInflight[key];
   var once=function(){
-    return authReq("/rpc/"+fn,body||{}).then(function(r){return (r&&r.ok)?r.json:null;},function(){return null;});
+    return authReq("/rest/v1/rpc/"+fn,body||{}).then(function(r){return (r&&r.ok)?r.json:null;},function(){return null;});
   };
   // 串行 + 同一请求去重：避免页面加载瞬间并发多个跨域预检被网关拦掉
   var p=_sqChain.then(function(){
