@@ -7415,6 +7415,13 @@ function saveCheckout(){
   if(isGift)a.note=(a.note?a.note+" · ":"")+"免费名额核销（不收款）";
   if(sv){a.unitPrice=custPrice(sv,cust);a.serviceCost=(+sv.cost||0);}else{a.unitPrice=null;a.serviceCost=null;}
   saveDB();
+  // 结账结果立即写云端（云端权威落库）：避免定时整表推送与拉取的时间戳竞态
+  // 把刚结账的完成状态被云端旧值回滚，导致股东免费/兑换次数不减、统计对不上
+  try{
+    if(cloudMode&&sess&&navigator.onLine){
+      authReq("/rest/v1/rpc/appt_checkout",{p_id:a.id,p_amount:(Math.max(0,parseFloat(amt)||0)),p_note:(a.note||null),p_method:(method||null)}).catch(function(){});
+    }
+  }catch(e){}
   closeModal("checkoutMask");
   toast(redeemNote?("已核销套餐卡："+redeemNote):(isGift?"已核销免费领取名额（不收款）":(amt>0?("已收款 "+fmtMoney(amt)+"（"+(PAY_METHODS[method]||method)+"）"):"已结账（金额为 0）")));
   upsertConsumptionFromAppt(a,"checkout");
