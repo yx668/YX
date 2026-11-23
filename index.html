@@ -5163,16 +5163,26 @@ function renderShareBoard(){
   try{ if(typeof renderShareQuota==="function") renderShareQuota(); }catch(e){}
 }
 /* ---------- 共享股东额度（本月免费 4 次 + 累计兑换 + 本月分享名额） ---------- */
+var _sqChain=Promise.resolve(),_sqInflight={};
 function shareQuotaCall(fn,body){
   if(!cloudCfg||!cloudCfg.url)return Promise.resolve(null);
+  var key=fn+"|"+JSON.stringify(body||{});
+  if(_sqInflight[key])return _sqInflight[key];
   var once=function(){
     return authReq("/rpc/"+fn,body||{}).then(function(r){return (r&&r.ok)?r.json:null;},function(){return null;});
   };
-  // Supabase 偶发 CORS/网关抖动，失败自动重试 1 次
-  return once().then(function(j){
-    if(j)return j;
-    return new Promise(function(res){setTimeout(function(){res(once());},900);});
+  // 串行 + 同一请求去重：避免页面加载瞬间并发多个跨域预检被网关拦掉
+  var p=_sqChain.then(function(){
+    return once().then(function(j){
+      if(j)return j;
+      return new Promise(function(res){setTimeout(function(){res(once());},900);});
+    });
   });
+  _sqChain=p.then(function(){},function(){});
+  _sqInflight[key]=p;
+  var clear=function(){try{delete _sqInflight[key];}catch(e){}};
+  p.then(clear,clear);
+  return p;
 }
 var _shareQCache=null,_shareQTime=0;
 function renderShareQuota(force){
