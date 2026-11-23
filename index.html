@@ -380,6 +380,10 @@ tr:hover td{background:#fafbfc}
           <div class="section-body" id="shareInfo"></div>
         </div>
         <div class="section">
+          <div class="section-head"><div><h2>我的免费洗脸额度</h2><div class="desc">本月免费次数 + 累计兑换次数；先用本月次数，再用兑换次数，用完按股东价收费</div></div></div>
+          <div class="section-body" id="shareQuota"><div class="hint">正在读取额度…</div></div>
+        </div>
+        <div class="section">
           <div class="section-head"><div><h2>我的佣金等级</h2><div class="desc">当前适用佣金比例（按当月流水与本人累计消费取较高档位）</div></div></div>
           <div class="section-body" id="shareCommission"></div>
         </div>
@@ -394,7 +398,7 @@ tr:hover td{background:#fafbfc}
           <div class="section-body" id="shareMyPkgs"></div>
         </div>
         <div class="section">
-          <div class="section-head"><div><h2>我预约的项目 <span class="tag tag-blue" id="shareSelfCnt"></span></h2><div class="desc">我作为客户的预约与消费记录（含管理员或他人代登记、苗衣出租）</div></div></div>
+          <div class="section-head"><div><h2>我预约的项目 <span class="tag tag-blue" id="shareSelfCnt"></span></h2><div class="desc">我自己给自己预约的记录与消费（含苗衣出租）</div></div><button class="btn btn-primary btn-sm" type="button" onclick="openShareBook(shareSess&&shareSess.cid)">＋ 我要预约</button></div>
           <div class="section-body no-pad" id="shareSelf"></div>
         </div>
         <div class="section">
@@ -619,6 +623,17 @@ tr:hover td{background:#fafbfc}
               <label style="font-size:13px;color:var(--text-2)">结束 <input type="time" id="cfgEnd"></label>
               <button class="btn btn-primary btn-sm" type="button" onclick="saveSchedule()" data-admin="1">保存时段</button>
             </div>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-head"><div><h2>共享股东额度设置</h2><div class="desc">每月免费分享名额、股东洗脸价；可单独重置某股东本月名额、手动加减兑换次数</div></div><button class="btn btn-ghost btn-sm" type="button" onclick="renderShareQuotaAdmin()">刷新额度</button></div>
+          <div class="section-body">
+            <div class="form-grid">
+              <div class="form-item"><label>每月免费分享名额（个）</label><input id="sqLimit" type="number" min="0" step="1" value="6"></div>
+              <div class="form-item"><label>股东价（元/次，免费次数用完后按此收费）</label><input id="sqPrice" type="number" min="0" step="0.01" value="19.9"></div>
+            </div>
+            <div style="margin-top:12px"><button class="btn btn-primary btn-sm" type="button" onclick="saveShareQuotaCfg()">保存设置</button><span class="hint" style="margin-left:10px">改完立即对所有股东生效</span></div>
+            <div id="sqList" style="margin-top:16px"><div class="hint">点右上「刷新额度」读取各股东本月数据</div></div>
           </div>
         </div>
       </section>
@@ -3433,7 +3448,7 @@ function fmtDateCn(s){
   var t=s===todayStr()?"今天 · ":"";
   return t+(d.getMonth()+1)+"月"+d.getDate()+"日 "+w[d.getDay()];
 }
-var statusMap={pending:["待确认","tag-warn"],confirmed:["已确认","tag-blue"],done:["已完成","tag-green"],cancelled:["已取消","tag-gray"],rented:["出租中","tag-warn"],returned:["已归还","tag-green"]};
+var statusMap={pending:["待确认","tag-warn"],confirmed:["已确认","tag-blue"],done:["已完成","tag-green"],cancelled:["已取消","tag-gray"],rented:["出租中","tag-warn"],returned:["已归还","tag-green"],expired:["已过期","tag-gray"]};
 var memberStatusMap={active:["在职","tag-green"],leave:["休假","tag-warn"],inactive:["离职","tag-gray"]};
 
 /* ================= 云端同步（Supabase 轻量 REST/Auth 客户端） ================= */
@@ -4779,12 +4794,11 @@ function lv2CustomersOf(shareId){
   return out;
 }
 function openShareBook(cid){
-  // 共享股东为名下客户（不含自己）一键建预约
+  // 共享股东只能为自己预约（不再为名下客户代约）
   if(shareSess){
-    if(!cid){toast("请先选择要预约的客户","err");return;}
-    if(cid===shareSess.cid){toast("您不能为自己预约，请让门店管理员或他人为您登记","err");return;}
-    var mine=lv1IdsOf(shareSess.cid);
-    if(!mine[cid]){toast("只能为您名下的客户预约","err");return;}
+    if(!cid){toast("请选择预约人","err");return;}
+    var selfId=shareSess.cid;
+    if(cid!==selfId){toast("共享股东只能为自己预约","err");return;}
   }
   openApptModal(null);
   var pick=$("aCustPick");
@@ -5021,14 +5035,13 @@ function renderShareBoard(){
   }
   else{
     // 搜索框位于「客户」表头文字后面，随列表重建；输入值渲染后恢复
-    lv1Html="<table><tr><th style=\"text-align:left\"><span style=\"display:inline-flex;align-items:center;gap:8px\">客户 <input id=\"shareLv1Q\" class=\"input\" style=\"width:150px;height:26px\" placeholder=\"🔍 搜索客户…\" oninput=\"renderShareBoard()\"></span></th><th style=\"text-align:right\">本月消费</th><th style=\"text-align:right\">操作</th></tr>";
+    lv1Html="<table><tr><th style=\"text-align:left\"><span style=\"display:inline-flex;align-items:center;gap:8px\">客户 <input id=\"shareLv1Q\" class=\"input\" style=\"width:150px;height:26px\" placeholder=\"🔍 搜索客户…\" oninput=\"renderShareBoard()\"></span></th><th style=\"text-align:right\">本月消费</th></tr>";
     lv1List.forEach(function(c){
       var tag=c.type==="shareholder"?'<span class="tag tag-warn">共享股东</span>':'<span class="tag tag-blue">普通客户</span>';
       var mSpent=monthSpentOf(c.id,ym0);
       lv1Html+='<tr><td><div class="member-cell"><span class="avatar" style="background:'+esc(c.color||"#6b7280")+'">'+esc((c.name||"?")[0])+"</span>"+
         '<div class="info"><div class="name" style="cursor:pointer;color:var(--primary);text-decoration:underline" onclick="viewCustomerDetailForShare(\''+c.id+'\')" title="点击查看该客户全部消费详情">'+esc(c.name)+" "+tag+'</div><div class="role">'+esc(c.phone||"-")+"</div></div></div></td>"+
-        '<td style="text-align:right"><b style="color:'+(mSpent>0?"#16a34a":"var(--text-2)")+'">'+fmtMoney(mSpent)+"</b></td>"+
-        '<td style="text-align:right"><button class="btn btn-primary btn-xs" type="button" onclick="openShareBook(\''+c.id+'\')">＋ 为其预约</button></td></tr>';
+        '<td style="text-align:right"><b style="color:'+(mSpent>0?"#16a34a":"var(--text-2)")+'">'+fmtMoney(mSpent)+"</b></td></tr>";
     });
     lv1Html+="</table>";
   }
@@ -5147,7 +5160,90 @@ function renderShareBoard(){
     rh+="</table>";
   }
   $("shareRents").innerHTML=rh;
+  try{ if(typeof renderShareQuota==="function") renderShareQuota(); }catch(e){}
 }
+/* ---------- 共享股东额度（本月免费 4 次 + 累计兑换 + 本月分享名额） ---------- */
+function shareQuotaCall(fn,body){
+  if(!cloudCfg||!cloudCfg.url)return Promise.resolve(null);
+  return authReq("/rpc/"+fn,body||{}).then(function(r){return (r&&r.ok)?r.json:null;},function(){return null;});
+}
+var _shareQCache=null,_shareQTime=0;
+function renderShareQuota(force){
+  var box=$("shareQuota");
+  if(!box||!shareSess)return;
+  var paint=function(q){
+    if(!q||q.ok!==true){box.innerHTML='<div class="hint">额度读取失败，请点右上「刷新数据」重试。</div>';return;}
+    var freeLeft=+q.free_left||0, base=+q.free_base||4, bonusLeft=+q.bonus_left||0, price=+q.price||19.9;
+    var shareLeft=+q.remaining||0, limit=+q.limit||6, used=+q.used||0, total=freeLeft+bonusLeft;
+    box.innerHTML=
+      '<div style="display:flex;gap:12px;flex-wrap:wrap">'+
+      '<div style="flex:1;min-width:120px;background:var(--bg-1);border-radius:10px;padding:12px 14px;text-align:center"><div style="font-size:24px;font-weight:800;color:var(--primary);line-height:1.2">'+freeLeft+'<span style="font-size:13px;color:var(--text-3)"> / '+base+'</span></div><div class="hint">本月免费次数</div></div>'+
+      '<div style="flex:1;min-width:120px;background:var(--bg-1);border-radius:10px;padding:12px 14px;text-align:center"><div style="font-size:24px;font-weight:800;color:#16a34a;line-height:1.2">'+bonusLeft+'</div><div class="hint">累计兑换次数</div></div>'+
+      '<div style="flex:1;min-width:120px;background:var(--bg-1);border-radius:10px;padding:12px 14px;text-align:center"><div style="font-size:24px;font-weight:800;color:var(--text-1);line-height:1.2">'+shareLeft+'<span style="font-size:13px;color:var(--text-3)"> / '+limit+'</span></div><div class="hint">本月免费名额（已领 '+used+'）</div></div>'+
+      '</div>'+
+      '<div class="hint" style="margin-top:10px;line-height:1.95">当前可用免费洗脸 <b style="color:var(--primary);font-size:15px">'+total+'</b> 次（本月 '+freeLeft+' 次 + 兑换 '+bonusLeft+' 次）。先用本月次数，再用兑换次数；全部用完按股东价 <b>'+fmtMoney(price)+'</b>/次 收费。<br>本月免费名额每 2 人核销自动兑换 1 次，兑换次数不清零，可累计到下月。</div>';
+  };
+  if(!force&&_shareQCache&&Date.now()-_shareQTime<15000){paint(_shareQCache);return;}
+  shareQuotaCall("share_quota_info",{p_ref:shareSess.cid}).then(function(q){
+    if(q&&q.ok===true){_shareQCache=q;_shareQTime=Date.now();}
+    paint(q);
+  });
+}
+window.renderShareQuota=renderShareQuota;
+window.shareQuotaCall=shareQuotaCall;
+
+/* ---------- 后台：共享股东额度管理 ---------- */
+function renderShareQuotaAdmin(){
+  var box=$("sqList"); if(!box)return;
+  var holders=(DB.customers||[]).filter(function(c){return c.type==="shareholder"&&String(c.name||"").indexOf("__DEL__")!==0;});
+  if(!holders.length){box.innerHTML='<div class="hint">暂无共享股东</div>';return;}
+  box.innerHTML='<div class="hint">正在读取各股东额度…</div>';
+  Promise.all(holders.map(function(h){
+    return shareQuotaCall("share_quota_info",{p_ref:h.id}).then(function(q){return {h:h,q:q};});
+  })).then(function(rows){
+    var html='<table><tr><th>股东</th><th style="text-align:center">本月名额</th><th style="text-align:center">已领</th><th style="text-align:center">兑换余额</th><th style="text-align:center">本月免费</th><th style="text-align:right">操作</th></tr>';
+    rows.forEach(function(r){
+      var q=r.q||{},left=+q.remaining||0,used=+q.used||0,limit=+q.limit||0,bl=+q.bonus_left||0,fl=+q.free_left||0;
+      html+='<tr><td>'+esc(r.h.name)+'</td>'+
+        '<td style="text-align:center"><b>'+left+'</b> / '+limit+'</td>'+
+        '<td style="text-align:center">'+used+'</td>'+
+        '<td style="text-align:center"><b style="color:#16a34a">'+bl+'</b></td>'+
+        '<td style="text-align:center">'+fl+'</td>'+
+        '<td style="text-align:right;white-space:nowrap">'+
+          '<button class="btn btn-ghost btn-xs" type="button" onclick="shareQuotaReset(\''+r.h.id+'\')">重置本月</button> '+
+          '<button class="btn btn-ghost btn-xs" type="button" onclick="shareQuotaBonus(\''+r.h.id+'\',1)">兑换 +1</button> '+
+          '<button class="btn btn-ghost btn-xs" type="button" onclick="shareQuotaBonus(\''+r.h.id+'\',-1)">兑换 -1</button>'+
+        '</td></tr>';
+    });
+    html+='</table><div class="hint" style="padding:8px 14px;line-height:1.9">「重置本月」＝清空该股东本月已领名额（可重新分享），不影响已核销记录与兑换次数。<br>「兑换 ±1」＝手工加减累计兑换次数，用于补发或扣回。</div>';
+    box.innerHTML=html;
+    var f=rows[0]&&rows[0].q;
+    if(f&&f.ok===true){ if($("sqLimit"))$("sqLimit").value=f.limit; if($("sqPrice"))$("sqPrice").value=f.price; }
+  });
+}
+function saveShareQuotaCfg(){
+  var lim=parseInt($("sqLimit").value,10); if(isNaN(lim)||lim<0)lim=6;
+  var price=parseFloat($("sqPrice").value); if(isNaN(price)||price<0)price=19.9;
+  shareQuotaCall("share_quota_admin",{p_owner:"",p_limit:lim,p_price:price,p_bonus_delta:0,p_reset:false}).then(function(r){
+    if(r&&r.ok===true){toast("已保存：每月名额 "+lim+" 个，股东价 "+fmtMoney(price));renderShareQuotaAdmin();}
+    else toast("保存失败，请稍后重试","err");
+  });
+}
+function shareQuotaReset(cid){
+  if(!confirm("确定把这名股东本月的已领名额清零吗？已核销记录和兑换次数不变。"))return;
+  shareQuotaCall("share_quota_admin",{p_owner:cid,p_limit:null,p_price:null,p_bonus_delta:0,p_reset:true}).then(function(r){
+    if(r&&r.ok===true){toast("已重置本月名额");renderShareQuotaAdmin();}else toast("重置失败，请稍后重试","err");
+  });
+}
+function shareQuotaBonus(cid,d){
+  shareQuotaCall("share_quota_admin",{p_owner:cid,p_limit:null,p_price:null,p_bonus_delta:d,p_reset:false}).then(function(r){
+    if(r&&r.ok===true){toast("已调整兑换次数 "+(d>0?"+":"")+d);renderShareQuotaAdmin();}else toast("调整失败，请稍后重试","err");
+  });
+}
+window.renderShareQuotaAdmin=renderShareQuotaAdmin;
+window.saveShareQuotaCfg=saveShareQuotaCfg;
+window.shareQuotaReset=shareQuotaReset;
+window.shareQuotaBonus=shareQuotaBonus;
 document.getElementById("nav").addEventListener("click",function(e){
   var item=e.target.closest(".nav-item");
   if(item)switchView(item.getAttribute("data-view"));
@@ -6878,14 +6974,14 @@ function openApptModal(id){
   $("aClient").value=a?a.client:"";
   $("aPhone").value=a?a.phone:"";
   $("aNote").value=a?a.note||"":"";
-  // 关联客户档案下拉（共享股东只能选择名下客户，不能选自己）
+  // 关联客户档案下拉（共享股东只能选自己，用于给自己预约）
   var cp=$("aCustPick");
   var curCust=a?(a.customer_id||""):"";
   if(!curCust&&a&&a.client){
     var hitC=(DB.customers||[]).find(function(c){return c.name===a.client;});
     if(hitC)curCust=hitC.id;
   }
-  var custOpts=(DB.customers||[]).filter(function(c){return !shareSess||lv1IdsOf(shareSess.cid)[c.id];});
+  var custOpts=(DB.customers||[]).filter(function(c){return !shareSess||c.id===shareSess.cid;});
   cp.innerHTML='<option value="">（散客，不关联档案）</option>'+custOpts.map(function(c){
     return '<option value="'+c.id+'">'+esc(c.name)+(c.type==="shareholder"?"（共享股东）":"")+"</option>";
   }).join("");
@@ -7018,6 +7114,7 @@ $("btnGlobalAdd").addEventListener("click",function(){
 
 /* ================= 结账收款 ================= */
 var checkoutApptId=null;
+var coShareFreeMode=""; // 股东本人面部清洁：free=扣本月免费次数 / bonus=扣兑换次数 / paid=按股东价
 var coRedeemPkg=""; // 结账时选中的套餐卡 id（核销不收款）
 /* 客户可用于抵扣某项目的套餐卡（剩余次数>0，不含已退款） */
 function pkgCardsOf(cid,serviceId){
@@ -7150,9 +7247,16 @@ function custPrice(sv,cust){
 function isFreeGiftAppt(a){
   var n=String(a&&a.note||"");
   if(!n)return false;
-  if(n.indexOf("领取一次免费洗脸")>=0)return true;
+  var hit=(n.indexOf("领取一次免费洗脸")>=0);
   // 「某某股东赠送的免费洗脸」也是股东送的名额，不能误收款
-  if(n.indexOf("免费洗脸")>=0&&(n.indexOf("赠送")>=0||n.indexOf("领取")>=0))return true;
+  if(!hit&&n.indexOf("免费洗脸")>=0&&(n.indexOf("赠送")>=0||n.indexOf("领取")>=0))hit=true;
+  if(!hit)return false;
+  // 股东赠送名额自领取日起 7 天内有效，超期作废（不能按免费核销，按正常价格结算）
+  if(a.kind==="site"&&a.date){
+    var d0=new Date(String(a.date).slice(0,10)+"T00:00:00");
+    if(!isNaN(d0.getTime())&&(Date.now()-d0.getTime())>7*86400000)return false;
+  }
+  return true;
 }
 function openCheckout(id){
   if(!canEdit()){toast("仅管理员可以结账","err");return;}
@@ -7187,6 +7291,35 @@ function openCheckout(id){
     if($("coAmount").parentNode)$("coAmount").parentNode.appendChild(giftTip);
   }
   $("coMethod").value=isGift?"free":(paid?a.payMethod:"cash");
+  /* 共享股东本人做面部清洁：先扣本月免费次数 → 再扣累计兑换次数 → 都没有按股东价收费 */
+  coShareFreeMode="";
+  (function(){
+    var oldTip=document.getElementById("coShareQuotaTip");
+    if(oldTip&&oldTip.parentNode)oldTip.parentNode.removeChild(oldTip);
+    if(isGift||!cust||!isSh||!sv||sv.id!=="52ee8a1e-e7dc-4b88-b387-96e25d8665fa")return;
+    if(typeof shareQuotaCall!=="function")return;
+    shareQuotaCall("share_quota_info",{p_ref:cust.id}).then(function(q){
+      if(!q||q.ok!==true)return;
+      var free=+q.free_left||0,bonus=+q.bonus_left||0,price=+q.price||19.9;
+      var tip=document.createElement("div");
+      tip.id="coShareQuotaTip";
+      tip.style.cssText="margin-top:10px;background:#eef2ff;border:1px solid #c7d2fe;color:#3730a3;border-radius:8px;padding:9px 12px;font-size:13px;line-height:1.7";
+      if(free>0){
+        coShareFreeMode="free";
+        tip.innerHTML="<b>股东免费次数</b>：本月还剩 "+free+" 次，本次核销<b>扣 1 次、不收款</b>。";
+        $("coAmount").value=0;$("coAmount").disabled=true;$("coMethod").value="free";
+      }else if(bonus>0){
+        coShareFreeMode="bonus";
+        tip.innerHTML="<b>股东兑换次数</b>：累计还剩 "+bonus+" 次，本次核销<b>扣 1 次、不收款</b>。";
+        $("coAmount").value=0;$("coAmount").disabled=true;$("coMethod").value="free";
+      }else{
+        coShareFreeMode="paid";
+        tip.innerHTML="<b>免费次数已用完</b>：本次按股东价 <b>"+fmtMoney(price)+"</b> 收费（金额可手动改）。";
+        if(!((+$("coAmount").value||0)>0))$("coAmount").value=price;
+      }
+      if($("coAmount").parentNode)$("coAmount").parentNode.appendChild(tip);
+    });
+  })();
   // 套餐卡抵扣区：客户有含该项目次数的套餐卡时显示可选
   coRedeemPkg="";
   var cards=cust?pkgCardsOf(cust.id,sv?sv.id:""):[];
@@ -7233,16 +7366,23 @@ function saveCheckout(){
   var cust=custOfAppt(a);
   var redeemNote="";
   // 套餐卡核销：扣减对应项目次数，本次不收款；佣金=卡锁定每次核销佣金
+  var pkgUsed=false;
   if(coRedeemPkg){
     var card=(DB.packageBuys||[]).find(function(b){return b.id===coRedeemPkg;});
     if(card&&card.remaining&&sv&&card.remaining[sv.id]>0){
       card.remaining[sv.id]--;
+      pkgUsed=true;
       card.commUsed=Math.round(((+card.commUsed||0)+pkgCommEachOf(card))*100)/100; // 已核销佣金累计（预拿=总佣金−已核销）
       amt=0;
       a.redeemValue=custPrice(sv,cust); // 核销价值：客户消费流水
       a.commEarned=pkgCommEachOf(card); // 套餐佣金：每次核销 = (成交金额-成本)×购卡当月档位÷总次数（购卡时锁定）
       redeemNote=card.name+"（剩余 "+card.remaining[sv.id]+" "+(sv.isRent?"天":"次")+"）"+(a.commEarned>0?" · 佣金 "+fmtMoney(a.commEarned):"");
     }
+  }
+  if(!isGift&&!pkgUsed&&(coShareFreeMode==="free"||coShareFreeMode==="bonus")){
+    amt=0;method="free";
+    a.note=(a.note?a.note+" · ":"")+(coShareFreeMode==="free"?"股东免费次数核销":"股东兑换次数核销");
+    try{_shareQTime=0;_shareQCache=null;}catch(e){} // 清额度缓存，回列表立即刷新剩余次数
   }
   a.amount=amt;
   a.payMethod=method;
@@ -8841,12 +8981,30 @@ function openConsumptionModalFromCC(){
     sec.className = 'section';
     sec.innerHTML =
       '<div class="section-head"><div><h2>我的专属分享码</h2>' +
-      '<div class="desc">客户扫码直接填表领取一次免费洗脸，预约自动记在您名下</div></div>' +
+      '<div class="desc">客户扫码填表领取一次免费洗脸，预约自动记在您名下；每月最多 6 个免费名额（管理员可调）</div></div>' +
       '<button class="btn btn-primary btn-sm" type="button" id="btnMyShare">生成分享码</button></div>' +
       '<div class="section-body" id="myShareBox">' +
-      '<div class="hint">点右上角「生成分享码」，把二维码发给客户或发朋友圈即可。</div></div>';
+      '<div id="myShareQuota" class="hint">正在读取本月剩余名额…</div></div>';
     page.insertBefore(sec, page.firstChild);
     el('btnMyShare').onclick = gen;
+    refreshQuota();
+  }
+
+  function refreshQuota(){
+    var s = me(); if(!s || !el('myShareQuota')) return Promise.resolve(null);
+    var call = window.shareQuotaCall;
+    if(typeof call !== 'function') return Promise.resolve(null);
+    return call('share_quota_info', { p_ref: s.cid }).then(function(q){
+      var box = el('myShareQuota'), btn = el('btnMyShare');
+      if(!box) return q;
+      if(!q || q.ok !== true){ box.innerHTML = '名额读取失败，点「生成分享码」会自动重试。'; return q; }
+      var left = +q.remaining || 0, limit = +q.limit || 6, used = +q.used || 0;
+      box.innerHTML = left > 0
+        ? '本月免费名额剩余 <b style="color:#16a34a">' + left + '</b> / ' + limit + '（已领取 ' + used + ' 个，7 天未到店核销会自动退回名额）'
+        : '<span style="color:#b02a2e;font-weight:700">本月免费赠送次数已用完</span>：再分享的链接只打开官网，不带免费领取（有客户 7 天未到店核销，名额会自动退回）';
+      if(btn) btn.textContent = left > 0 ? ('生成分享码（剩 ' + left + ' 个名额）') : '生成普通分享码';
+      return q;
+    });
   }
 
   function drawRoundRect(c, x, y, w, h, r){
@@ -8864,7 +9022,7 @@ function openConsumptionModalFromCC(){
   }
 
   /* 整张分享海报：1080×1440，与官网分享卡同一套视觉 */
-  function buildPoster(name, url){
+  function buildPoster(name, url, plain){
     var W = 1080, H = 1440;
     var cv = document.createElement('canvas');
     cv.width = W; cv.height = H;
@@ -8883,12 +9041,12 @@ function openConsumptionModalFromCC(){
 
     c.fillStyle = '#F3EFE6';
     c.font = '700 82px "Noto Serif SC","Microsoft YaHei",serif';
-    c.fillText('扫我一下', W / 2, 248);
-    c.fillText('免费洗一次脸', W / 2, 350);
+    c.fillText(plain ? '扫我一下' : '扫我一下', W / 2, 248);
+    c.fillText(plain ? '进店看看' : '免费洗一次脸', W / 2, 350);
 
     c.fillStyle = '#9DB0C7';
     c.font = '400 32px "Noto Sans SC","Microsoft YaHei",sans-serif';
-    c.fillText(name ? (name + ' 邀您 · 填手机号就能领') : '填手机号就能领，到店核销', W / 2, 416);
+    c.fillText(plain ? (name ? (name + ' 邀您 · 扫码打开门店官网') : '扫码打开门店官网') : (name ? (name + ' 邀您 · 填手机号就能领') : '填手机号就能领，到店核销'), W / 2, 416);
 
     var cardX = 150, cardY = 470, cardW = 780, cardH = 780;
     c.fillStyle = '#FFFFFF';
@@ -8914,7 +9072,7 @@ function openConsumptionModalFromCC(){
 
     c.fillStyle = '#F3EFE6';
     c.font = '500 36px "Noto Sans SC","Microsoft YaHei",sans-serif';
-    c.fillText('长按图片 · 识别二维码 · 领取', W / 2, 1330);
+    c.fillText(plain ? '长按图片 · 识别二维码 · 打开官网' : '长按图片 · 识别二维码 · 领取', W / 2, 1330);
 
     c.fillStyle = '#B23A2E';
     c.font = '400 28px "Noto Sans SC","Microsoft YaHei",sans-serif';
@@ -8927,55 +9085,67 @@ function openConsumptionModalFromCC(){
     try{
       var s = me();
       if(!s){ if(typeof toast === 'function') toast('请先用共享股东身份登录','err'); return; }
-      var url = BASE + '?book=free&ref=' + encodeURIComponent(s.cid);
-      var box = el('myShareBox');
-      box.innerHTML =
-        '<div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap">' +
-          '<div style="flex:0 0 auto;max-width:100%">' +
-            '<img id="msPoster" alt="我的专属分享图" src="" style="width:100%;max-width:290px;border-radius:12px;display:block;border:1px solid var(--border)">' +
-            '<div style="font-size:12px;color:var(--text-2);margin-top:8px;text-align:center">长按这张图，可直接保存到相册</div>' +
-          '</div>' +
-          '<div style="flex:1;min-width:220px">' +
-            '<div style="font-size:15px;font-weight:600;margin-bottom:8px">' + esc(s.name || '') + ' 的专属邀请图</div>' +
-            '<div class="hint" style="margin-bottom:12px">发朋友圈或直接发给客户：对方扫码先打开官网，页面最底部点「立即领取」就填姓名手机号，提交后自动挂到您名下。</div>' +
-            '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
-              '<button class="btn btn-primary btn-sm" type="button" id="msSave">保存图片</button>' +
-              '<button class="btn btn-ghost btn-sm" type="button" id="msCopy">复制链接</button>' +
+      var plain = false, url = '';
+      var go = function(q){
+        if(!q || q.ok !== true){ if(typeof toast === 'function') toast('名额读取失败，请稍后重试','err'); refreshQuota(); return; }
+        var left = +q.remaining || 0, limit = +q.limit || 6, used = +q.used || 0;
+        plain = left <= 0;
+        url = plain ? BASE : (BASE + '?book=free&ref=' + encodeURIComponent(s.cid));
+        var box = el('myShareBox');
+        box.innerHTML =
+          (plain
+            ? '<div style="background:#fef2f2;border:1px solid #fecaca;color:#b02a2e;border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.8;margin-bottom:14px"><b>本月免费赠送次数已用完（已领 '+used+' / '+limit+'）</b><br>本次为普通分享：客户扫码只打开官网，不会弹免费领取。客户 7 天未到店核销，名额会自动退回，届时可再生成免费分享。</div>'
+            : '<div style="background:#ecfdf5;border:1px solid #6ee7b7;color:#047857;border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.8;margin-bottom:14px"><b>本月剩余免费名额 '+left+' / '+limit+'</b><br>客户提交领取即占用 1 个名额；7 天内没到店核销，名额自动退回给您。</div>') +
+          '<div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap">' +
+            '<div style="flex:0 0 auto;max-width:100%">' +
+              '<img id="msPoster" alt="我的专属分享图" src="" style="width:100%;max-width:290px;border-radius:12px;display:block;border:1px solid var(--border)">' +
+              '<div style="font-size:12px;color:var(--text-2);margin-top:8px;text-align:center">长按这张图，可直接保存到相册</div>' +
             '</div>' +
-            '<div style="font-size:12px;color:var(--text-3);word-break:break-all;margin-top:12px">' + esc(url) + '</div>' +
-          '</div>' +
-        '</div>';
-
-      var img = el('msPoster');
-      var lastPoster = '';
-      var paint = function(){
-        lastPoster = buildPoster(s.name || '', url);
-        img.src = lastPoster;
-        img.setAttribute('data-qr', url);
+            '<div style="flex:1;min-width:220px">' +
+              '<div style="font-size:15px;font-weight:600;margin-bottom:8px">' + esc(s.name || '') + (plain ? ' 的官网分享图' : ' 的专属邀请图') + '</div>' +
+              '<div class="hint" style="margin-bottom:12px">' + (plain
+                ? '本月免费名额已送完，这张是普通分享：客户扫码只打开官网首页，看不到免费领取入口。'
+                : '发朋友圈或直接发给客户：对方扫码先打开官网，页面最底部点「立即领取」就填姓名手机号，提交后自动挂到您名下。') + '</div>' +
+              '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+                '<button class="btn btn-primary btn-sm" type="button" id="msSave">保存图片</button>' +
+                '<button class="btn btn-ghost btn-sm" type="button" id="msCopy">复制链接</button>' +
+              '</div>' +
+              '<div style="font-size:12px;color:var(--text-3);word-break:break-all;margin-top:12px">' + esc(url) + '</div>' +
+            '</div>' +
+          '</div>';
+        var img = el('msPoster');
+        var lastPoster = '';
+        var paint = function(){
+          lastPoster = buildPoster(s.name || '', url, plain);
+          img.src = lastPoster;
+          img.setAttribute('data-qr', url);
+        };
+        paint();
+        try{
+          if(document.fonts && document.fonts.load){
+            document.fonts.load('700 82px "Noto Serif SC"').then(function(f){
+              if(f && f.length){ paint(); }
+            }, function(){});
+          }
+        }catch(e){}
+        el('msSave').onclick = function(){
+          var a = document.createElement('a');
+          a.download = '银绣智享-' + String(s.name || '股东').replace(/[\\/:*?"<>|]/g, '') + (plain ? '-门店官网.png' : '-免费洗脸.png');
+          a.href = lastPoster;
+          a.click();
+        };
+        el('msCopy').onclick = function(){
+          if(navigator.clipboard && navigator.clipboard.writeText){
+            navigator.clipboard.writeText(url).then(function(){
+              if(typeof toast === 'function') toast('链接已复制');
+            }, function(){ if(typeof toast === 'function') toast(url); });
+          } else if(typeof toast === 'function'){ toast(url); }
+        };
       };
-      paint();
-      /* 衬线字体到位后再画一次，标题更接近海报质感；取不到就用系统字体 */
-      try{
-        if(document.fonts && document.fonts.load){
-          document.fonts.load('700 82px "Noto Serif SC"').then(function(f){
-            if(f && f.length){ paint(); }
-          }, function(){});
-        }
-      }catch(e){}
-
-      el('msSave').onclick = function(){
-        var a = document.createElement('a');
-        a.download = '银绣智享-' + String(s.name || '股东').replace(/[\\/:*?"<>|]/g, '') + '-免费洗脸.png';
-        a.href = lastPoster;
-        a.click();
-      };
-      el('msCopy').onclick = function(){
-        if(navigator.clipboard && navigator.clipboard.writeText){
-          navigator.clipboard.writeText(url).then(function(){
-            if(typeof toast === 'function') toast('链接已复制');
-          }, function(){ if(typeof toast === 'function') toast(url); });
-        } else if(typeof toast === 'function'){ toast(url); }
-      };
+      var call = window.shareQuotaCall;
+      if(typeof call === 'function'){ call('share_quota_info', { p_ref: s.cid }).then(go); }
+      else { go({ ok: true, remaining: 1 }); }
+      return;
     }catch(e){
       if(typeof toast === 'function') toast('生成失败：' + (e && e.message ? e.message : e), 'err');
     }
@@ -9118,64 +9288,38 @@ function openConsumptionModalFromCC(){
       btn.disabled = true; btn.style.opacity = '.6'; btn.textContent = '提交中…';
       msg.textContent = '';
 
-      var hdr = { 'apikey': c.key, 'Authorization': 'Bearer ' + c.key };
-      var hdrJson = { 'Content-Type': 'application/json', 'apikey': c.key, 'Authorization': 'Bearer ' + c.key, 'Prefer': 'return=minimal' };
+      var hdrJson = { 'Content-Type': 'application/json', 'apikey': c.key, 'Authorization': 'Bearer ' + c.key };
       var base = c.url + '/rest/v1';
-      var nowIso = new Date().toISOString();
 
-      // 客户档案与股东姓名一次取回：查重 / 墓碑恢复 / 建档全部在云端函数里完成，不再匿名读整表
-      var refName = '';
-      var guestReady = fetch(base + '/rpc/site_guest_ensure', {
+      // 云端一次完成：名额校验（6 个/月，领取即占用）→ 过期单作废 → 建档 → 写预约
+      fetch(base + '/rpc/site_gift_claim', {
         method: 'POST', headers: hdrJson,
-        body: JSON.stringify({ p_name: name, p_phone: phone, p_referrer: REF || '' })
+        body: JSON.stringify({ p_name: name, p_phone: phone, p_ref: REF || '' })
       })
-        .then(function(r){ return r.ok ? r.json() : null; })
+        .then(function(r){
+          return r.text().then(function(tx){
+            var j = null; try{ j = JSON.parse(tx); }catch(e){}
+            if(!r.ok || !j){ throw new Error('server'); }
+            return j;
+          });
+        })
         .then(function(j){
-          if(!j || j.ok !== true) return null;
-          refName = String(j.refname || '');
-          return j.id || null;
-        })
-        .catch(function(){ return null; });
-
-      // 每个手机号只能领取一次免费洗脸（先查云端，数据库还有兜底拦截）
-      var giftChk = fetch(base + '/rpc/site_gift_check', { method: 'POST', headers: hdrJson, body: JSON.stringify({ p_phone: phone }) })
-        .then(function(r){ return r.ok ? r.json() : null; })
-        .then(function(j){ return !!(j && j.claimed); })
-        .catch(function(){ return false; });
-
-      giftChk
-        .then(function(claimed){
-          if(claimed){ throw new Error('dup'); }
-          return guestReady;
-        })
-        .then(function(cid){
-          var row = {
-            id: uuid4(),
-            date: nowIso.slice(0, 10),
-            time: '', duration: null, service_id: '52ee8a1e-e7dc-4b88-b387-96e25d8665fa', member_id: null,
-            client: name, phone: phone,
-            note: (refName ? refName + '赠送的免费洗脸' : '领取一次免费洗脸') + '；项目：面部清洁',
-            status: 'pending', amount: null, pay_method: null, paid_at: null,
-            customer_id: cid || null, kind: 'site', referrer: REF || null,
-            items: null, updated_at: nowIso
-          };
-          return fetch(base + '/appointments', { method: 'POST', headers: hdrJson, body: JSON.stringify([row]) })
-            .then(function(r){
-              return r.text().then(function(tx){
-                var dup = String(tx || '').indexOf('dup_free_claim') >= 0;
-                if(!r.ok || dup){ throw new Error(dup ? 'dup' : ('写入失败 ' + r.status)); }
-                return true;
-              });
-            });
-        })
-        .then(function(){ done(name, phone); })
-        .catch(function(e){
+          if(j.ok === true){ done(name, phone); return; }
           btn.disabled = false; btn.style.opacity = '1'; btn.textContent = '立即领取';
-          if(String(e && e.message) === 'dup'){
+          var code = String(j.code || '');
+          if(code === 'quota_full'){
+            msg.textContent = '本月免费名额已经被别人领完了，请联系分享股东';
+          } else if(code === 'dup'){
             msg.textContent = '这个手机号已经领取过免费洗脸了，每人只能领一次';
+          } else if(code === 'bad_ref'){
+            msg.textContent = '分享链接已失效，请让分享股东重新发一次';
           } else {
             msg.textContent = '提交没成功，请稍后再试或微信联系门店';
           }
+        })
+        .catch(function(e){
+          btn.disabled = false; btn.style.opacity = '1'; btn.textContent = '立即领取';
+          msg.textContent = '提交没成功，请稍后再试或微信联系门店';
           if(window.console) console.warn(e);
         });
     };
