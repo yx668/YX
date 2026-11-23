@@ -5165,7 +5165,14 @@ function renderShareBoard(){
 /* ---------- 共享股东额度（本月免费 4 次 + 累计兑换 + 本月分享名额） ---------- */
 function shareQuotaCall(fn,body){
   if(!cloudCfg||!cloudCfg.url)return Promise.resolve(null);
-  return authReq("/rpc/"+fn,body||{}).then(function(r){return (r&&r.ok)?r.json:null;},function(){return null;});
+  var once=function(){
+    return authReq("/rpc/"+fn,body||{}).then(function(r){return (r&&r.ok)?r.json:null;},function(){return null;});
+  };
+  // Supabase 偶发 CORS/网关抖动，失败自动重试 1 次
+  return once().then(function(j){
+    if(j)return j;
+    return new Promise(function(res){setTimeout(function(){res(once());},900);});
+  });
 }
 var _shareQCache=null,_shareQTime=0;
 function renderShareQuota(force){
