@@ -5423,7 +5423,13 @@ function applyShareCloudData(d){
     if(s.rent_days!=null){s.rentDays=s.rent_days;delete s.rent_days;}
     return s;
   });
-  DB.services=mergeRows(svc,DB.services);
+  // 股东端预约项目以云端为准：管理员后台增/删项目后，手机端下次刷新即同步；
+  // 不再并集保留本地旧项目，避免后台已删除的"剪发/染发"之类项目残留在股东端下拉里
+  if(svc.length){
+    DB.services=svc.filter(function(s){return !isDeletedLocal("services",s.id);});
+  }else{
+    DB.services=[]; // 云端项目已清空（后台全删）→ 手机端同步清空
+  }
   var appt=(d.appointments||[]).map(function(a){
     if(a.items!=null)a.items=normalizeItems(a.items);
     if(a.unitprice!=null){a.unitPrice=a.unitprice;delete a.unitprice;}
