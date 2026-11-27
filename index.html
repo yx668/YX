@@ -378,18 +378,18 @@ tr:hover td{background:#fafbfc}
         <div class="section">
           <div class="section-head"><div><h2>我的信息</h2><div class="desc">共享股东身份卡片，仅展示与您相关的数据</div></div><button class="btn btn-ghost btn-sm" type="button" onclick="sharePull(true)" style="flex-shrink:0">刷新数据</button></div>
           <div class="section-body" id="shareInfo"></div>
+          <div id="shareQuota" style="margin-top:12px"><div class="hint">正在读取额度…</div></div>
         </div>
         <div class="section">
-          <div class="section-head"><div><h2>我的免费洗脸额度</h2><div class="desc">本月免费次数 + 累计兑换次数；先用本月次数，再用兑换次数，用完按股东价收费</div></div></div>
-          <div class="section-body" id="shareQuota"><div class="hint">正在读取额度…</div></div>
-        </div>
-        <div class="section">
-          <div class="section-head"><div><h2>我的佣金等级</h2><div class="desc">当前适用佣金比例（按当月流水与本人累计消费取较高档位）</div></div></div>
+          <div class="section-head"><div><h2>我的推广服务费</h2><div class="desc">固定 30% · 按本人直推客户成交订单扣除成本后的纯利润实时结算</div></div></div>
           <div class="section-body" id="shareCommission"></div>
         </div>
         <div class="section">
-          <div class="section-head">
-            <div><h2>名下客户预约与消费</h2><div class="desc">您直接介绍的客户的预约与消费，消费仅统计本月（次月清零）· 本月总消费 <b id="shareLv1MonthTotal" style="color:#16a34a">¥0</b></div></div>
+          <div class="section-head"><div><h2>我的分红点与本月分红</h2><div class="desc">贡献分红点是奖励池分配权重，不是股权、不可转让、不可变现</div></div></div>
+          <div class="section-body" id="shareBonus"></div>
+        </div>
+        <div class="section">
+          <div class="section-head"><div><h2>我推广的客户</h2><div class="desc">您直接介绍的客户的预约次数、时间与消费（仅统计本月消费）· 本月总消费 <b id="shareLv1MonthTotal" style="color:#16a34a">¥0</b></div></div>
           </div>
           <div class="section-body no-pad" id="shareLv1"></div>
         </div>
@@ -402,11 +402,7 @@ tr:hover td{background:#fafbfc}
           <div class="section-body no-pad" id="shareSelf"></div>
         </div>
         <div class="section">
-          <div class="section-head"><div><h2>下级客户预约统计</h2><div class="desc">您名下客户再介绍客户的已成交预约（完成/已归还），按服务项目分类汇总，免费与收费分列</div></div></div>
-          <div class="section-body no-pad" id="shareLv2"></div>
-        </div>
-        <div class="section">
-          <div class="section-head"><div><h2>苗衣出租归还</h2><div class="desc">我本人或我名下客户正在出租的苗衣，归还由门店管理员确认并结算租金</div></div></div>
+          <div class="section-head"><div><h2>苗衣出租归还</h2><div class="desc">我本人或我推广的客户正在出租的苗衣，归还由门店管理员确认并结算租金</div></div></div>
           <div class="section-body" id="shareRents"></div>
         </div>
       </section>
@@ -4949,18 +4945,18 @@ function renderShareBoard(){
     $("shareSelfCnt").textContent="共 0 条";
     $("shareSelf").innerHTML="";
     $("shareLv1").innerHTML="";
-    $("shareLv2").innerHTML="";
     return;
   }
   var ym=genShareYm();
-  // 1) 个人信息卡 + 佣金提现三数
+  // 1) 个人信息卡 + 服务费与提现三数（新口径：固定 30% 纯利润）
   var ref=me.referrer?customerById(me.referrer):null;
-  var cs=commissionSummary(me.id);
+  var _feeTotal=promoFeesTotal(me.id),_withdrawn=withdrawnTotal(me.id);
+  var cs={total:_feeTotal,withdrawn:_withdrawn,pending:Math.max(0,Math.round((_feeTotal-_withdrawn)*100)/100)};
   $("shareInfo").innerHTML='<div class="member-cell"><span class="avatar" style="background:'+esc(me.color||"#d97706")+'">'+esc((me.name||"?")[0])+"</span>"+
     '<div class="info"><div class="name">'+esc(me.name)+' <span class="tag tag-warn">共享股东</span></div>'+
     '<div class="role">电话：'+(esc(me.phone)||"-")+(ref?("　介绍人："+esc(ref.name)):("　介绍人：无"))+"</div></div></div>"+
     '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:14px">'+
-    '<div style="flex:1;min-width:120px;background:var(--bg-1);border-radius:10px;padding:12px 14px;text-align:center"><div style="font-size:26px;font-weight:800;color:var(--primary);line-height:1.2">'+fmtMoney(cs.total)+'</div><div class="hint" style="margin-top:4px">我的总佣金</div></div>'+
+    '<div style="flex:1;min-width:120px;background:var(--bg-1);border-radius:10px;padding:12px 14px;text-align:center"><div style="font-size:26px;font-weight:800;color:var(--primary);line-height:1.2">'+fmtMoney(cs.total)+'</div><div class="hint" style="margin-top:4px">累计推广服务费</div></div>'+
     '<div style="flex:1;min-width:120px;background:var(--bg-1);border-radius:10px;padding:12px 14px;text-align:center"><div style="font-size:26px;font-weight:800;color:var(--text-1);line-height:1.2">'+fmtMoney(cs.withdrawn)+'</div><div class="hint" style="margin-top:4px">已提现</div></div>'+
     '<div style="flex:1;min-width:120px;background:var(--bg-1);border-radius:10px;padding:12px 14px;text-align:center"><div style="font-size:26px;font-weight:800;color:#16a34a;line-height:1.2">'+fmtMoney(cs.pending)+'</div><div class="hint" style="margin-top:4px">待提现</div></div>'+
     '</div>'+
@@ -5007,19 +5003,9 @@ function renderShareBoard(){
     sh+="</table>";
     $("shareSelf").innerHTML=sh;
   }
-  // 3) 我的佣金等级（仅显示比例数字）
-  var com=commissionOf(me.id,ym);
-  // 本人历史累计消费 & 距第二级（40%）缺口：本人累计消费满 3000 元升级 40%
-  var selfSpend=com?com.selfSpend:0;
-  var nextTier=com&&com.ratio>=0.4;
-  $("shareCommission").innerHTML=
-    '<div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">'+
-    '<div style="text-align:center"><div style="font-size:46px;font-weight:800;color:var(--primary);line-height:1.1">'+(com?Math.round(com.ratio*100):0)+'%</div><div class="hint">当前佣金比例</div></div>'+
-    '<div style="flex:1;min-width:240px;font-size:12px;color:var(--text-2);line-height:2">'+
-    (nextTier
-      ? '<div style="background:var(--bg-1);border-radius:8px;padding:8px 10px;margin-bottom:8px">✔ 您当前已达 <b>40% 及以上</b>佣金档，个人累计消费 <b style="color:#16a34a">'+fmtMoney(selfSpend)+'</b></div>'
-      : '<div style="background:var(--bg-1);border-radius:8px;padding:8px 10px;margin-bottom:8px">💰 个人累计消费：<b style="color:var(--primary)">'+fmtMoney(selfSpend)+'</b>，距第二级（40%）佣金还差 <b style="color:var(--danger)">'+fmtMoney(Math.max(0,3000-selfSpend))+'</b>（本人累计消费满 3000 元升级）</div>')+
-    "取两种方式中较高的档位：<b>① 当月流水：</b>低于 3000 元 30% / 3000-6000 元 40% / 满 6000 元 50%；<b>② 本人历史累计消费：</b>满 3000 元 40% / 满 6000 元 50%。<br>佣金仅作查看与核对，打款结算请与门店管理员线下确认。</div></div>";
+  // 3) 我的推广服务费（固定 30%）+ 分红点与本月分红
+  renderSharePromo(me,ym);
+  promoLoadGift();
   // 4) 名下客户预约与消费（原「快捷操作」模块已移除；支持搜索过滤）
   var ym0=curYm(); // 当前年月：名下客户消费与业绩卡片均按本月统计，次月自动清零
   var lv1Ids=lv1IdsOf(me.id);
@@ -5053,95 +5039,6 @@ function renderShareBoard(){
   $("shareLv1MonthTotal").textContent=fmtMoney(mTotal);
   $("shareLv1").innerHTML=lv1Html;
   if($("shareLv1Q"))$("shareLv1Q").value=shareQVal;
-  // 6) 下级客户：已成交预约（状态=完成 或 出租已归还）——先逐条明细，再按服务项目分类汇总
-  var lv2=lv2CustomersOf(me.id);
-  var lv2Html="";
-  if(!lv2.length){lv2Html='<div class="empty"><div class="big">👥</div><h3>暂无下级客户</h3><p>您名下客户再介绍的客户，会在这里按服务项目展示他们的已成交预约次数。</p></div>';}
-  else{
-    // 已成交预约（仅统计口径内：普通预约=已完成，出租=已归还）
-    var doneApps=DB.appointments.filter(function(a){
-      if(a.status==="cancelled")return false;
-      if(a.kind==="direct")return false; // 直接购买不计入预约次数
-      var done=(a.status==="done")||(a.kind==="rent"&&a.status==="returned");
-      if(!done)return false;
-      return lv2.some(function(c){return c.id===a.customer_id;});
-    });
-    if(!doneApps.length){lv2Html='<div class="hint">下级客户暂无已成交预约（预约「已完成」或出租「已归还」会计入统计）。</div>';}
-    else{
-      var order=["苗衣出租","面部清洁","面部修复","胯部塑形","其他"];
-      // —— 明细：客户 × 项目，次数聚合（苗衣出租按天累计：天数/次数） ——
-      var det={}; // key=cid|base -> {cust, base, free, paid, days, redeem}
-      var grp={}; // 基础名 -> {free:N, paid:N, days:N, redeem:N}
-      function lump(baseName,isFree,addDays,isRedeem){
-        var g=grp[baseName]||{free:0,paid:0,days:0,redeem:0};
-        if(isFree)g.free++;else g.paid++;
-        g.days+=(+addDays||0);
-        if(isRedeem)g.redeem++;
-        grp[baseName]=g;
-      }
-      doneApps.forEach(function(a){
-        var cust=customerById(a.customer_id);
-        var sv=a.serviceId?serviceById(a.serviceId):null;
-        var name=sv?sv.name:(a.serviceName||(a.kind==="rent"?"苗衣出租":"未指定项目"));
-        var base=String(name).replace(/免费$/,""); // 面部清洁免费 → 面部清洁
-        var isFree=(sv&&(+sv.price||0)===0)||(!sv&&String(name).indexOf("免费")>=0);
-        var addDays=a.kind==="rent"?(+a.rentDays||0):1; // 出租按结算天数累计，其余按 1 次
-        var isRedeem=(+a.redeemValue||0)>0; // 套餐卡核销标记
-        lump(base,isFree,addDays,isRedeem);
-        var key=(a.customer_id||"")+"|"+base;
-        var d=det[key]||{cust:cust?cust.name:a.client,base:base,free:0,paid:0,days:0,redeem:0};
-        if(isFree)d.free++;else d.paid++;
-        d.days+=addDays;
-        if(isRedeem)d.redeem++;
-        det[key]=d;
-      });
-      var detKeys=Object.keys(det);
-      detKeys.sort(function(x,y){
-        var a=det[x],b=det[y];
-        if(a.cust!==b.cust)return a.cust<b.cust?-1:1;
-        var ai=order.indexOf(a.base),bi=order.indexOf(b.base);
-        return (ai<0?99:ai)-(bi<0?99:bi);
-      });
-      var dh="<table><tr><th>下级客户</th><th>预约项目</th><th style=\"text-align:center\">次数（苗衣出租按天）</th></tr>";
-      detKeys.forEach(function(k){
-        var d=det[k],n=d.free+d.paid;
-        var tag;
-        if(d.free>0&&d.paid>0)tag='<span class="tag tag-blue">免费 '+d.free+'</span> <span class="tag tag-green">收费 '+d.paid+'</span>';
-        else if(d.free>0)tag='<span class="tag tag-blue">免费 '+d.free+'</span>';
-        else tag='<span class="tag tag-green">收费 '+d.paid+'</span>';
-        var cntTxt=(d.base==="苗衣出租"?(d.days+" 天 / ")+n+" 次":n+" 次");
-        var rdTag=d.redeem>0?' <span class="tag tag-warn">套餐核销 '+d.redeem+'</span>':"";
-        dh+="<tr><td>"+esc(d.cust)+"</td><td>"+esc(d.base)+"</td>"+
-          '<td style="text-align:center"><b>'+cntTxt+"</b> "+tag+rdTag+"</td></tr>";
-      });
-      dh+="</table>";
-      // —— 汇总：按服务项目 ——
-      var baseNames=Object.keys(grp);
-      baseNames.sort(function(x,y){
-        var xi=order.indexOf(x),yi=order.indexOf(y);
-        if(xi<0)xi=99;if(yi<0)yi=99;
-        return xi-yi;
-      });
-      var sh="<table><tr><th>服务项目</th><th style=\"text-align:center\">次数（苗衣出租按天）</th><th style=\"text-align:right\">明细</th></tr>";
-      baseNames.forEach(function(b){
-        var g=grp[b],total=g.free+g.paid;
-        var detail;
-        if(g.free>0&&g.paid>0)detail='<span class="tag tag-blue">免费 '+g.free+'</span> <span class="tag tag-green">收费 '+g.paid+'</span>';
-        else if(g.free>0)detail='<span class="tag tag-blue">免费 '+g.free+'</span>';
-        else detail='<span class="tag tag-green">收费 '+g.paid+'</span>';
-        var cntTxt=(b==="苗衣出租"?(g.days+" 天 / ")+total+" 次":total+" 次");
-        var rdTag=g.redeem>0?' <span class="tag tag-warn">套餐核销 '+g.redeem+'</span>':"";
-        sh+="<tr><td>"+esc(b)+"</td>"+
-          '<td style="text-align:center"><b>'+cntTxt+"</b>"+rdTag+"</td>"+
-          '<td style="text-align:right">'+detail+"</td></tr>";
-      });
-      sh+='<tr><td colspan="3" style="font-size:12px;color:var(--text-3);padding:8px 14px">统计范围：全部下级客户的已成交预约（普通预约=已完成，出租=已归还）。</td></tr>';
-      sh+="</table>";
-      lv2Html='<div style="font-size:13px;font-weight:700;color:var(--text-1);margin:2px 0 8px">📋 预约明细</div>'+dh+
-        '<div style="font-size:13px;font-weight:700;color:var(--text-1);margin:16px 0 8px">📊 项目总统计</div>'+sh;
-    }
-  }
-  $("shareLv2").innerHTML=lv2Html;
   // 7) 苗衣出租归还（本人或名下客户正在出租中）
   var rentIds={};rentIds[me.id]=1;
   lv1List.forEach(function(c){rentIds[c.id]=1;});
@@ -6290,6 +6187,185 @@ function renderReports(){
   renderRpConsumption(R);
 }
 
+/* ================= 推广服务费 30% + 贡献分红点（2026-11-27 口径） ================= */
+/* ① 服务费：直推客户订单（实收 − 成本）× 30%，订单结账/套餐核销时实时生成
+   ② 分红点：注册赠送 1 点/90 天、直推业绩点（每满 100 元，按当月档位全额倍率，当月有效）、
+      本人自消费点（每满 50 元，365 天）；自消费不计直推业绩档位
+   ③ 奖金池：当月（实收 − 成本）毛利 × 20%，按个人有效点 ÷ 全店总有效点分配
+   ④ 不存在间推/下线/团队层级：只认客户本人 referrer 指向的推广伙伴 */
+var PROMO={feeRate:0.30,poolRate:0.20,giftPoints:1,giftDays:90,selfStep:50,selfDays:365,selfDirectStep:100,
+  tiers:[[0,1],[3000,1.3],[6000,1.6],[10000,2]],taxRate:0.20};
+function promoR2(n){return Math.round(((+n||0))*100)/100;}
+function promoIsPkgBuy(a){
+  if(!a)return false;
+  if(a.pkgBuyOnly)return true;
+  if(a.kind==="direct"&&!((+a.commEarned||0)>0)&&(a.items||[]).some(function(i){return i.kind==="pkg";}))return true;
+  return false;
+}
+/* 计入“实收”的订单金额：服务单=实收+核销价值；套餐购买单不计（营收按核销确认） */
+function promoOrderValue(a){
+  if(promoIsPkgBuy(a))return 0;
+  if(!isPaidAppt(a)&&!((+a.redeemValue||0)>0))return 0;
+  return promoR2((+a.amount||0)+(+a.redeemValue||0));
+}
+function promoOrderCost(a){var p=apptProfit(a);return promoR2(p.cost);}
+/* 是否属于该推广伙伴的直推客户订单（本人自消费不算，也不向上找上级 → 无间推） */
+function promoIsDirect(a,pid){
+  if(!a||!a.customer_id||a.customer_id===pid)return false;
+  var c=customerById(a.customer_id);
+  return !!(c&&c.referrer===pid);
+}
+function promoFeesOf(pid,ym){
+  var out={rows:[],amount:0,cost:0,profit:0,fee:0};
+  (DB.appointments||[]).forEach(function(a){
+    if((a.date||"").slice(0,7)!==ym)return;
+    if(!promoIsDirect(a,pid))return;
+    var v=promoOrderValue(a);if(v<=0)return;
+    var cst=promoOrderCost(a),pf=promoR2(Math.max(0,v-cst)),f=promoR2(pf*PROMO.feeRate);
+    out.rows.push({a:a,value:v,cost:cst,profit:pf,fee:f});
+    out.amount+=v;out.cost+=cst;out.profit+=pf;out.fee+=f;
+  });
+  out.amount=promoR2(out.amount);out.cost=promoR2(out.cost);out.profit=promoR2(out.profit);out.fee=promoR2(out.fee);
+  out.rows.sort(function(x,y){return (x.a.date<y.a.date)?1:-1;});
+  return out;
+}
+function promoFeesTotal(pid){
+  var months={};
+  (DB.appointments||[]).forEach(function(a){var m=(a.date||"").slice(0,7);if(m&&promoIsDirect(a,pid))months[m]=1;});
+  var s=0;Object.keys(months).forEach(function(m){s+=promoFeesOf(pid,m).fee;});
+  return promoR2(s);
+}
+/* 直推业绩（冲档口径）：本月实收金额，含套餐购买全额，退款扣减 */
+function promoDirectPerfOf(pid,ym){
+  var s=0;
+  (DB.appointments||[]).forEach(function(a){
+    if((a.date||"").slice(0,7)!==ym)return;
+    if(!promoIsDirect(a,pid))return;
+    if(promoIsPkgBuy(a)){s+=(+a.amount||0);return;}
+    s+=promoOrderValue(a);
+  });
+  (DB.refunds||[]).forEach(function(r){
+    if((r.date||"").slice(0,7)!==ym)return;
+    var c=r.customerId?customerById(r.customerId):null;
+    if(!c||c.referrer!==pid||c.id===pid)return;
+    s-=(+r.amount||0);
+  });
+  if(s<0)s=0;
+  return promoR2(s);
+}
+function promoMultOf(perf){
+  var m=PROMO.tiers[0][1];
+  PROMO.tiers.forEach(function(t){if(perf>=t[0])m=t[1];});
+  return m;
+}
+/* 直推业绩点：每满 100 元 1 点 × 当月档位倍率（全额适用） */
+function promoDirectPointsOf(pid,ym){
+  var perf=promoDirectPerfOf(pid,ym);
+  var n=Math.floor(perf/PROMO.selfDirectStep);
+  return promoR2(n*promoMultOf(perf));
+}
+function promoSelfSpendOf(pid,ym){return promoR2(monthSpentOf(pid,ym));}
+/* 本人自消费点：每满 50 元 1 点，固定倍率 */
+function promoSelfPointsOf(pid,ym){return promoR2(Math.floor(promoSelfSpendOf(pid,ym)/PROMO.selfStep));}
+function promoPoolOf(ym){
+  var revenue=0,cost=0;
+  (DB.appointments||[]).forEach(function(a){
+    if((a.date||"").slice(0,7)!==ym)return;
+    var v=promoOrderValue(a);if(v<=0)return;
+    revenue+=v;cost+=promoOrderCost(a);
+  });
+  var gross=Math.max(0,promoR2(revenue-cost));
+  return {revenue:promoR2(revenue),cost:promoR2(cost),gross:gross,pool:promoR2(gross*PROMO.poolRate)};
+}
+function promoPartners(){
+  return (DB.customers||[]).filter(function(c){return c.type==="shareholder"&&String(c.name||"").indexOf("__DEL__")!==0;});
+}
+function promoTotalPoints(ym,giftMap){
+  var t=0;
+  promoPartners().forEach(function(c){
+    var g=(giftMap&&giftMap[c.id]!=null)?giftMap[c.id]:0;
+    t+=g+promoDirectPointsOf(c.id,ym)+promoSelfPointsOf(c.id,ym);
+  });
+  return promoR2(t);
+}
+function promoMyIncome(pid,ym,giftMap){
+  var gift=(giftMap&&giftMap[pid]!=null)?giftMap[pid]:0;
+  var dpt=promoDirectPointsOf(pid,ym);
+  var spt=promoSelfPointsOf(pid,ym);
+  var perf=promoDirectPerfOf(pid,ym);
+  var valid=promoR2(gift+dpt+spt);
+  var pool=promoPoolOf(ym);
+  var total=promoTotalPoints(ym,giftMap);
+  var ratio=total>0?valid/total:0;
+  var gross=promoR2(pool.pool*ratio);
+  var tax=promoR2(gross*PROMO.taxRate);
+  return {gift:gift,dpt:dpt,spt:spt,valid:valid,perf:perf,mult:promoMultOf(perf),pool:pool,
+    total:total,ratio:ratio,gross:gross,tax:tax,net:promoR2(gross-tax)};
+}
+var PROMO_GIFT={};
+function promoLoadGift(){
+  if(!cloudCfg||!cloudCfg.url||!shareSess||!shareSess.pwdHash||!shareSess.cid)return;
+  authReq("/rest/v1/rpc/promo_points",{p_phone:shareSess.phone,p_pwd_hash:shareSess.pwdHash}).then(function(r){
+    return r.ok?r.json():null;
+  }).then(function(j){
+    if(!j||!j.ok)return;
+    var g=0;
+    (j.points||[]).forEach(function(b){
+      if(b.ptype!=="gift"||b.status!=="active")return;
+      if(b.expire_at&&new Date(b.expire_at).getTime()<Date.now())return;
+      g+=(+b.points||0);
+    });
+    PROMO_GIFT[shareSess.cid]=g;
+    try{renderSharePromo(customerById(shareSess.cid),curYm());}catch(e){}
+  }).catch(function(){});
+}
+/* 我的推广服务费卡 */
+function renderSharePromo(me,ym){
+  if(!me)return;
+  var box=$("shareCommission");
+  if(box){
+    var f=promoFeesOf(me.id,ym);
+    var cum=promoFeesTotal(me.id);
+    var rows=f.rows.length?('<table><tr><th>日期</th><th>客户</th><th>项目</th><th style="text-align:right">实收</th><th style="text-align:right">成本</th><th style="text-align:right">服务费 30%</th></tr>'+
+      f.rows.map(function(r){
+        var a=r.a,sv=a.serviceId?serviceById(a.serviceId):null,c=customerById(a.customer_id);
+        return '<tr><td>'+esc(a.date)+'</td><td>'+esc(c?c.name:(a.client||"-"))+'</td><td>'+esc(sv?sv.name:((a.redeemValue?(a.serviceName||"套餐核销"):"服务")))+'</td>'+
+          '<td style="text-align:right">'+fmtMoney(r.value)+'</td><td style="text-align:right;color:var(--text-3)">'+fmtMoney(r.cost)+'</td>'+
+          '<td style="text-align:right"><b style="color:#16a34a">'+fmtMoney(r.fee)+'</b></td></tr>';
+      }).join("")+'</table>'):'<div class="hint">本月暂无推广服务费（客户结账后实时计入）。</div>';
+    box.innerHTML=
+      '<div style="display:flex;gap:12px;flex-wrap:wrap">'+
+      '<div style="flex:1;min-width:110px;background:var(--bg-1);border-radius:10px;padding:12px;text-align:center"><div style="font-size:28px;font-weight:800;color:var(--primary)">30%</div><div class="hint">固定费率</div></div>'+
+      '<div style="flex:1;min-width:110px;background:var(--bg-1);border-radius:10px;padding:12px;text-align:center"><div style="font-size:22px;font-weight:800;color:#16a34a">'+fmtMoney(f.fee)+'</div><div class="hint">本月服务费</div></div>'+
+      '<div style="flex:1;min-width:110px;background:var(--bg-1);border-radius:10px;padding:12px;text-align:center"><div style="font-size:22px;font-weight:800">'+fmtMoney(cum)+'</div><div class="hint">累计服务费</div></div>'+
+      '</div>'+
+      '<div class="hint" style="margin:10px 0 8px">本月直推成交 '+f.rows.length+' 单 · 实收 '+fmtMoney(f.amount)+' · 成本 '+fmtMoney(f.cost)+' · 毛利 '+fmtMoney(f.profit)+' → 服务费 <b>'+fmtMoney(f.fee)+'</b>（线下打款结算）</div>'+
+      rows;
+  }
+  var box2=$("shareBonus");
+  if(box2){
+    var inc=promoMyIncome(me.id,ym,PROMO_GIFT);
+    box2.innerHTML=
+      '<div style="display:flex;gap:10px;flex-wrap:wrap">'+
+      '<div style="flex:1;min-width:130px;background:var(--bg-1);border-radius:10px;padding:10px"><div class="hint">注册赠送点 · 90 天</div><div style="font-size:20px;font-weight:800">'+inc.gift.toFixed(1)+' 点</div></div>'+
+      '<div style="flex:1;min-width:130px;background:var(--bg-1);border-radius:10px;padding:10px"><div class="hint">本月直推业绩点 · 当月有效</div><div style="font-size:20px;font-weight:800;color:var(--primary)">'+inc.dpt.toFixed(1)+' 点</div><div class="hint">业绩 '+fmtMoney(inc.perf)+' × '+inc.mult+' 倍</div></div>'+
+      '<div style="flex:1;min-width:130px;background:var(--bg-1);border-radius:10px;padding:10px"><div class="hint">本人自消费点 · 365 天</div><div style="font-size:20px;font-weight:800">'+inc.spt.toFixed(1)+' 点</div></div>'+
+      '</div>'+
+      '<div style="margin-top:10px;background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1px solid #bbf7d0;border-radius:10px;padding:12px 14px">'+
+      '<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:baseline">'+
+      '<div><div class="hint">我的有效点</div><div style="font-size:22px;font-weight:800;color:#15803d">'+inc.valid.toFixed(1)+' 点</div></div>'+
+      '<div><div class="hint">全店总有效点</div><div style="font-size:18px;font-weight:700">'+inc.total.toFixed(1)+' 点</div></div>'+
+      '<div><div class="hint">我的占比</div><div style="font-size:18px;font-weight:700">'+(inc.total>0?(inc.ratio*100).toFixed(2):"0.00")+'%</div></div>'+
+      '</div>'+
+      '<div style="margin-top:10px;border-top:1px dashed #86efac;padding-top:10px;display:flex;gap:14px;flex-wrap:wrap;align-items:baseline">'+
+      '<div><div class="hint">本月奖金池（毛利 '+fmtMoney(inc.pool.gross)+' × 20%）</div><div style="font-size:18px;font-weight:700">'+fmtMoney(inc.pool.pool)+'</div></div>'+
+      '<div><div class="hint">本月可分红（预计）</div><div style="font-size:24px;font-weight:800;color:#15803d">'+fmtMoney(inc.gross)+'</div></div>'+
+      '<div><div class="hint">代扣个税 / 实发</div><div style="font-size:16px;font-weight:700">'+fmtMoney(inc.tax)+' / '+fmtMoney(inc.net)+'</div></div>'+
+      '</div>'+
+      '<div class="hint" style="margin-top:8px">月中显示为按当前累计毛利测算的预计值，月结后以结算单为准；当月无毛利则池为 0，无分红、不保底。分红点是分配权重标记，不是股权，不可转让、不可变现。</div>'+
+      '</div>';
+  }
+}
 /* ================= 佣金计算引擎 ================= */
 /* 口径（用户确认版）：
    ① 只有已结账（status=done 且金额>0）的记录才参与核算；
