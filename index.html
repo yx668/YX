@@ -6222,10 +6222,19 @@ function promoFeesOf(pid,ym){
   (DB.appointments||[]).forEach(function(a){
     if((a.date||"").slice(0,7)!==ym)return;
     if(!promoIsDirect(a,pid))return;
+    // 套餐核销单：服务费 = 该卡锁定的每次核销佣金（a.commEarned），不再按 30% 重算
+    // （旧逻辑把核销价值 399 再乘 30% 得 89.7，与套餐实收−成本的预拿佣金重复计算）
+    if((+a.commEarned||0)>0&&(+a.redeemValue||0)>0&&!promoIsPkgBuy(a)){
+      var fee=promoR2(+a.commEarned),vv=promoR2(+a.redeemValue||0);
+      var prof=promoR2(fee/PROMO.feeRate),cst=promoR2(Math.max(0,vv-prof));
+      out.rows.push({a:a,value:vv,cost:cst,profit:prof,fee:fee,redeem:true});
+      out.amount+=vv;out.cost+=cst;out.profit+=prof;out.fee+=fee;
+      return;
+    }
     var v=promoOrderValue(a);if(v<=0)return;
-    var cst=promoOrderCost(a),pf=promoR2(Math.max(0,v-cst)),f=promoR2(pf*PROMO.feeRate);
-    out.rows.push({a:a,value:v,cost:cst,profit:pf,fee:f});
-    out.amount+=v;out.cost+=cst;out.profit+=pf;out.fee+=f;
+    var cst2=promoOrderCost(a),pf=promoR2(Math.max(0,v-cst2)),f=promoR2(pf*PROMO.feeRate);
+    out.rows.push({a:a,value:v,cost:cst2,profit:pf,fee:f});
+    out.amount+=v;out.cost+=cst2;out.profit+=pf;out.fee+=f;
   });
   out.amount=promoR2(out.amount);out.cost=promoR2(out.cost);out.profit=promoR2(out.profit);out.fee=promoR2(out.fee);
   out.rows.sort(function(x,y){return (x.a.date<y.a.date)?1:-1;});
