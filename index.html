@@ -6339,7 +6339,7 @@ function renderSharePromo(me,ym){
         return '<tr><td>'+esc(a.date)+'</td><td>'+esc(c?c.name:(a.client||"-"))+'</td><td>'+esc(sv?sv.name:((a.redeemValue?(a.serviceName||"套餐核销"):"服务")))+'</td>'+
           '<td style="text-align:right">'+fmtMoney(r.value)+'</td><td style="text-align:right;color:var(--text-3)">'+fmtMoney(r.cost)+'</td>'+
           '<td style="text-align:right"><b style="color:#16a34a">'+fmtMoney(r.fee)+'</b></td></tr>';
-      }).join("")+'</table>':'';
+      }).join("")+'</table>'):'';
   }
   var box2=$("shareBonus");
   if(box2){
