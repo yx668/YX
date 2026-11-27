@@ -347,6 +347,7 @@ tr:hover td{background:#fafbfc}
       <button class="nav-item" data-view="buy" data-admin="1" type="button"><span class="ic">🛒</span><span>直接购买</span></button>
       <div class="nav-group" id="ngStat">经营分析</div>
       <button class="nav-item" data-view="report" data-admin="1" type="button"><span class="ic">📈</span><span>统计报表</span></button>
+      <button class="nav-item" data-view="promo" data-admin="1" type="button"><span class="ic">💼</span><span>推广结算</span></button>
       <button class="nav-item" data-view="visit" data-admin="1" type="button"><span class="ic">👀</span><span>访客线索</span></button>
       <div class="nav-group" id="ngBase">基础档案</div>
       <button class="nav-item" data-view="customers" data-admin="1" type="button"><span class="ic">👤</span><span>客户档案</span></button>
@@ -404,6 +405,30 @@ tr:hover td{background:#fafbfc}
         <div class="section">
           <div class="section-head"><div><h2>苗衣出租归还</h2><div class="desc">我本人或我推广的客户正在出租的苗衣，归还由门店管理员确认并结算租金</div></div></div>
           <div class="section-body" id="shareRents"></div>
+        </div>
+      </section>
+
+      <!-- 推广结算（管理员） -->
+      <section class="page" id="page-promo">
+        <div class="section">
+          <div class="section-head"><div><h2>推广服务费总览</h2><div class="desc">全店直推成交订单：服务费 =（实收 − 成本）× 30%，按订单实时生成</div></div><button class="btn btn-ghost btn-sm" type="button" onclick="renderPromoAdmin()">刷新</button></div>
+          <div class="section-body" id="promoSummary"></div>
+        </div>
+        <div class="section">
+          <div class="section-head"><div><h2>服务费明细（按单）</h2><div class="desc">仅统计直推客户订单，本人自消费不产生服务费</div></div></div>
+          <div class="section-body no-pad" id="promoFees"></div>
+        </div>
+        <div class="section">
+          <div class="section-head"><div><h2>分红点台账</h2><div class="desc">注册赠送 90 天 · 直推业绩点当月有效 · 本人自消费 365 天；不冻结、不做现金兑换</div></div></div>
+          <div class="section-body no-pad" id="promoPoints"></div>
+        </div>
+        <div class="section">
+          <div class="section-head"><div><h2>本月奖金池与分配</h2><div class="desc">池 = 当月（实收 − 成本）毛利 × 20%，按个人有效点 ÷ 全店总有效点分配</div></div></div>
+          <div class="section-body" id="promoPool"></div>
+        </div>
+        <div class="section">
+          <div class="section-head"><div><h2>月度结算</h2><div class="desc">生成结算快照并写入云端（每月 1 日后执行一次），用于发放留档</div></div></div>
+          <div class="section-body" id="promoSettle"></div>
         </div>
       </section>
 
@@ -4752,21 +4777,22 @@ function renderNav(){
   $("ngCash").classList.toggle("hidden",locked||shareMode);
   document.querySelectorAll("[data-admin]").forEach(function(el){el.style.display=(locked||shareMode)?"none":"";});
   if(shareMode)currentView="share";
-  else if(locked&&["customers","members","config","data","report","buy","site","visit"].indexOf(currentView)>=0)currentView="dashboard";
-  var titles={dashboard:"工作台",calendar:"预约日历",list:"预约列表",buy:"直接购买",customers:"客户档案",members:"成员档案",config:"项目与时段",data:"备份与恢复",report:"统计报表",share:"我的共享板块",site:"官网内容",visit:"访客线索"};
+  else if(locked&&["customers","members","config","data","report","promo","buy","site","visit"].indexOf(currentView)>=0)currentView="dashboard";
+  var titles={dashboard:"工作台",calendar:"预约日历",list:"预约列表",buy:"直接购买",customers:"客户档案",members:"成员档案",config:"项目与时段",data:"备份与恢复",report:"统计报表",promo:"推广结算",share:"我的共享板块",site:"官网内容",visit:"访客线索"};
   $("pageTitle").textContent=titles[currentView]||"";
-  ["dashboard","calendar","list","buy","customers","members","config","data","report","share","site","visit"].forEach(function(v){
+  ["dashboard","calendar","list","buy","customers","members","config","data","report","promo","share","site","visit"].forEach(function(v){
     $("page-"+v).classList.toggle("active",v===currentView);
   });
   if(currentView==="share")renderShareBoard();
   if(currentView==="report")renderReports();
+  if(currentView==="promo")renderPromoAdmin();
   if(currentView==="config")renderSchedule();
   if(currentView==="site"){ if(siteLoaded)renderSiteForm(); else loadSiteContent(); }
   if(currentView==="visit")renderVisit();
 }
 function switchView(v){
   if(shareSess&&v!=="share"){toast("共享股东仅可查看自己的共享板块","err");return;}
-  if(!isAdmin()&&["customers","members","config","data","report","buy","site","visit"].indexOf(v)>=0){toast("普通用户仅可查看与新建预约","err");return;}
+  if(!isAdmin()&&["customers","members","config","data","report","promo","buy","site","visit"].indexOf(v)>=0){toast("普通用户仅可查看与新建预约","err");return;}
   currentView=v;
   try{localStorage.setItem("bkgbook_view",v);}catch(e){}
   renderNav();
@@ -6280,16 +6306,23 @@ function promoPoolOf(ym){
 function promoPartners(){
   return (DB.customers||[]).filter(function(c){return c.type==="shareholder"&&String(c.name||"").indexOf("__DEL__")!==0;});
 }
+/* 注册赠送点：服务端已为每位推广伙伴初始化 1 点（2026-11-27 起 90 天）；
+   拉取到精确记录时用记录值，未拉到时按统一有效期兜底，避免把“未取到”显示成 0 */
+var PROMO_GIFT_EXPIRE_DEFAULT="2027-02-25T23:59:59+08:00";
+function promoGiftOf(cid,giftMap){
+  if(giftMap&&giftMap[cid]!=null)return giftMap[cid];
+  if(new Date().getTime()>new Date(PROMO_GIFT_EXPIRE_DEFAULT).getTime())return 0;
+  return PROMO.giftPoints;
+}
 function promoTotalPoints(ym,giftMap){
   var t=0;
   promoPartners().forEach(function(c){
-    var g=(giftMap&&giftMap[c.id]!=null)?giftMap[c.id]:0;
-    t+=g+promoDirectPointsOf(c.id,ym)+promoSelfPointsOf(c.id,ym);
+    t+=promoGiftOf(c.id,giftMap)+promoDirectPointsOf(c.id,ym)+promoSelfPointsOf(c.id,ym);
   });
   return promoR2(t);
 }
 function promoMyIncome(pid,ym,giftMap){
-  var gift=(giftMap&&giftMap[pid]!=null)?giftMap[pid]:0;
+  var gift=promoGiftOf(pid,giftMap);
   var dpt=promoDirectPointsOf(pid,ym);
   var spt=promoSelfPointsOf(pid,ym);
   var perf=promoDirectPerfOf(pid,ym);
@@ -6306,7 +6339,7 @@ var PROMO_GIFT={};
 function promoLoadGift(){
   if(!cloudCfg||!cloudCfg.url||!shareSess||!shareSess.pwdHash||!shareSess.cid)return;
   authReq("/rest/v1/rpc/promo_points",{p_phone:shareSess.phone,p_pwd_hash:shareSess.pwdHash}).then(function(r){
-    return r.ok?r.json():null;
+    return r.ok?r.json:null;
   }).then(function(j){
     if(!j||!j.ok)return;
     var g=0;
@@ -6365,6 +6398,101 @@ function renderSharePromo(me,ym){
       '<div class="hint" style="margin-top:8px">月中显示为按当前累计毛利测算的预计值，月结后以结算单为准；当月无毛利则池为 0，无分红、不保底。分红点是分配权重标记，不是股权，不可转让、不可变现。</div>'+
       '</div>';
   }
+}
+/* ================= 管理员：推广结算页 ================= */
+function promoAllRows(ym){
+  var rows=[];
+  promoPartners().forEach(function(p){
+    rows.push({p:p,fees:promoFeesOf(p.id,ym),inc:promoMyIncome(p.id,ym,PROMO_GIFT)});
+  });
+  return rows;
+}
+function renderPromoAdmin(){
+  if(!isAdmin())return;
+  var ym=curYm(),pool=promoPoolOf(ym),all=promoAllRows(ym);
+  var totalFee=0,ordersN=0;
+  all.forEach(function(r){totalFee+=r.fees.fee;ordersN+=r.fees.rows.length;});
+  totalFee=promoR2(totalFee);
+  var box=$("promoSummary");
+  if(box){
+    box.innerHTML='<div style="display:flex;gap:12px;flex-wrap:wrap">'+
+      '<div style="flex:1;min-width:120px;background:var(--bg-1);border-radius:10px;padding:12px;text-align:center"><div style="font-size:24px;font-weight:800;color:var(--primary)">'+fmtMoney(totalFee)+'</div><div class="hint">本月服务费合计</div></div>'+
+      '<div style="flex:1;min-width:120px;background:var(--bg-1);border-radius:10px;padding:12px;text-align:center"><div style="font-size:24px;font-weight:800">'+ordersN+'</div><div class="hint">直推成交单数</div></div>'+
+      '<div style="flex:1;min-width:120px;background:var(--bg-1);border-radius:10px;padding:12px;text-align:center"><div style="font-size:24px;font-weight:800">'+fmtMoney(pool.revenue)+'</div><div class="hint">本月实收（含核销）</div></div>'+
+      '<div style="flex:1;min-width:120px;background:var(--bg-1);border-radius:10px;padding:12px;text-align:center"><div style="font-size:24px;font-weight:800">'+fmtMoney(pool.gross)+'</div><div class="hint">本月毛利</div></div>'+
+      '<div style="flex:1;min-width:120px;background:var(--bg-1);border-radius:10px;padding:12px;text-align:center"><div style="font-size:24px;font-weight:800;color:#16a34a">'+fmtMoney(pool.pool)+'</div><div class="hint">奖金池（毛利×20%）</div></div>'+
+      '</div><div class="hint" style="margin-top:10px">口径：服务费 30%（实收−成本）；奖金池 20%（毛利）；本人自消费不进直推档位；不存在间推/下线/团队层级。</div>';
+  }
+  var flat=[];
+  all.forEach(function(r){r.fees.rows.forEach(function(x){flat.push({p:r.p,x:x});});});
+  flat.sort(function(a,b){return (a.x.a.date<b.x.a.date)?1:-1;});
+  var fb=$("promoFees");
+  if(fb){
+    fb.innerHTML=flat.length?('<table><tr><th>日期</th><th>推广伙伴</th><th>客户</th><th>项目</th><th style="text-align:right">实收</th><th style="text-align:right">成本</th><th style="text-align:right">服务费30%</th></tr>'+
+      flat.map(function(o){
+        var x=o.x,a=x.a,sv=a.serviceId?serviceById(a.serviceId):null;
+        var ccx=a.customer_id?customerById(a.customer_id):null;
+        return '<tr><td>'+esc(a.date)+'</td><td>'+esc(o.p.name)+'</td><td>'+esc(ccx?ccx.name:(a.client||"-"))+'</td><td>'+esc(sv?sv.name:(x.a.serviceName||"套餐核销"))+'</td>'+
+          '<td style="text-align:right">'+fmtMoney(x.value)+'</td><td style="text-align:right;color:var(--text-3)">'+fmtMoney(x.cost)+'</td>'+
+          '<td style="text-align:right"><b style="color:#16a34a">'+fmtMoney(x.fee)+'</b></td></tr>';
+      }).join("")+'</table>'):'<div class="hint">本月暂无直推成交。</div>';
+  }
+  var tb=$("promoPoints");
+  if(tb){
+    tb.innerHTML='<table><tr><th>推广伙伴</th><th>本月直推业绩</th><th>档位</th><th style="text-align:center">注册赠送点</th><th style="text-align:center">直推点</th><th style="text-align:center">自消费点</th><th style="text-align:center">有效点</th></tr>'+
+      all.map(function(r){
+        var inc=r.inc;
+        return '<tr><td><b>'+esc(r.p.name)+'</b><div class="hint">'+esc(r.p.phone||"")+'</div></td>'+
+          '<td>'+fmtMoney(inc.perf)+'</td><td>'+inc.mult+' 倍</td>'+
+          '<td style="text-align:center">'+inc.gift.toFixed(1)+'</td>'+
+          '<td style="text-align:center">'+inc.dpt.toFixed(1)+'</td>'+
+          '<td style="text-align:center">'+inc.spt.toFixed(1)+'</td>'+
+          '<td style="text-align:center"><b style="color:#15803d">'+inc.valid.toFixed(1)+'</b></td></tr>';
+      }).join("")+
+      '<tr><td colspan="6" style="text-align:right;font-weight:700">全店总有效点</td><td style="text-align:center;font-weight:800">'+promoTotalPoints(ym,PROMO_GIFT).toFixed(1)+'</td></tr></table>';
+  }
+  var pb=$("promoPool");
+  if(pb){
+    var tot=promoTotalPoints(ym,PROMO_GIFT);
+    pb.innerHTML='<div style="display:flex;gap:14px;flex-wrap:wrap">'+
+      '<div><div class="hint">本月毛利</div><div style="font-size:20px;font-weight:800">'+fmtMoney(pool.gross)+'</div></div>'+
+      '<div><div class="hint">奖金池（20%）</div><div style="font-size:24px;font-weight:800;color:#15803d">'+fmtMoney(pool.pool)+'</div></div>'+
+      '<div><div class="hint">全店总有效点</div><div style="font-size:20px;font-weight:700">'+tot.toFixed(1)+'</div></div>'+
+      '</div>'+
+      '<table style="margin-top:10px"><tr><th>推广伙伴</th><th style="text-align:center">有效点</th><th style="text-align:center">占比</th><th style="text-align:right">应发分红</th><th style="text-align:right">代扣个税</th><th style="text-align:right">实发</th></tr>'+
+      all.map(function(r){
+        var inc=r.inc;
+        return '<tr><td>'+esc(r.p.name)+'</td><td style="text-align:center">'+inc.valid.toFixed(1)+'</td>'+
+          '<td style="text-align:center">'+(inc.total>0?(inc.ratio*100).toFixed(2):"0.00")+'%</td>'+
+          '<td style="text-align:right">'+fmtMoney(inc.gross)+'</td>'+
+          '<td style="text-align:right;color:var(--text-3)">'+fmtMoney(inc.tax)+'</td>'+
+          '<td style="text-align:right"><b style="color:#16a34a">'+fmtMoney(inc.net)+'</b></td></tr>';
+      }).join("")+'</table>'+
+      '<div class="hint" style="margin-top:8px">以上为按当前数据实时测算；月结时按当月最终毛利与有效点生成结算快照。无毛利则池为 0、无分红、不保底。</div>';
+  }
+  var sb=$("promoSettle");
+  if(sb){
+    sb.innerHTML='<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">'+
+      '<div class="hint" style="flex:1;min-width:200px">结算月份：<b>'+esc(ym)+'</b>（建议每月 1 日后对上一月执行）</div>'+
+      '<button class="btn btn-primary" type="button" onclick="settlePromoMonth(\''+ym+'\')">生成结算快照并写入云端</button>'+
+      '</div><div class="hint" style="margin-top:8px">写入后伙伴端可见结算单；重复执行会覆盖同一月份的结算数据（幂等）。</div>';
+  }
+}
+function settlePromoMonth(ym){
+  if(!isAdmin()){toast("仅管理员可结算","err");return;}
+  if(!cloudCfg||!cloudCfg.url){toast("未连接云端，无法写入结算快照","err");return;}
+  var pool=promoPoolOf(ym),all=promoAllRows(ym),tot=promoTotalPoints(ym,PROMO_GIFT);
+  var rows=[];
+  all.forEach(function(r){
+    var inc=r.inc;
+    rows.push({partner_id:r.p.id,gift:inc.gift,direct:inc.dpt,self:inc.spt,valid:inc.valid,
+      ratio:tot>0?inc.valid/tot:0,gross:inc.gross,tax:inc.tax,net:inc.net});
+  });
+  authReq("/rest/v1/rpc/promo_settle_write",{p_month:ym,p_pool:pool.pool,p_total_points:tot,p_rows:rows}).then(function(r){
+    var j=r.ok?r.json:null;
+    if(j&&j.ok)toast("已生成 "+ym+" 结算快照（"+j.rows+" 人）","ok");
+    else toast("结算写入失败，请检查网络或联系技术","err");
+  }).catch(function(){toast("结算写入失败（网络异常）","err");});
 }
 /* ================= 佣金计算引擎 ================= */
 /* 口径（用户确认版）：
