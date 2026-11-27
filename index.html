@@ -5047,12 +5047,23 @@ function renderShareBoard(){
   }
   else{
     // 搜索框位于「客户」表头文字后面，随列表重建；输入值渲染后恢复
-    lv1Html="<table><tr><th style=\"text-align:left\"><span style=\"display:inline-flex;align-items:center;gap:8px\">客户 <input id=\"shareLv1Q\" class=\"input\" style=\"width:150px;height:26px\" placeholder=\"🔍 搜索客户…\" oninput=\"renderShareBoard()\"></span></th><th style=\"text-align:right\">本月消费</th></tr>";
+    lv1Html="<table><tr><th style=\"text-align:left\"><span style=\"display:inline-flex;align-items:center;gap:8px\">客户 <input id=\"shareLv1Q\" class=\"input\" style=\"width:130px;height:26px\" placeholder=\"🔍 搜索客户…\" oninput=\"renderShareBoard()\"></span></th><th style=\"text-align:center\">预约次数</th><th>最近预约</th><th style=\"text-align:right\">本月消费</th></tr>";
     lv1List.forEach(function(c){
       var tag=c.type==="shareholder"?'<span class="tag tag-warn">共享股东</span>':'<span class="tag tag-blue">普通客户</span>';
       var mSpent=monthSpentOf(c.id,ym0);
+      var apps=(DB.appointments||[]).filter(function(a){return a.customer_id===c.id&&a.kind!=="direct"&&a.status!=="cancelled";});
+      var mCnt=apps.filter(function(a){return (a.date||"").indexOf(ym0)===0;}).length;
+      apps.sort(function(x,y){return ((x.date||"")+(x.time||""))<((y.date||"")+(y.time||""))?1:-1;});
+      var last=apps[0];
+      var lastTxt="<span class=\"hint\">-</span>";
+      if(last){
+        var lsv=last.serviceId?serviceById(last.serviceId):null;
+        lastTxt=esc(last.date)+" "+esc(last.time||"")+"<div class=\"hint\">"+esc(lsv?lsv.name:(last.kind==="rent"?"苗衣出租":"项目"))+" · "+(statusMap[last.status]?statusMap[last.status][0]:last.status)+"</div>";
+      }
       lv1Html+='<tr><td><div class="member-cell"><span class="avatar" style="background:'+esc(c.color||"#6b7280")+'">'+esc((c.name||"?")[0])+"</span>"+
         '<div class="info"><div class="name" style="cursor:pointer;color:var(--primary);text-decoration:underline" onclick="viewCustomerDetailForShare(\''+c.id+'\')" title="点击查看该客户全部消费详情">'+esc(c.name)+" "+tag+'</div><div class="role">'+esc(c.phone||"-")+"</div></div></div></td>"+
+        '<td style="text-align:center"><b>'+apps.length+'</b> 次<div class="hint">本月 '+mCnt+' 次</div></td>'+
+        '<td>'+lastTxt+'</td>'+
         '<td style="text-align:right"><b style="color:'+(mSpent>0?"#16a34a":"var(--text-2)")+'">'+fmtMoney(mSpent)+"</b></td></tr>";
     });
     lv1Html+="</table>";
@@ -6395,7 +6406,7 @@ function renderSharePromo(me,ym){
       '<div><div class="hint">本月可分红（预计）</div><div style="font-size:24px;font-weight:800;color:#15803d">'+fmtMoney(inc.gross)+'</div></div>'+
       '<div><div class="hint">代扣个税 / 实发</div><div style="font-size:16px;font-weight:700">'+fmtMoney(inc.tax)+' / '+fmtMoney(inc.net)+'</div></div>'+
       '</div>'+
-      '<div class="hint" style="margin-top:8px">月中显示为按当前累计毛利测算的预计值，月结后以结算单为准；当月无毛利则池为 0，无分红、不保底。分红点是分配权重标记，不是股权，不可转让、不可变现。</div>'+
+      '<div class="hint" style="margin-top:8px">全店总有效点按本机已同步数据测算，月结以云端结算单为准；月中显示为按当前累计毛利测算的预计值；当月无毛利则池为 0，无分红、不保底。分红点是分配权重标记，不是股权，不可转让、不可变现。</div>'+
       '</div>';
   }
 }
@@ -6631,7 +6642,8 @@ function withdrawnTotal(shareId){
   return Math.round(s*100)/100;
 }
 function commissionSummary(shareId){
-  var total=commissionTotal(shareId);
+  // 2026-11-27 新口径：累计推广服务费（固定 30%，实收−成本的纯利润）− 已提现
+  var total=promoFeesTotal(shareId);
   var withd=withdrawnTotal(shareId);
   return {total:total,withdrawn:withd,pending:Math.max(0,Math.round((total-withd)*100)/100)};
 }
