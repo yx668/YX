@@ -6223,7 +6223,7 @@ function promoFeesOf(pid,ym){
   (DB.appointments||[]).forEach(function(a){
     if((a.date||"").slice(0,7)!==ym)return;
     if(!promoIsDirect(a,pid))return;
-    // 套餐核销单：服务费 = 该卡锁定的每次核销佣金（a.commEarned），不再按 30% 重算
+    // 套餐核销单：服务费 = 该次核销的实算佣金（a.commEarned =（本次核销实收−项目成本）×30%），不再按 30% 重算
     // （旧逻辑把核销价值 399 再乘 30% 得 89.7，与套餐实收−成本的预拿佣金重复计算）
     if((+a.commEarned||0)>0&&(+a.redeemValue||0)>0&&!promoIsPkgBuy(a)){
       var fee=promoR2(+a.commEarned),vv=promoR2(+a.redeemValue||0);
@@ -6353,7 +6353,7 @@ function renderSharePromo(me,ym){
         var nm=sv?sv.name:((a.redeemValue?(a.serviceName||"套餐核销"):"服务"))+(r.redeem?"（套餐核销）":"");
         if(r.redeem&&nm.indexOf("套餐核销")<0)nm+="（套餐核销）";
         return '<tr><td>'+esc(a.date)+'</td><td>'+esc(c?c.name:(a.client||"-"))+'</td><td>'+esc(nm)+'</td>'+
-          '<td style="text-align:right">'+fmtMoney(r.value)+'</td><td style="text-align:right;color:var(--text-3)">'+(r.redeem?"—":fmtMoney(r.cost))+'</td>'+
+          '<td style="text-align:right">'+fmtMoney(r.value)+'</td><td style="text-align:right;color:var(--text-3)">'+fmtMoney(r.cost)+'</td>'+
           '<td style="text-align:right"><b style="color:#16a34a">'+fmtMoney(r.fee)+'</b></td></tr>';
       }).join("")+'</table>'):'';
   }
@@ -6417,7 +6417,7 @@ function renderPromoAdmin(){
         var nm=sv?sv.name:(x.a.serviceName||"套餐核销")+(x.redeem?"（套餐核销）":"");
         if(x.redeem&&nm.indexOf("套餐核销")<0)nm+="（套餐核销）";
         return '<tr><td>'+esc(a.date)+'</td><td>'+esc(o.p.name)+'</td><td>'+esc(ccx?ccx.name:(a.client||"-"))+'</td><td>'+esc(nm)+'</td>'+
-          '<td style="text-align:right">'+fmtMoney(x.value)+'</td><td style="text-align:right;color:var(--text-3)">'+(x.redeem?"—":fmtMoney(x.cost))+'</td>'+
+          '<td style="text-align:right">'+fmtMoney(x.value)+'</td><td style="text-align:right;color:var(--text-3)">'+fmtMoney(x.cost)+'</td>'+
           '<td style="text-align:right"><b style="color:#16a34a">'+fmtMoney(x.fee)+'</b></td></tr>';
       }).join("")+'</table>'):'<div class="hint">本月暂无直推成交。</div>';
   }
@@ -7580,7 +7580,7 @@ function saveCheckout(){
   var sv=a.serviceId?serviceById(a.serviceId):null;
   var cust=custOfAppt(a);
   var redeemNote="";
-  // 套餐卡核销：扣减对应项目次数，本次不收款；佣金=卡锁定每次核销佣金
+  // 套餐卡核销：扣减对应项目次数，本次不收款；佣金=（本次核销实收−项目成本）×30%
   var pkgUsed=false;
   if(coRedeemPkg){
     var card=(DB.packageBuys||[]).find(function(b){return b.id===coRedeemPkg;});
