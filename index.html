@@ -390,12 +390,13 @@ tr:hover td{background:#fafbfc}
           <div class="section-body no-pad" id="shareLv1"></div>
         </div>
         <div class="section">
-          <div class="section-head"><div><h2>我购买的套餐</h2><div class="desc">您购买的套餐卡及剩余次数（到店核销，用一次扣一次）</div></div></div>
-          <div class="section-body" id="shareMyPkgs"></div>
-        </div>
-        <div class="section">
-          <div class="section-head"><div><h2>我预约的项目 <span class="tag tag-blue" id="shareSelfCnt"></span></h2><div class="desc">我自己给自己预约的记录与消费（含苗衣出租）</div></div><button class="btn btn-primary btn-sm" type="button" onclick="openShareBook(shareSess&&shareSess.cid)">＋ 我要预约</button></div>
-          <div class="section-body no-pad" id="shareSelf"></div>
+          <div class="section-head"><div><h2>我的套餐与预约 <span class="tag tag-blue" id="shareSelfCnt"></span></h2><div class="desc">我的套餐卡剩余次数 + 本人预约记录与消费（含苗衣出租）</div></div><button class="btn btn-primary btn-sm" type="button" onclick="openShareBook(shareSess&&shareSess.cid)">＋ 我要预约</button></div>
+          <div class="section-body no-pad">
+            <div style="padding:12px 16px 4px"><div style="font-size:13px;font-weight:700;color:var(--text-1)">我的套餐卡</div></div>
+            <div style="padding:0 16px 10px" id="shareMyPkgs"></div>
+            <div style="padding:12px 16px 4px;border-top:1px solid var(--border)"><div style="font-size:13px;font-weight:700;color:var(--text-1)">我的预约记录</div></div>
+            <div id="shareSelf"></div>
+          </div>
         </div>
         <div class="section">
           <div class="section-head"><div><h2>苗衣出租归还</h2><div class="desc">我本人或我推广的客户正在出租的苗衣，归还由门店管理员确认并结算租金</div></div></div>
@@ -4807,11 +4808,7 @@ function lv1IdsOf(shareId){
   (DB.customers||[]).forEach(function(c){if(c.referrer===shareId)ids[c.id]=1;});
   return ids;
 }
-function lv2CustomersOf(shareId){
-  var lv1=lv1IdsOf(shareId),out=[];
-  (DB.customers||[]).forEach(function(c){if(c.referrer&&lv1[c.referrer])out.push(c);});
-  return out;
-}
+
 function openShareBook(cid){
   // 共享股东只能为自己预约（不再为名下客户代约）
   if(shareSess){
@@ -4933,7 +4930,7 @@ function renderShareBoard(){
   if(String(me.name||"").indexOf("__DEL__")===0){
     // 档案已被删除（软删除墓碑）：提示并引导退出重新登录，避免显示乱码
     $("shareInfo").innerHTML='<div class="hint">您的股东账号已被删除或停用，请联系门店管理员确认；或点击左下角「退出」后重新登录有效账号。</div>';
-    $("shareSelfCnt").textContent="共 0 条";
+    $("shareSelfCnt").textContent="套餐 0 张 · 预约 0 条";
     $("shareSelf").innerHTML="";
     $("shareLv1").innerHTML="";
     return;
@@ -4980,7 +4977,7 @@ function renderShareBoard(){
   // 4) 我预约的项目（本人作为客户的记录，管理员/他人可代登记；含苗衣出租）
   var selfApps=DB.appointments.filter(function(a){return a.customer_id===me.id&&a.status!=="cancelled"&&a.kind!=="direct";})
     .sort(function(x,y){return x.date<y.date?-1:1;});
-  if($("shareSelfCnt"))$("shareSelfCnt").textContent="共 "+selfApps.length+" 条";
+  if($("shareSelfCnt"))$("shareSelfCnt").textContent="套餐 "+myPkgs.length+" 张 · 预约 "+selfApps.length+" 条";
   if(!selfApps.length){
     $("shareSelf").innerHTML='<div class="empty"><div class="big">📅</div><h3>暂无本人预约记录</h3><p>您作为客户的预约与消费会显示在这里（由门店管理员或他人为您登记）。</p></div>';
   }else{
@@ -5991,24 +5988,7 @@ function renderWeek(week,appts){
   html+="</div>";
   return html;
 }
-function dayTimelineHTML(date,appts){
-  var start=DB.schedule.start||"09:00",end=DB.schedule.end||"20:00";
-  var s=minOf(start),e=minOf(end);
-  var rows="";
-  for(var t=s;t<e;t+=60){
-    rows+='<div class="tl-row"><div class="tl-time">'+fmtMin(t)+'</div><div class="tl-track"></div></div>';
-  }
-  var blocks="";
-  appts.filter(function(a){return a.date===date;}).forEach(function(a){
-    var m=memberById(a.memberId),sv=serviceById(a.serviceId);
-    var st=minOf(a.time),du=a.duration||60;
-    var top=Math.max(st-s,0)/60*52,height=du/60*52;
-    var color=(m&&m.color)||(sv&&sv.color)||"#6b7280";
-    blocks+='<div class="appt-block'+(a.status==="cancelled"?" cancelled":"")+'" style="top:'+top+'px;height:'+Math.max(height-3,18)+'px;background:'+color+'" title="'+esc(sv?sv.name:"预约")+' · '+esc(a.client)+'" onclick="openApptModal(\''+a.id+'\')">'+
-      '<div class="t">'+esc(a.time)+" "+(sv?esc(sv.name):"预约")+'</div><div class="c">'+(m?esc(m.name)+" · ":"")+esc(a.client)+"</div></div>";
-  });
-  return '<div class="day-timeline"><div style="position:relative">'+rows+'<div style="position:absolute;left:70px;right:0;top:0;bottom:0">'+blocks+"</div></div></div>";
-}
+
 
 /* ================= 预约列表 ================= */
 function renderList(){
@@ -7914,17 +7894,7 @@ function saveDirectBuy(){
 /* 客户退款消费调整（退套餐预存款；ym 传则只统计该月）：
    退款卡对应直购单（预存款）已计入消费 → 扣减退款额（消费=购买价−退款=已核销真实消费）；
    直购单已不存在 → 补记已核销真实消费（购买价−退款），保证已真实消费部分不丢 */
-function refundAdjustOf(cid,ym){
-  var s=0;
-  (DB.refunds||[]).forEach(function(r){
-    if(r.customerId!==cid||(ym&&(r.date||"").indexOf(ym)!==0))return;
-    var rAmt=+r.amount||0;if(!rAmt)return;
-    var card=r.cardId?(DB.packageBuys||[]).find(function(b){return b.id===r.cardId;}):null;
-    var hasBuy=card&&(DB.appointments||[]).some(function(a){return a.kind==="direct"&&a.customer_id===cid&&a.date===card.date&&a.time===card.time;});
-    s+=hasBuy? -rAmt : Math.max(0,(+r.price||0)-rAmt);
-  });
-  return s;
-}
+
 /* ================= 总消费记录（历史消费台账） ================= */
 var conEditId=null;
 function curYm(){var d=new Date();return d.getFullYear()+"-"+(d.getMonth()<9?"0":"")+(d.getMonth()+1);}
@@ -7953,27 +7923,7 @@ function monthSpentOf(cid,ym){
   return Math.round(Math.max(0,s)*100)/100;
 }
 /* 客户历史总消费（不限月份，含出租归还租金；与 monthSpentOf 同口径） */
-function totalSpentOf(cid){
-  var s=0,keyed={};
-  (DB.consumptions||[]).forEach(function(c){
-    var custId=c.customer_id||c.customerId||"";
-    if(c.pkgBuy)return; // 套餐购买预存款在 appointments 同单统计，避免此处重复
-    if(custId===cid){
-      if(c.apptId){
-        var ap=DB.appointments.find(function(a){return a.id===c.apptId;});
-        if(ap&&(+ap.redeemValue||0)>0){ // 核销/混合台账：消费统计按预约实收
-          if(+ap.amount>0)keyed[ap.id]=1;
-          return;
-        }
-      }
-      s+=(+c.amount||0);if(c.apptId)keyed[c.apptId]=1;
-    }
-  });
-  DB.appointments.forEach(function(a){
-    if(a.customer_id===cid&&!keyed[a.id]&&(a.status==="done"||(a.kind==="rent"&&a.status==="returned")))s+=(+a.amount||0);
-  });
-  return Math.round(Math.max(0,s+refundAdjustOf(cid))*100)/100;
-}
+
 /* 结账 / 直接购买后自动登记消费记录（同预约重复结账只更新，不新增） */
 function upsertConsumptionFromAppt(a,kind){
   if(!DB.consumptions)DB.consumptions=[];
