@@ -3872,8 +3872,9 @@ var sched=res[3]&&res[3][0];
         }),DB.packageBuys||[]).filter(function(b){return b&&b.id&&!isDeletedLocal("packagebuys",b.id);});
         (DB.packageBuys||[]).forEach(function(_b){if(_b&&_localRefunded[_b.id])_b.refunded=true;});
       }else if(res[7]){
-        (DB.packageBuys||[]).forEach(function(_b){if(_b&&_b.id)markDeleted("packagebuys",_b.id);});
-        DB.packageBuys=[]; // 云端套餐卡已清空：本地旧卡墓碑化（防周期上推复活云端）并清除
+        // 云端暂时为空：只清掉本地已标记删除的卡，其余保留并随本轮 queuePush 重新上推
+        // （旧逻辑无差别墓碑化，会把刚售出但尚未推送成功的套餐卡清掉 → 预拿佣金/核销次数全部丢失）
+        DB.packageBuys=(DB.packageBuys||[]).filter(function(b){return b&&b.id&&!isDeletedLocal("packagebuys",b.id);});
       }
       if(res[8]&&res[8].length){
         DB.refunds=mergeRows((res[8]||[]).map(stripRow).map(function(r){
@@ -3885,8 +3886,8 @@ var sched=res[3]&&res[3][0];
         return r;
       }),DB.refunds||[]).filter(function(r){return r&&r.id&&!isDeletedLocal("refunds",r.id);});
       }else if(res[8]){
-        (DB.refunds||[]).forEach(function(_r){if(_r&&_r.id)markDeleted("refunds",_r.id);});
-        DB.refunds=[]; // 云端退款已清空：本地旧退款墓碑化并清除，防孤儿退款残留
+        // 云端暂时为空：只清本地已标记删除的退款，其余保留并重新上推（防本地退款记录被空表抹掉）
+        DB.refunds=(DB.refunds||[]).filter(function(r){return r&&r.id&&!isDeletedLocal("refunds",r.id);});
       }
       DB.withdrawals=mergeRows((res[9]||[]).map(stripRow).map(function(w){
         if(w.customerid!=null){w.shareId=w.customerid;delete w.customerid;}
@@ -4875,7 +4876,7 @@ function viewShareholderDetail(cid){
     '<div class="hint">电话：'+(esc(c.phone)||"-")+(ref?"　介绍人："+esc(ref.name):"　介绍人：无")+"</div></div></div>"+
     '<div style="display:flex;gap:12px;flex-wrap:wrap">'+
     '<div style="flex:1;min-width:120px;background:var(--bg-1);border-radius:10px;padding:12px;text-align:center">'+
-    '<div style="font-size:24px;font-weight:800;color:var(--primary)">'+fmtMoney(cs.total)+'</div><div class="hint">累计服务费</div></div>'+
+    '<div style="font-size:24px;font-weight:800;color:var(--primary)">'+fmtMoney(cs.total)+'</div><div class="hint">累计推广佣金</div></div>'+
     '<div style="flex:1;min-width:120px;background:var(--bg-1);border-radius:10px;padding:12px;text-align:center">'+
     '<div style="font-size:24px;font-weight:800;color:var(--text-1)">'+fmtMoney(cs.withdrawn)+'</div><div class="hint">已提现</div></div>'+
     '<div style="flex:1;min-width:120px;background:var(--bg-1);border-radius:10px;padding:12px;text-align:center">'+
@@ -4945,7 +4946,7 @@ function renderShareBoard(){
     '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">'+
     '<div style="flex:1;min-width:100px;background:var(--bg-1);border-radius:10px;padding:12px 10px;text-align:center"><div style="font-size:22px;font-weight:800;color:var(--primary);line-height:1.2">30%</div><div class="hint" style="margin-top:4px">推广服务费率</div></div>'+
     '<div style="flex:1;min-width:100px;background:var(--bg-1);border-radius:10px;padding:12px 10px;text-align:center"><div style="font-size:22px;font-weight:800;color:#16a34a;line-height:1.2">'+fmtMoney(fInfo.fee)+'</div><div class="hint" style="margin-top:4px">本月服务费</div></div>'+
-    '<div style="flex:1;min-width:100px;background:var(--bg-1);border-radius:10px;padding:12px 10px;text-align:center"><div style="font-size:22px;font-weight:800;color:var(--text-1);line-height:1.2">'+fmtMoney(cs.total)+'</div><div class="hint" style="margin-top:4px">累计服务费</div></div>'+
+    '<div style="flex:1;min-width:100px;background:var(--bg-1);border-radius:10px;padding:12px 10px;text-align:center"><div style="font-size:22px;font-weight:800;color:var(--text-1);line-height:1.2">'+fmtMoney(cs.total)+'</div><div class="hint" style="margin-top:4px">累计推广佣金</div></div>'+
     '</div>'+
     '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">'+
     '<div style="flex:1;min-width:100px;background:var(--bg-1);border-radius:10px;padding:12px 10px;text-align:center"><div style="font-size:22px;font-weight:800;color:var(--text-1);line-height:1.2">'+fmtMoney(cs.withdrawn)+'</div><div class="hint" style="margin-top:4px">已提现</div></div>'+
@@ -6583,7 +6584,7 @@ function openWithdrawModal(cid){
   var cs=commissionSummary(cid);
   $("withdrawTitle").textContent="佣金提现 - "+c.name;
   $("withdrawInfo").innerHTML=
-    '<div style="flex:1;min-width:110px;text-align:center;background:var(--bg-1);border-radius:8px;padding:10px"><div style="font-size:20px;font-weight:800;color:var(--primary)">'+fmtMoney(cs.total)+'</div><div class="hint">累计服务费</div></div>'+
+    '<div style="flex:1;min-width:110px;text-align:center;background:var(--bg-1);border-radius:8px;padding:10px"><div style="font-size:20px;font-weight:800;color:var(--primary)">'+fmtMoney(cs.total)+'</div><div class="hint">累计推广佣金</div></div>'+
     '<div style="flex:1;min-width:110px;text-align:center;background:var(--bg-1);border-radius:8px;padding:10px"><div style="font-size:20px;font-weight:800;color:var(--text-1)">'+fmtMoney(cs.withdrawn)+'</div><div class="hint">已提现</div></div>'+
     '<div style="flex:1;min-width:110px;text-align:center;background:var(--bg-1);border-radius:8px;padding:10px"><div style="font-size:20px;font-weight:800;color:#16a34a">'+fmtMoney(cs.pending)+'</div><div class="hint">待提现</div></div>';
   $("withdrawAmount").value="";
@@ -7399,6 +7400,24 @@ function pkgPendingCommOf(shId){
   });
   return Math.round(s*100)/100;
 }
+/* 套餐卡立即单条上云（卖出/核销/退款后不等周期推送，防云端空表把本地卡清掉、股东端看不到次数与预拿佣金） */
+function pushPkgCards(ids){
+  try{
+    if(!(cloudMode&&sess&&ids&&ids.length))return;
+    var rows=[];
+    (ids||[]).forEach(function(id){
+      var b=(DB.packageBuys||[]).find(function(x){return x.id===id;});
+      if(!b)return;
+      rows.push({id:b.id,customerid:b.customerId||null,customer_name:b.client||null,pkgid:b.pkgId||null,pkg_name:b.name||null,
+        price:(b.price!=null)?+b.price:0,cost:(b.pkgCost!=null)?+b.pkgCost:0,date:b.date||null,time:b.time||null,
+        isshare:!!b.isShare,remaining:b.remaining||{},totals:b.totals||{},refunded:!!b.refunded,
+        commeach:(b.commEach!=null)?+b.commEach:0,commtotal:(b.commTotal!=null)?+b.commTotal:0,commused:(b.commUsed!=null)?+b.commUsed:0,
+        updated_at:new Date().toISOString()});
+    });
+    if(!rows.length)return;
+    cloudUpsert("packagebuys",rows,"id").catch(function(e){toast("套餐卡云端同步失败："+(e&&e.message?e.message:e),"err");});
+  }catch(e){}
+}
 var PAY_METHODS={cash:"现金",wechat:"微信",alipay:"支付宝",card:"银行卡",other:"其他",free:"免费"};
 function custOfAppt(a){
   var cust=a.customer_id?customerById(a.customer_id):null;
@@ -7559,6 +7578,7 @@ function saveCheckout(){
   if(isGift)a.note=(a.note?a.note+" · ":"")+"免费名额核销（不收款）";
   if(sv){a.unitPrice=custPrice(sv,cust);a.serviceCost=(+sv.cost||0);}else{a.unitPrice=null;a.serviceCost=null;}
   saveDB();
+  if(pkgUsed)pushPkgCards([coRedeemPkg]); // 核销扣次后立即上云，股东端套餐剩余次数同步
   // 结账结果立即写云端（云端权威落库）：避免定时整表推送与拉取的时间戳竞态
   // 把刚结账的完成状态被云端旧值回滚，导致股东免费/兑换次数不减、统计对不上
   try{
@@ -7809,6 +7829,7 @@ function saveDirectBuy(){
   };
   DB.appointments.push(rec);
   // 生成套餐卡记录（预存款，含各项目剩余次数；并锁定套餐佣金：利润×比例÷总次数=每次核销佣金）
+  var newCardIds=[];
   pkgSel.forEach(function(p){
     var price=isShare&&p.priceShareholder!=null? +p.priceShareholder : +p.price;
     var remaining={},totals={};
@@ -7823,19 +7844,22 @@ function saveDirectBuy(){
     var commTotal=Math.round(pkgProfit*ratio*100)/100;
     var commEach=totalCount>0?Math.round(commTotal/totalCount*100)/100:0;
     DB.packageBuys=DB.packageBuys||[];
-    DB.packageBuys.push({id:uid(),pkgId:p.id,name:p.name,customerId:c?c.id:"",client:client,phone:$("buyPhone").value.trim(),
+    var _newId=uid();
+    DB.packageBuys.push({id:_newId,pkgId:p.id,name:p.name,customerId:c?c.id:"",client:client,phone:$("buyPhone").value.trim(),
       date:todayStr(),time:pad(now.getHours())+":"+pad(now.getMinutes()),price:Math.round(price*100)/100,
       isShare:!!isShare,method:method,remaining:remaining,totals:totals,
       commEach:commEach,commTotal:commTotal,pkgCost:pkgCostTotal});
+    newCardIds.push(_newId);
   });
   // 套餐卡核销扣次（选中的「用套餐」项目），并累计本单核销佣金
-  var redeemLog=[],commEarned=0;
+  var redeemLog=[],commEarned=0,redeemedCardIds=[];
   items.forEach(function(it){
     if(it.kind!=="redeem"||!it.cardId)return;
     var card=(DB.packageBuys||[]).find(function(b){return b.id===it.cardId;});
     if(card&&card.remaining&&card.remaining[it.serviceId]>0){
       card.remaining[it.serviceId]=Math.max(0,card.remaining[it.serviceId]-it.qty);
       redeemLog.push(card.name+" -"+it.qty);
+      redeemedCardIds.push(card.id);
       // 套餐服务费：每次核销 = (成交金额-成本)×30%÷总次数
       if(card){commEarned+=pkgCommEachOf(card)*it.qty;card.commUsed=Math.round(((+card.commUsed||0)+pkgCommEachOf(card)*it.qty)*100)/100;}
       else{
@@ -7849,6 +7873,7 @@ function saveDirectBuy(){
   });
   if(commEarned>0)rec.commEarned=Math.round(commEarned*100)/100;
   saveDB();
+  pushPkgCards(newCardIds.concat(redeemedCardIds));
   closeModal("checkoutMask");
   toast(redeemLog.length?("已收款 "+fmtMoney(total)+"（"+(PAY_METHODS[method]||method)+"）· 核销："+redeemLog.join("、")):("已收款 "+fmtMoney(total)+"（"+(PAY_METHODS[method]||method)+"）"));
   upsertConsumptionFromAppt(rec,"buy");
@@ -8903,7 +8928,7 @@ function renderCustomerConsumptionManager(){
   var c=customerById(ccManagerTargetId);if(!c)return;
   var isAdminRole=isAdmin(),isSh=c.type==="shareholder";
   $("customerConsumptionTitle").textContent=esc(c.name)+" · "+(isSh?"股东详情":"客户详情");
-  // ---- 客户详细信息卡（服务费比例 / 累计服务费 / 本月消费 / 历史消费） ----
+  // ---- 客户详细信息卡（服务费比例 / 累计推广佣金 / 本月消费 / 历史消费） ----
   var html='<div style="padding:16px;border-bottom:1px solid var(--border)">'+
     (function(){
       var ym2=curYm();
@@ -8948,7 +8973,7 @@ function renderCustomerConsumptionManager(){
           '<div style="margin-top:10px;font-size:12.5px;color:var(--text-2);line-height:2">'+
           (isSh?
             '<div>推广服务费比例：<b style="font-size:20px;font-weight:800;color:var(--primary)">'+(com2?Math.round(com2.ratio*100):0)+'%</b>　可预拿服务费：<b style="font-size:18px;font-weight:800;color:#d97706">'+fmtMoney(pkgPendingCommOf(c.id))+'</b></div>'+
-            '<div>累计服务费：<b style="color:var(--text-1)">'+fmtMoney(csum2.total)+'</b>　已提现 '+fmtMoney(csum2.withdrawn)+' · 待提现 '+fmtMoney(csum2.pending)+'</div>'
+            '<div>累计推广佣金：<b style="color:var(--text-1)">'+fmtMoney(csum2.total)+'</b>　已提现 '+fmtMoney(csum2.withdrawn)+' · 待提现 '+fmtMoney(csum2.pending)+'</div>'
             :'<div>该客户为普通客户，无推广服务费。</div>')+
           '</div></div>'+
         '<div style="min-width:230px;flex:1;display:flex;flex-direction:column;gap:10px">'+
