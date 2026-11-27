@@ -7587,11 +7587,14 @@ function saveCheckout(){
     if(card&&card.remaining&&sv&&card.remaining[sv.id]>0){
       card.remaining[sv.id]--;
       pkgUsed=true;
-      card.commUsed=Math.round(((+card.commUsed||0)+pkgCommEachOf(card))*100)/100; // 已核销佣金累计（预拿=总佣金−已核销）
       amt=0;
-      a.redeemValue=cashOfCard(card,sv.id,cust); // 核销确认实收：优先按套餐里填的每次核销金额
-      a.commEarned=pkgCommEachOf(card); // 套餐服务费：每次核销 = (成交金额-成本)×30%÷总次数
-      redeemNote=card.name+"（剩余 "+card.remaining[sv.id]+" "+(sv.isRent?"天":"次")+"）"+(a.commEarned>0?" · 佣金 "+fmtMoney(a.commEarned):"");
+      var rvR=cashOfCard(card,sv.id,cust); // 本次核销确认实收：优先按套餐里填的每次核销金额
+      var costR=Math.max(0,+((sv&&sv.cost)||0)); // 该项目单次成本
+      var feeR=promoR2(Math.max(0,rvR-costR)*PROMO.feeRate); // 本次佣金 = (核销实收 − 成本) × 30%
+      a.redeemValue=rvR;
+      a.commEarned=feeR;
+      card.commUsed=Math.round(((+card.commUsed||0)+feeR)*100)/100; // 已核销佣金累计（预拿=总佣金−已核销）
+      redeemNote=card.name+"（剩余 "+card.remaining[sv.id]+" "+(sv.isRent?"天":"次")+"）"+(feeR>0?" · 佣金 "+fmtMoney(feeR):"");
     }
   }
   if(!isGift&&!pkgUsed&&(coShareFreeMode==="free"||coShareFreeMode==="bonus")){
@@ -7891,8 +7894,15 @@ function saveDirectBuy(){
       card.remaining[it.serviceId]=Math.max(0,card.remaining[it.serviceId]-it.qty);
       redeemLog.push(card.name+" -"+it.qty);
       redeemedCardIds.push(card.id);
-      // 套餐服务费：每次核销 = (成交金额-成本)×30%÷总次数
-      if(card){commEarned+=pkgCommEachOf(card)*it.qty;card.commUsed=Math.round(((+card.commUsed||0)+pkgCommEachOf(card)*it.qty)*100)/100;}
+      // 本次佣金 = (核销实收 − 项目成本) × 30%，不再平摊套餐总额
+      if(card){
+        var svF=serviceById(it.serviceId);
+        var rvF=cashOfCard(card,it.serviceId,c);
+        var costF=Math.max(0,+((svF&&svF.cost)||0));
+        var feeF=promoR2(Math.max(0,rvF-costF)*PROMO.feeRate)*it.qty;
+        commEarned+=feeF;
+        card.commUsed=Math.round(((+card.commUsed||0)+feeF)*100)/100;
+      }
       else{
         var svR=serviceById(it.serviceId);
         var shR=c?(c.referrer?customerById(c.referrer):null):null; // 核销兜底同样只归上级介绍人
@@ -8420,9 +8430,11 @@ function saveReturnRent(){
   if(card&&freeDays>0){
     card.remaining[sv.id]=(+card.remaining[sv.id]||0)-freeDays;
     if(card.remaining[sv.id]<=0)delete card.remaining[sv.id];
-    redeemValue=Math.round(unit*freeDays*100)/100;
-    var each=+(card.commEach||0);
-    if(each>0)commEarned=Math.round(each*freeDays*100)/100;
+    // 本次佣金 = (核销实收 − 项目成本) × 30%（按天累计），不再用卡内平摊佣金
+    var cashD=cashOfCard(card,sv.id,cust);
+    var costD=Math.max(0,+((sv&&sv.cost)||0));
+    redeemValue=Math.round(cashD*freeDays*100)/100;
+    commEarned=Math.round(Math.max(0,cashD-costD)*PROMO.feeRate*freeDays*100)/100;
     card.commUsed=Math.round(((+card.commUsed||0)+commEarned)*100)/100; // 已核销佣金累计（预拿=总佣金−已核销）
     // 备注与预约结账一致：套餐核销·套餐名（剩余X天）·佣金XX.XX
     var redeemNote=card.name+"（剩余 "+((card.remaining[sv.id]!==undefined)?card.remaining[sv.id]:0)+" "+(sv.isRent?"天":"次")+"）"+(commEarned>0?" · 佣金 "+fmtMoney(commEarned):"");
