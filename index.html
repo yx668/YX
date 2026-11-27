@@ -382,10 +382,6 @@ tr:hover td{background:#fafbfc}
           <div id="shareQuota" style="margin-top:12px"><div class="hint">正在读取额度…</div></div>
         </div>
         <div class="section">
-          <div class="section-head"><div><h2>我的推广服务费</h2><div class="desc">固定 30% · 按本人直推客户成交订单扣除成本后的纯利润实时结算</div></div></div>
-          <div class="section-body" id="shareCommission"></div>
-        </div>
-        <div class="section">
           <div class="section-head"><div><h2>我的分红点与本月分红</h2><div class="desc">贡献分红点是奖励池分配权重，不是股权、不可转让、不可变现</div></div></div>
           <div class="section-body" id="shareBonus"></div>
         </div>
@@ -4943,18 +4939,22 @@ function renderShareBoard(){
   var ref=me.referrer?customerById(me.referrer):null;
   var _feeTotal=promoFeesTotal(me.id),_withdrawn=withdrawnTotal(me.id);
   var cs={total:_feeTotal,withdrawn:_withdrawn,pending:Math.max(0,Math.round((_feeTotal-_withdrawn)*100)/100)};
+  var fInfo=promoFeesOf(me.id,ym);
   $("shareInfo").innerHTML='<div class="member-cell"><span class="avatar" style="background:'+esc(me.color||"#d97706")+'">'+esc((me.name||"?")[0])+"</span>"+
     '<div class="info"><div class="name">'+esc(me.name)+' <span class="tag tag-warn">共享股东</span></div>'+
     '<div class="role">电话：'+(esc(me.phone)||"-")+(ref?("　介绍人："+esc(ref.name)):("　介绍人：无"))+"</div></div></div>"+
-    '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:14px">'+
-    '<div style="flex:1;min-width:120px;background:var(--bg-1);border-radius:10px;padding:12px 14px;text-align:center"><div style="font-size:26px;font-weight:800;color:var(--primary);line-height:1.2">'+fmtMoney(cs.total)+'</div><div class="hint" style="margin-top:4px">累计推广服务费</div></div>'+
-    '<div style="flex:1;min-width:120px;background:var(--bg-1);border-radius:10px;padding:12px 14px;text-align:center"><div style="font-size:26px;font-weight:800;color:var(--text-1);line-height:1.2">'+fmtMoney(cs.withdrawn)+'</div><div class="hint" style="margin-top:4px">已提现</div></div>'+
-    '<div style="flex:1;min-width:120px;background:var(--bg-1);border-radius:10px;padding:12px 14px;text-align:center"><div style="font-size:26px;font-weight:800;color:#16a34a;line-height:1.2">'+fmtMoney(cs.pending)+'</div><div class="hint" style="margin-top:4px">待提现</div></div>'+
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">'+
+    '<div style="flex:1;min-width:100px;background:var(--bg-1);border-radius:10px;padding:12px 10px;text-align:center"><div style="font-size:22px;font-weight:800;color:var(--primary);line-height:1.2">30%</div><div class="hint" style="margin-top:4px">推广服务费率</div></div>'+
+    '<div style="flex:1;min-width:100px;background:var(--bg-1);border-radius:10px;padding:12px 10px;text-align:center"><div style="font-size:22px;font-weight:800;color:#16a34a;line-height:1.2">'+fmtMoney(fInfo.fee)+'</div><div class="hint" style="margin-top:4px">本月服务费</div></div>'+
+    '<div style="flex:1;min-width:100px;background:var(--bg-1);border-radius:10px;padding:12px 10px;text-align:center"><div style="font-size:22px;font-weight:800;color:var(--text-1);line-height:1.2">'+fmtMoney(cs.total)+'</div><div class="hint" style="margin-top:4px">累计服务费</div></div>'+
     '</div>'+
-    '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:12px;background:linear-gradient(135deg,#fff7ed,#ffedd5);border:1px solid #fed7aa;border-radius:10px;padding:10px 14px">'+
-    '<div style="font-size:22px;line-height:1">🎫</div>'+
-    '<div style="flex:1;min-width:180px"><div style="font-size:12px;font-weight:700;color:#b45309">可预拿服务费</div><div style="font-size:22px;font-weight:800;color:#d97706;line-height:1.2">'+fmtMoney(pkgPendingCommOf(me.id))+'</div><div class="hint" style="margin-top:2px">名下套餐卡未核销服务费（30% 纯利润口径），核销一次到账一次</div></div>'+
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">'+
+    '<div style="flex:1;min-width:100px;background:var(--bg-1);border-radius:10px;padding:12px 10px;text-align:center"><div style="font-size:22px;font-weight:800;color:var(--text-1);line-height:1.2">'+fmtMoney(cs.withdrawn)+'</div><div class="hint" style="margin-top:4px">已提现</div></div>'+
+    '<div style="flex:1;min-width:100px;background:var(--bg-1);border-radius:10px;padding:12px 10px;text-align:center"><div style="font-size:22px;font-weight:800;color:#16a34a;line-height:1.2">'+fmtMoney(cs.pending)+'</div><div class="hint" style="margin-top:4px">待提现</div></div>'+
+    '<div style="flex:1;min-width:100px;background:linear-gradient(135deg,#fff7ed,#ffedd5);border:1px solid #fed7aa;border-radius:10px;padding:12px 10px;text-align:center"><div style="font-size:22px;font-weight:800;color:#d97706;line-height:1.2">'+fmtMoney(pkgPendingCommOf(me.id))+'</div><div class="hint" style="margin-top:4px">可预拿服务费</div></div>'+
     '</div>'+
+    '<div class="hint" style="margin:10px 0 6px">本月直推成交 '+fInfo.rows.length+' 单 · 实收 '+fmtMoney(fInfo.amount)+' · 成本 '+fmtMoney(fInfo.cost)+' · 毛利 '+fmtMoney(fInfo.profit)+' → 服务费 <b>'+fmtMoney(fInfo.fee)+'</b>（线下打款结算）</div>'+
+    '<div id="shareFeeDetail"></div>'+
     '<div class="hint" style="margin-top:8px">提现需联系门店管理员线下办理，您本人不可自行提现。</div>';
   // 3) 我购买的套餐（套餐卡与剩余次数；已退款不显示）
   var myPkgs=(DB.packageBuys||[]).filter(function(b){return b.customerId===me.id&&!b.refunded;});
@@ -6328,28 +6328,19 @@ function promoLoadGift(){
     try{renderSharePromo(customerById(shareSess.cid),curYm());}catch(e){}
   }).catch(function(){});
 }
-/* 我的推广服务费卡 */
+/* 推广服务费明细（数字已并入「我的信息」卡，这里只渲染本月逐单明细） */
 function renderSharePromo(me,ym){
   if(!me)return;
-  var box=$("shareCommission");
-  if(box){
+  var det=$("shareFeeDetail");
+  if(det){
     var f=promoFeesOf(me.id,ym);
-    var cum=promoFeesTotal(me.id);
-    var rows=f.rows.length?('<table><tr><th>日期</th><th>客户</th><th>项目</th><th style="text-align:right">实收</th><th style="text-align:right">成本</th><th style="text-align:right">服务费 30%</th></tr>'+
+    det.innerHTML=f.rows.length?('<table><tr><th>日期</th><th>客户</th><th>项目</th><th style="text-align:right">实收</th><th style="text-align:right">成本</th><th style="text-align:right">服务费 30%</th></tr>'+
       f.rows.map(function(r){
         var a=r.a,sv=a.serviceId?serviceById(a.serviceId):null,c=customerById(a.customer_id);
         return '<tr><td>'+esc(a.date)+'</td><td>'+esc(c?c.name:(a.client||"-"))+'</td><td>'+esc(sv?sv.name:((a.redeemValue?(a.serviceName||"套餐核销"):"服务")))+'</td>'+
           '<td style="text-align:right">'+fmtMoney(r.value)+'</td><td style="text-align:right;color:var(--text-3)">'+fmtMoney(r.cost)+'</td>'+
           '<td style="text-align:right"><b style="color:#16a34a">'+fmtMoney(r.fee)+'</b></td></tr>';
       }).join("")+'</table>'):'<div class="hint">本月暂无推广服务费（客户结账后实时计入）。</div>';
-    box.innerHTML=
-      '<div style="display:flex;gap:12px;flex-wrap:wrap">'+
-      '<div style="flex:1;min-width:110px;background:var(--bg-1);border-radius:10px;padding:12px;text-align:center"><div style="font-size:28px;font-weight:800;color:var(--primary)">30%</div><div class="hint">固定费率</div></div>'+
-      '<div style="flex:1;min-width:110px;background:var(--bg-1);border-radius:10px;padding:12px;text-align:center"><div style="font-size:22px;font-weight:800;color:#16a34a">'+fmtMoney(f.fee)+'</div><div class="hint">本月服务费</div></div>'+
-      '<div style="flex:1;min-width:110px;background:var(--bg-1);border-radius:10px;padding:12px;text-align:center"><div style="font-size:22px;font-weight:800">'+fmtMoney(cum)+'</div><div class="hint">累计服务费</div></div>'+
-      '</div>'+
-      '<div class="hint" style="margin:10px 0 8px">本月直推成交 '+f.rows.length+' 单 · 实收 '+fmtMoney(f.amount)+' · 成本 '+fmtMoney(f.cost)+' · 毛利 '+fmtMoney(f.profit)+' → 服务费 <b>'+fmtMoney(f.fee)+'</b>（线下打款结算）</div>'+
-      rows;
   }
   var box2=$("shareBonus");
   if(box2){
@@ -6362,14 +6353,14 @@ function renderSharePromo(me,ym){
       '</div>'+
       '<div style="margin-top:10px;background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1px solid #bbf7d0;border-radius:10px;padding:12px 14px">'+
       '<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:baseline">'+
-      '<div><div class="hint">我的有效点</div><div style="font-size:22px;font-weight:800;color:#15803d">'+inc.valid.toFixed(1)+' 点</div></div>'+
-      '<div><div class="hint">全店总有效点</div><div style="font-size:18px;font-weight:700">'+inc.total.toFixed(1)+' 点</div></div>'+
-      '<div><div class="hint">我的占比</div><div style="font-size:18px;font-weight:700">'+(inc.total>0?(inc.ratio*100).toFixed(2):"0.00")+'%</div></div>'+
+      '<div><div class="hint">我的有效点</div><div style="font-size:22px;font-weight:800;color:#15803d;line-height:1.3">'+inc.valid.toFixed(1)+' 点</div></div>'+
+      '<div><div class="hint">全店总有效点</div><div style="font-size:22px;font-weight:800;color:var(--text-1);line-height:1.3">'+inc.total.toFixed(1)+' 点</div></div>'+
+      '<div><div class="hint">我的占比</div><div style="font-size:22px;font-weight:800;color:var(--text-1);line-height:1.3">'+(inc.total>0?(inc.ratio*100).toFixed(2):"0.00")+'%</div></div>'+
       '</div>'+
       '<div style="margin-top:10px;border-top:1px dashed #86efac;padding-top:10px;display:flex;gap:14px;flex-wrap:wrap;align-items:baseline">'+
-      '<div><div class="hint">本月奖金池（毛利 '+fmtMoney(inc.pool.gross)+' × 20%）</div><div style="font-size:18px;font-weight:700">'+fmtMoney(inc.pool.pool)+'</div></div>'+
-      '<div><div class="hint">本月可分红（预计）</div><div style="font-size:24px;font-weight:800;color:#15803d">'+fmtMoney(inc.gross)+'</div></div>'+
-      '<div><div class="hint">代扣个税 / 实发</div><div style="font-size:16px;font-weight:700">'+fmtMoney(inc.tax)+' / '+fmtMoney(inc.net)+'</div></div>'+
+      '<div><div class="hint">本月奖金池（毛利 '+fmtMoney(inc.pool.gross)+' × 20%）</div><div style="font-size:22px;font-weight:800;color:var(--text-1);line-height:1.3">'+fmtMoney(inc.pool.pool)+'</div></div>'+
+      '<div><div class="hint">本月可分红（预计）</div><div style="font-size:22px;font-weight:800;color:#15803d;line-height:1.3">'+fmtMoney(inc.gross)+'</div></div>'+
+      '<div><div class="hint">代扣个税 / 实发</div><div style="font-size:22px;font-weight:800;color:var(--text-1);line-height:1.3">'+fmtMoney(inc.tax)+' / '+fmtMoney(inc.net)+'</div></div>'+
       '</div>'+
       '<div class="hint" style="margin-top:8px">全店总有效点按本机已同步数据测算，月结以云端结算单为准；月中显示为按当前累计毛利测算的预计值；当月无毛利则池为 0，无分红、不保底。分红点是分配权重标记，不是股权，不可转让、不可变现。</div>'+
       '</div>';
