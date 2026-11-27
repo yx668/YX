@@ -4953,7 +4953,7 @@ function renderShareBoard(){
     '<div style="flex:1;min-width:100px;background:var(--bg-1);border-radius:10px;padding:12px 10px;text-align:center"><div style="font-size:22px;font-weight:800;color:#16a34a;line-height:1.2">'+fmtMoney(cs.pending)+'</div><div class="hint" style="margin-top:4px">待提现</div></div>'+
     '<div style="flex:1;min-width:100px;background:linear-gradient(135deg,#fff7ed,#ffedd5);border:1px solid #fed7aa;border-radius:10px;padding:12px 10px;text-align:center"><div style="font-size:22px;font-weight:800;color:#d97706;line-height:1.2">'+fmtMoney(pkgPendingCommOf(me.id))+'</div><div class="hint" style="margin-top:4px">可预拿服务费</div></div>'+
     '</div>'+
-    '<div class="hint" style="margin:10px 0 6px">本月直推成交 '+fInfo.rows.length+' 单 · 实收 '+fmtMoney(fInfo.amount)+' · 成本 '+fmtMoney(fInfo.cost)+' · 毛利 '+fmtMoney(fInfo.profit)+' → 服务费 <b>'+fmtMoney(fInfo.fee)+'</b>（线下打款结算）</div>'+
+    '<div class="hint" style="margin:10px 0 6px">本月直推成交 '+fInfo.rows.length+' 单'+(fInfo.redeemCount?'（其中套餐核销 '+fInfo.redeemCount+' 次 · 核销价值 '+fmtMoney(fInfo.redeemValue)+'）':'')+' · 实收 '+fmtMoney(fInfo.amount)+(fInfo.redeemCount?'':' · 成本 '+fmtMoney(fInfo.cost)+' · 毛利 '+fmtMoney(fInfo.profit))+' → 服务费 <b>'+fmtMoney(fInfo.fee)+'</b>（线下打款结算）</div>'+
     '<div id="shareFeeDetail"></div>'+
     '<div class="hint" style="margin-top:8px">提现需联系门店管理员线下办理，您本人不可自行提现。</div>';
   // 3) 我购买的套餐（套餐卡与剩余次数；已退款不显示）
@@ -6228,7 +6228,8 @@ function promoFeesOf(pid,ym){
       var fee=promoR2(+a.commEarned),vv=promoR2(+a.redeemValue||0);
       var prof=promoR2(fee/PROMO.feeRate),cst=promoR2(Math.max(0,vv-prof));
       out.rows.push({a:a,value:vv,cost:cst,profit:prof,fee:fee,redeem:true});
-      out.amount+=vv;out.cost+=cst;out.profit+=prof;out.fee+=fee;
+      out.redeemCount=(out.redeemCount||0)+1;out.redeemValue=promoR2((out.redeemValue||0)+vv);
+      out.fee+=fee; // 核销单不计入实收/成本/毛利（不是当次收款），服务费按卡锁定值计
       return;
     }
     var v=promoOrderValue(a);if(v<=0)return;
@@ -6253,6 +6254,8 @@ function promoDirectPerfOf(pid,ym){
     if((a.date||"").slice(0,7)!==ym)return;
     if(!promoIsDirect(a,pid))return;
     if(promoIsPkgBuy(a)){s+=(+a.amount||0);return;}
+    // 套餐核销单没有实收（核销价值不是当次收款），不计入直推业绩
+    if((+a.commEarned||0)>0&&(+a.redeemValue||0)>0)return;
     s+=promoOrderValue(a);
   });
   (DB.refunds||[]).forEach(function(r){
@@ -6343,11 +6346,13 @@ function renderSharePromo(me,ym){
   var det=$("shareFeeDetail");
   if(det){
     var f=promoFeesOf(me.id,ym);
-    det.innerHTML=f.rows.length?('<table><tr><th>日期</th><th>客户</th><th>项目</th><th style="text-align:right">实收</th><th style="text-align:right">成本</th><th style="text-align:right">服务费 30%</th></tr>'+
+    det.innerHTML=f.rows.length?('<table><tr><th>日期</th><th>客户</th><th>项目</th><th style="text-align:right">实收</th><th style="text-align:right">成本</th><th style="text-align:right">服务费</th></tr>'+
       f.rows.map(function(r){
         var a=r.a,sv=a.serviceId?serviceById(a.serviceId):null,c=customerById(a.customer_id);
-        return '<tr><td>'+esc(a.date)+'</td><td>'+esc(c?c.name:(a.client||"-"))+'</td><td>'+esc(sv?sv.name:((a.redeemValue?(a.serviceName||"套餐核销"):"服务")))+'</td>'+
-          '<td style="text-align:right">'+fmtMoney(r.value)+'</td><td style="text-align:right;color:var(--text-3)">'+fmtMoney(r.cost)+'</td>'+
+        var nm=sv?sv.name:((a.redeemValue?(a.serviceName||"套餐核销"):"服务"))+(r.redeem?"（套餐核销）":"");
+        if(r.redeem&&nm.indexOf("套餐核销")<0)nm+="（套餐核销）";
+        return '<tr><td>'+esc(a.date)+'</td><td>'+esc(c?c.name:(a.client||"-"))+'</td><td>'+esc(nm)+'</td>'+
+          '<td style="text-align:right">'+fmtMoney(r.value)+'</td><td style="text-align:right;color:var(--text-3)">'+(r.redeem?"—":fmtMoney(r.cost))+'</td>'+
           '<td style="text-align:right"><b style="color:#16a34a">'+fmtMoney(r.fee)+'</b></td></tr>';
       }).join("")+'</table>'):'';
   }
@@ -6404,12 +6409,14 @@ function renderPromoAdmin(){
   flat.sort(function(a,b){return (a.x.a.date<b.x.a.date)?1:-1;});
   var fb=$("promoFees");
   if(fb){
-    fb.innerHTML=flat.length?('<table><tr><th>日期</th><th>推广伙伴</th><th>客户</th><th>项目</th><th style="text-align:right">实收</th><th style="text-align:right">成本</th><th style="text-align:right">服务费30%</th></tr>'+
+    fb.innerHTML=flat.length?('<table><tr><th>日期</th><th>推广伙伴</th><th>客户</th><th>项目</th><th style="text-align:right">实收</th><th style="text-align:right">成本</th><th style="text-align:right">服务费</th></tr>'+
       flat.map(function(o){
         var x=o.x,a=x.a,sv=a.serviceId?serviceById(a.serviceId):null;
         var ccx=a.customer_id?customerById(a.customer_id):null;
-        return '<tr><td>'+esc(a.date)+'</td><td>'+esc(o.p.name)+'</td><td>'+esc(ccx?ccx.name:(a.client||"-"))+'</td><td>'+esc(sv?sv.name:(x.a.serviceName||"套餐核销"))+'</td>'+
-          '<td style="text-align:right">'+fmtMoney(x.value)+'</td><td style="text-align:right;color:var(--text-3)">'+fmtMoney(x.cost)+'</td>'+
+        var nm=sv?sv.name:(x.a.serviceName||"套餐核销")+(x.redeem?"（套餐核销）":"");
+        if(x.redeem&&nm.indexOf("套餐核销")<0)nm+="（套餐核销）";
+        return '<tr><td>'+esc(a.date)+'</td><td>'+esc(o.p.name)+'</td><td>'+esc(ccx?ccx.name:(a.client||"-"))+'</td><td>'+esc(nm)+'</td>'+
+          '<td style="text-align:right">'+fmtMoney(x.value)+'</td><td style="text-align:right;color:var(--text-3)">'+(x.redeem?"—":fmtMoney(x.cost))+'</td>'+
           '<td style="text-align:right"><b style="color:#16a34a">'+fmtMoney(x.fee)+'</b></td></tr>';
       }).join("")+'</table>'):'<div class="hint">本月暂无直推成交。</div>';
   }
