@@ -809,7 +809,7 @@ tr:hover td{background:#fafbfc}
   </div>
 </div>
 
-<!-- 模态框：查看一级客户 -->
+<!-- 模态框：查看该客户的直推客户 -->
 <div class="mask" id="custLv1Mask">
   <div class="modal" style="max-width:680px">
     <div class="modal-head"><h3 id="custLv1Title">名下客户</h3><button class="modal-x" type="button" onclick="closeModal('custLv1Mask')">✕</button></div>
@@ -4558,10 +4558,10 @@ var SITE_DEF={
  "holder.d1": "我发现很多在家的人想赚到钱，其实比想象中难太多了。孩子读书需要接送，老人需要照顾，丢下孩子在家跟老人，又怕小孩以后不听话；去进厂或者去工地干苦工嘛，又苦又累又不得钱。",
  "holder.d2": "想找一个把项目做，其他平台总部大多都在大城市，太远也去不了；而且大部分平台都是需要入门费，需要自己掏钱来囤货，风险太大，卖不出去自己又用不完，最后全部砸自己手里。",
  "holder.d3": "我也发现，现在的兄弟姐妹不是没有能力、不是说不够努力，你只是缺少一个不用垫资、不用囤货、时间完全自由、有人手把手来带，0 投资，靠谱而且赚钱的机会。",
- "holder.point1": "客户到店消费，按成交额的利润拿 30%–50% 提成，档位越高比例越高，当月结算。",
+ "holder.point1": "客户到店消费，按订单纯利润（实收−成本）固定拿 30% 推广服务费，每单实时结算；另有贡献分红点，参与门店当月奖金池（毛利 20%）加权分红。",
  "holder.point2": "参与门店服务协作、带客到店协助，按协作内容另计。",
  "holder.join": "先了解，\n再决定。",
- "holder.side1": "公司将价值 20 万的店铺，免费共享给所有想要创业的人，成为店铺的老板之一，推广分享可以拿丰厚佣金。",
+ "holder.side1": "公司将价值 20 万的店铺，免费共享给所有想要创业的人，成为店铺的老板之一，推广分享固定拿 30% 服务费，还能拿分红点参与奖金池分红。",
  "holder.side2": "公司不用你投钱开房租，不用你囤货，不用你亲自来服务，让你轻轻松松也可以开启 0 投资的创业之路。",
  "store.lead": "到隆林德峨，先看衣、再做护理。建议提前预约，避免等候。",
  "store.mapcap": "德峨镇 · 苹果场 · G246 旁，地图定位搜「银绣智享德峨店」，旁边就是德峨镇牛马市场。",
@@ -4799,8 +4799,8 @@ function switchView(v){
 }
 
 /* ========== 共享股东板块（权限隔离视图） ========== */
-// 共享股东登录后（shareSess 存在）：仅可见自己名下一级客户预约与消费、
-// 二级客户各项目预约次数、我的佣金（按时间筛选只查看不打款）、一键建预约（名下客户/自己）。
+// 共享股东（推广伙伴）登录后（shareSess 存在）：仅可见自己直推客户的预约与消费、
+// 自己的推广服务费 30% 与贡献分红点、一键建预约（名下客户/自己）。
 function genShareYm(){
   var t=new Date();
   return t.getFullYear()+"-"+pad(t.getMonth()+1);
@@ -4837,7 +4837,7 @@ function quickBookFor(cid){
   openShareBook(cid);
   toast("已为客户「"+c.name+"」打开新建预约");
 }
-// 客户档案：查看该客户名下的一级客户列表
+// 客户档案：查看该客户名下的直推客户列表
 var lv1ViewCid=null; // 记录名下客户弹框当前查看的客户（新增下级后用于刷新）
 var addFromLv1=false; // 标记本次新增客户来自「名下客户」弹框：保存后自动回到该弹框并刷新
 function viewLv1Customers(cid){
@@ -4845,12 +4845,12 @@ function viewLv1Customers(cid){
   if(!c){toast("未找到该客户","err");return;}
   lv1ViewCid=cid;
   var lv1=(DB.customers||[]).filter(function(x){return x.referrer===cid;});
-  $("custLv1Title").textContent=c.name+" 名下的一级客户（"+lv1.length+" 人）";
+  $("custLv1Title").textContent=c.name+" 名下的直推客户（"+lv1.length+" 人）";
   // 增加下级客户：仅管理员可见，新增自动归为当前客户的一级下级
   var head=isAdmin()?'<div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button class="btn btn-primary btn-sm" type="button" onclick="addFromLv1=true;closeModal(\'custLv1Mask\');openCustomerModal(null,\''+cid+'\')">＋ 增加下级客户</button></div>':"";
   var body="";
   if(!lv1.length){
-    body='<div class="empty"><div class="big">👤</div><h3>暂无一级客户</h3><p>其他客户建档时选择「'+esc(c.name)+'」作为介绍人后，会显示在这里（一级客户=直接介绍人）。</p></div>';
+    body='<div class="empty"><div class="big">👤</div><h3>暂无直推客户</h3><p>其他客户建档时选择「'+esc(c.name)+'」作为介绍人后，会显示在这里（直推客户=建档时介绍人填的是本人）。</p></div>';
   }else{
     body="<table><tr><th style=\"text-align:left\">客户</th><th>身份</th><th style=\"text-align:left\">归属介绍人</th></tr>"+
       lv1.map(function(x){
@@ -4860,22 +4860,6 @@ function viewLv1Customers(cid){
         return '<tr><td><div class="member-cell"><span class="avatar" style="background:'+esc(x.color||"#6b7280")+'">'+esc((x.name||"?")[0])+"</span>"+
           '<div class="info"><div class="name" style="cursor:pointer;color:var(--primary);text-decoration:underline" onclick="viewCustomerDetailForShare(\''+x.id+'\')" title="点击查看消费详情">'+esc(x.name)+" "+ctag+'</div><div class="role">'+(esc(x.phone)||'-')+'</div></div></div></td>'+
           "<td>"+custTypeTag(x)+"</td><td>"+(x.referrer?esc((customerById(x.referrer)||{}).name||'-'):'<span class="hint">-</span>')+"</td></tr>";
-      }).join("")+"</table>";
-  }
-  // 二级客户明细：当前客户的一级客户再介绍的客户（路径：客户→一级→二级）
-  var lv1Ids={};
-  lv1.forEach(function(y){lv1Ids[y.id]=1;});
-  var lv2List=(DB.customers||[]).filter(function(x){return x.referrer&&lv1Ids[x.referrer];});
-  if(lv2List.length){
-    body+='<div style="margin-top:14px;font-size:13px;font-weight:700;color:var(--text-1)">二级客户（'+lv2List.length+" 人）</div>"+
-      "<table style=\"margin-top:6px\"><tr><th style=\"text-align:left\">客户</th><th style=\"text-align:left\">归属一级</th></tr>"+
-      lv2List.map(function(x){
-        var ref=customerById(x.referrer);
-        var cnt=DB.appointments.filter(function(a){return (a.customer_id&&a.customer_id===x.id)||((!a.customer_id)&&a.client===x.name);}).length;
-        var spentX=DB.appointments.reduce(function(s,a){return s+((a.customer_id&&a.customer_id===x.id&&isPaidAppt(a))?(+a.amount||0):0);},0);
-        return '<tr><td><div class="member-cell"><span class="avatar" style="background:'+esc(x.color||"#6b7280")+';width:22px;height:22px;font-size:11px">'+esc((x.name||"?")[0])+"</span>"+
-          '<div class="info"><div class="name" style="cursor:pointer;color:var(--primary);text-decoration:underline" onclick="viewCustomerDetailForShare(\''+x.id+'\')" title="点击查看消费详情">'+esc(x.name)+'</div><div class="role">'+(esc(x.phone)||'-')+'</div></div></div></td>'+
-          "<td>"+(ref?esc(ref.name):'<span class="hint">-</span>')+"</td></tr>";
       }).join("")+"</table>";
   }
   $("custLv1Body").innerHTML=head+body;
@@ -4896,18 +4880,18 @@ function viewShareholderDetail(cid){
     '<div class="hint">电话：'+(esc(c.phone)||"-")+(ref?"　介绍人："+esc(ref.name):"　介绍人：无")+"</div></div></div>"+
     '<div style="display:flex;gap:12px;flex-wrap:wrap">'+
     '<div style="flex:1;min-width:120px;background:var(--bg-1);border-radius:10px;padding:12px;text-align:center">'+
-    '<div style="font-size:24px;font-weight:800;color:var(--primary)">'+fmtMoney(cs.total)+'</div><div class="hint">总佣金</div></div>'+
+    '<div style="font-size:24px;font-weight:800;color:var(--primary)">'+fmtMoney(cs.total)+'</div><div class="hint">累计服务费</div></div>'+
     '<div style="flex:1;min-width:120px;background:var(--bg-1);border-radius:10px;padding:12px;text-align:center">'+
     '<div style="font-size:24px;font-weight:800;color:var(--text-1)">'+fmtMoney(cs.withdrawn)+'</div><div class="hint">已提现</div></div>'+
     '<div style="flex:1;min-width:120px;background:var(--bg-1);border-radius:10px;padding:12px;text-align:center">'+
     '<div style="font-size:24px;font-weight:800;color:#16a34a">'+fmtMoney(cs.pending)+'</div><div class="hint">待提现</div></div>'+
     '</div></div>';
-  // 2) 名下一级客户明细（含消费详情）
+  // 2) 直推客户明细（含消费详情）
   var lv1=(DB.customers||[]).filter(function(x){return x.referrer===c.id;});
   if(!lv1.length){
-    html+='<div class="empty"><div class="big">👤</div><h3>暂无一级客户</h3></div>';
+    html+='<div class="empty"><div class="big">👤</div><h3>暂无直推客户</h3></div>';
   }else{
-    html+='<div style="font-size:14px;font-weight:700;color:var(--text-1);margin-bottom:8px">一级客户（'+lv1.length+' 人）</div>'+
+    html+='<div style="font-size:14px;font-weight:700;color:var(--text-1);margin-bottom:8px">直推客户（'+lv1.length+' 人）</div>'+
       '<table><tr><th style="text-align:left">客户</th><th style="text-align:right">操作</th></tr>';
     lv1.forEach(function(x){
       var apps=DB.appointments.filter(function(a){return a.customer_id===x.id&&a.status!=="cancelled";});
@@ -4919,26 +4903,7 @@ function viewShareholderDetail(cid){
     });
     html+='</table>';
   }
-  // 3) 二级客户统计
-  var lv1Ids={};lv1.forEach(function(y){lv1Ids[y.id]=1;});
-  var lv2=(DB.customers||[]).filter(function(x){return x.referrer&&lv1Ids[x.referrer];});
-  if(lv2.length){
-    var lv2Total=lv2.reduce(function(s,x){
-      var apps=DB.appointments.filter(function(a){return a.customer_id===x.id&&a.status!=="cancelled";}).reduce(function(ss,a){return ss+(((a.status==="done"||(a.kind==="rent"&&a.status==="returned"))?(+a.amount||0):0));},0);
-      return s+apps;
-    },0);
-    html+='<div style="margin-top:16px;font-size:14px;font-weight:700;color:var(--text-1);margin-bottom:8px">二级客户（'+lv2.length+' 人 · 已消费 '+fmtMoney(lv2Total)+'）</div>'+
-      '<table><tr><th style="text-align:left">客户</th><th style="text-align:left">归属一级</th></tr>';
-    lv2.forEach(function(x){
-      var ref=customerById(x.referrer);
-      var apps=DB.appointments.filter(function(a){return a.customer_id===x.id&&a.status!=="cancelled";});
-      var spent=apps.reduce(function(s,a){return s+(((a.status==="done"||(a.kind==="rent"&&a.status==="returned"))?(+a.amount||0):0));},0);
-      html+='<tr><td><div class="member-cell"><span class="avatar" style="background:'+esc(x.color||"#6b7280")+'">'+esc((x.name||"?")[0])+'</span><div class="info"><div class="name" style="cursor:pointer;color:var(--primary);text-decoration:underline" onclick="viewCustomerDetailForShare(\''+x.id+'\')" title="点击查看消费详情">'+esc(x.name)+'</div><div class="role">'+(esc(x.phone)||'-')+'</div></div></div></td>'+
-        '<td>'+(ref?esc(ref.name):'<span class="hint">-</span>')+'</td></tr>';
-    });
-    html+='</table>';
-  }
-  // 4) 本人预约记录
+  // 3) 本人预约记录
   var selfApps=DB.appointments.filter(function(a){return a.customer_id===c.id&&a.status!=="cancelled"&&a.kind!=="direct";});
   if(selfApps.length){
     html+='<div style="margin-top:16px;font-size:14px;font-weight:700;color:var(--text-1);margin-bottom:8px">本人预约记录（'+selfApps.length+' 条）</div>'+
@@ -6156,7 +6121,7 @@ function renderReports(){
   var paidCount=paid.length+orphanCon.length;
   var income=paid.reduce(function(s,a){return s+(+a.amount||0);},0)+orphanCon.reduce(function(s,c){return s+(+c.amount||0);},0);
   var cost=paid.reduce(function(s,a){return s+apptProfit(a).cost;},0)+orphanCon.reduce(function(s,c){return s+(+c.cost||0);},0);
-  // 佣金：范围内已收款记录逐条核算——客户为某共享股东一级客户时，按该股东当月佣金比例计提
+  // 服务费：范围内已收款记录逐条核算——客户为某推广伙伴直推客户时，按固定 30% 计提
   var commission=calcCommission(paid);
   var profit=Math.round((income-cost-commission)*100)/100;
   // 当日营收：今日已收款合计（普通预约按预约日，出租单按归还日）
@@ -6505,14 +6470,13 @@ function settlePromoMonth(ym){
     else toast("结算写入失败，请检查网络或联系技术","err");
   }).catch(function(){toast("结算写入失败（网络异常）","err");});
 }
-/* ================= 佣金计算引擎 ================= */
-/* 口径（用户确认版）：
-   ① 只有已结账（status=done 且金额>0）的记录才参与核算；
-   ② 未登记散客（无 customer_id）或非该股东一级客户的消费，不计入任何股东业绩；
-   ③ 方式一：按月流水分档（<3000→30%、3000-6000→40%、≥6000→50%），
-      基数=当月一级客户利润合计（销售额−成本快照，成本缺失回退项目当前成本）；
-   ④ 方式二：共享股东本人历史累计消费满 3000 → 永久 40%、满 6000 → 永久 50%；
-   ⑤ 取两种方式中更大的比例：佣金 = 当月一级客户利润合计 × 比例（四舍五入到分）。 */
+/* ================= 推广服务费计算引擎（2026-11-27 固定 30% 口径） ================= */
+/* 口径：
+   ① 只有已结账（status=done 且金额>0）的记录才参与核算；套餐按核销进度确认（核销一次计一次）；
+   ② 未登记散客（无 customer_id）或非该推广伙伴直推客户的消费，不计入其业绩；
+   ③ 基数=该笔订单「实收 − 成本」，服务费 = 纯利润 × 30%，不设任何阶梯档位；
+   ④ 本人自消费不产生服务费、不计入冲档业绩；
+   ⑤ 不存在间推/下线/团队层级，任何人的收益只与自己的直推客户挂钩。 */
 /* 已结算口径：预约已完成已收款，或出租单已归还并收款 */
 function isPaidAppt(a){
   if(!a||!((+a.amount||0)>0))return false;
@@ -6520,7 +6484,7 @@ function isPaidAppt(a){
   if(a.kind==="rent"&&a.status==="returned")return true;
   return false;
 }
-// 佣金核算：给定已收款记录列表，客户为某共享股东一级客户时按该股东当月佣金比例计提
+// 服务费核算：给定已收款记录列表，客户为某推广伙伴直推客户时按固定 30% 计提
 function calcCommission(list){
   var c=0,seen={};
   function acc(a){
@@ -6566,18 +6530,14 @@ function doneApptsInMonth(ym){
     return false;
   });
 }
-function tierRatio(flow){
-  if(flow>=6000)return 0.5;
-  if(flow>=3000)return 0.4;
-  return 0.3;
-}
-// 计算某共享股东在 ym（YYYY-MM）的佣金明细；shareId 非共享股东时返回 null
+/* 计算某共享股东在 ym（YYYY-MM）的服务费明细；shareId 非共享股东时返回 null
+   2026-11-27 新口径：固定 30%（实收 − 成本），取消一切阶梯档位与本人自消费冲档 */
 function commissionOf(shareId,ym){
   var sh=customerById(shareId);
   if(!sh||sh.type!=="shareholder")return null;
   var lv1Ids={};
   (DB.customers||[]).forEach(function(c){if(c.referrer===shareId)lv1Ids[c.id]=1;});
-  // 档位流水=名下客户本月已收款消费合计（含套餐直购预存款；核销未收款不计）
+  // 直推业绩=名下客户本月实收合计（仅展示用，不参与任何档位判定）
   var flow=0;
   (DB.customers||[]).forEach(function(c){if(lv1Ids[c.id])flow+=monthSpentOf(c.id,ym);});
   var profitSum=0,lv1Count=0,commFixed=0;
@@ -6589,9 +6549,9 @@ function commissionOf(shareId,ym){
       var ownerX=custX?(custX.referrer||""):"";
       if(ownerX===shareId){
         commFixed+=+a.commEarned||0;
-        // 混合单（套餐免费+超出收费，如苗衣出租）：收费部分按预约佣金计入
+        // 混合单（套餐免费+超出收费）：收费部分按服务费计入
         if((+a.amount||0)>0&&(+a.chargeDays||0)>0){
-          var costPD=+(a.serviceCost||0); // 每天成本
+          var costPD=+(a.serviceCost||0);
           var feeCost=Math.round(costPD*(+a.chargeDays||0)*100)/100;
           profitSum+=Math.max(0,(+a.amount||0)-feeCost);
         }
@@ -6603,35 +6563,11 @@ function commissionOf(shareId,ym){
     profitSum+=p.profit;
     lv1Count++;
   });
-  // 方式二：股东本人历史累计消费（不限当月，含出租归还租金；退款按已核销真实消费调整，退款后不足 3000 自动掉回 30%）
-  var selfSpend=Math.max(0,Math.round((DB.appointments.reduce(function(s,a){
-    if(isPaidAppt(a)&&a.customer_id===shareId)return s+(+a.amount||0);
-    return s;
-  },0)+refundAdjustOf(shareId))*100)/100);
-  var r1=tierRatio(flow);
-  var r2=selfSpend>=6000?0.5:(selfSpend>=3000?0.4:0);
-  var ratio=Math.max(r1,r2);
+  var ratio=PROMO.feeRate;
   var commission=Math.round((profitSum*ratio+commFixed)*100)/100;
   return {shareId:shareId,ym:ym,flow:Math.round(flow*100)/100,profitSum:Math.round(profitSum*100)/100,
-    lv1Count:lv1Count,selfSpend:Math.round(selfSpend*100)/100,r1:r1,r2:r2,ratio:ratio,commission:commission};
+    lv1Count:lv1Count,ratio:ratio,commission:commission};
 }
-// 客户历史累计「已拿佣金」：逐月按佣金规则计提后求和；非共享股东返回 0
-function commissionTotal(shareId){
-  var sh=customerById(shareId);
-  if(!sh||sh.type!=="shareholder")return 0;
-  var months={};
-  (DB.appointments||[]).forEach(function(a){
-    if(a.pkgBuyOnly)return;
-    var paid=isPaidAppt(a)||((+a.redeemValue||0)>0&&(a.status==="done"||(a.kind==="rent"&&a.status==="returned")));
-    if(!paid||!a.customer_id)return;
-    var cc=customerById(a.customer_id);
-    if(cc&&cc.referrer===shareId)months[(a.date||"").slice(0,7)]=1;
-  });
-  var sum=0;
-  Object.keys(months).forEach(function(ym){var co=commissionOf(shareId,ym);if(co)sum+=co.commission;});
-  return Math.round(sum*100)/100;
-}
-
 /* ============ 佣金提现（共享股东查看，管理员操作） ============ */
 function withdrawalList(shareId){
   return (DB.withdrawals||[]).filter(function(w){return w.shareId===shareId;});
@@ -6657,7 +6593,7 @@ function openWithdrawModal(cid){
   var cs=commissionSummary(cid);
   $("withdrawTitle").textContent="佣金提现 - "+c.name;
   $("withdrawInfo").innerHTML=
-    '<div style="flex:1;min-width:110px;text-align:center;background:var(--bg-1);border-radius:8px;padding:10px"><div style="font-size:20px;font-weight:800;color:var(--primary)">'+fmtMoney(cs.total)+'</div><div class="hint">总佣金</div></div>'+
+    '<div style="flex:1;min-width:110px;text-align:center;background:var(--bg-1);border-radius:8px;padding:10px"><div style="font-size:20px;font-weight:800;color:var(--primary)">'+fmtMoney(cs.total)+'</div><div class="hint">累计服务费</div></div>'+
     '<div style="flex:1;min-width:110px;text-align:center;background:var(--bg-1);border-radius:8px;padding:10px"><div style="font-size:20px;font-weight:800;color:var(--text-1)">'+fmtMoney(cs.withdrawn)+'</div><div class="hint">已提现</div></div>'+
     '<div style="flex:1;min-width:110px;text-align:center;background:var(--bg-1);border-radius:8px;padding:10px"><div style="font-size:20px;font-weight:800;color:#16a34a">'+fmtMoney(cs.pending)+'</div><div class="hint">待提现</div></div>';
   $("withdrawAmount").value="";
@@ -6732,18 +6668,14 @@ function renderCustomers(){
   list.forEach(function(c){
     var cnt=DB.appointments.filter(function(a){return (a.customer_id&&a.customer_id===c.id)||((!a.customer_id)&&a.client===c.name);}).length;
     var spentC=DB.appointments.reduce(function(s,a){return s+((a.customer_id&&a.customer_id===c.id&&isPaidAppt(a))?(+a.amount||0):0);},0);
-    var lv1Cnt=(DB.customers||[]).filter(function(x){return x.referrer===c.id;}).length;
-    // 二级客户 = 该客户一级客户再介绍的客户（客户→一级→二级）
-    var lv1IdsC={};(DB.customers||[]).forEach(function(y){if(y.referrer===c.id)lv1IdsC[y.id]=1;});
-    var lv2Cnt=(DB.customers||[]).filter(function(x){return x.referrer&&lv1IdsC[x.referrer];}).length;
     var acts=canEdit()?
       ('<button class="btn btn-ghost btn-xs" type="button" onclick="openCustomerModal(\''+c.id+'\')">编辑</button>'+
        '<button class="btn btn-ghost-danger btn-xs" type="button" onclick="delCustomer(\''+c.id+'\')">删除</button>'):"";
     if(c.type==="shareholder"&&canEdit())acts='<button class="btn btn-ghost btn-xs" type="button" title="查看该股东佣金并办理提现" onclick="openWithdrawModal(\''+c.id+'\')">💰 提现</button>'+acts;
     acts='<button class="btn btn-primary btn-xs" type="button" title="为该客户快速新建预约" onclick="quickBookFor(\''+c.id+'\')">预约</button>'+acts;
-    var nameClick='onclick="viewCustomerDetailForShare(\''+c.id+'\')" style="cursor:pointer;color:var(--primary);text-decoration:underline" title="点击查看客户详情（预约记录、消费、二级客户）"';
+    var nameClick='onclick="viewCustomerDetailForShare(\''+c.id+'\')" style="cursor:pointer;color:var(--primary);text-decoration:underline" title="点击查看客户详情（预约记录、消费）"';
     html+='<tr><td><div class="member-cell"><span class="avatar" style="background:'+esc(c.color||"#6b7280")+'">'+esc((c.name||"?")[0])+"</span>"+
-      '<div class="info"><div class="name" '+nameClick+'>'+esc(c.name)+' <span class="tag tag-green" title="已拿佣金：历史累计，仅共享股东按名下客户已成交消费计提">💰 已拿 '+fmtMoney(commissionTotal(c.id))+'</span></div>'+(c.note?'<div class="role">'+esc(c.note)+"</div>":"")+"</div></div></td>"+
+      '<div class="info"><div class="name" '+nameClick+'>'+esc(c.name)+' <span class="tag tag-green" title="已拿服务费：该推广伙伴名下直推客户成交累计产生的 30% 服务费">💰 已赚 '+fmtMoney(promoFeesTotal(c.id))+'</span></div>'+(c.note?'<div class="role">'+esc(c.note)+"</div>":"")+"</div></div></td>"+
       "<td>"+custTypeTag(c)+(c.login_enabled?' <span class="tag tag-blue" title="已开通登录账号">🔐 可登录</span>':"")+"</td>"+
       "<td>"+custChainHtml(c)+"</td>"+
       "<td>"+(esc(c.phone)||'<span class="hint">-</span>')+"</td>"+
@@ -6781,7 +6713,7 @@ function loadReferrerOptions(sel){
       $("cHint").textContent="共享股东可绑定一位共享股东作为介绍人（A 名下可挂 B），形成共享股东层级；也可不绑定。";
     }else{
       rebuildRefOpts(false);
-      $("cHint").textContent="普通客户可选一位共享股东或已有客户作为介绍人：一级客户=介绍人是共享股东；二级客户=介绍人的介绍人是共享股东。";
+      $("cHint").textContent="普通客户可选一位共享股东或已有客户作为介绍人：直推客户=建档时介绍人填的正是这位推广伙伴；客户只归直接介绍人，不存在上级/间推。";
       $("cLoginEnable").checked=false;
       $("cLoginPwd").value="";
     }
@@ -7436,8 +7368,8 @@ function confirmRefundPkg(){
   renderAll(); // 全局刷新：杨亚拥等上级的可预拿佣金、统计报表等所有视图同步更新（退款卡已排除）
   if($("customerConsumptionBody"))openCustomerConsumptionManager(b.customerId||"");
 }
-/* 套餐卡每次核销佣金：核销档位按购卡当月锁定（购卡时确定，此后档位变化不再影响）
-   (成交金额-成本)×购卡当月上级股东档位 ÷ 总次数 */
+/* 套餐卡每次核销服务费：固定 30%（2026-11-27 起取消档位，不再受当月业绩影响）
+   (成交金额-成本)×30% ÷ 总次数 */
 function pkgCommEachOf(b){
   if(!b)return 0;
   var cust=b.customerId?customerById(b.customerId):null;
@@ -7454,7 +7386,7 @@ function pkgCommEachOf(b){
   if(total<=0)return 0;
   return Math.round(profit*ratio/total*100)/100;
 }
-/* 某股东名下可预拿佣金 = 其名下卡的未核销佣金（归属：卡主的介绍人/上级股东；实时按当前档位） */
+/* 某股东名下可预拿服务费 = 其名下卡的未核销服务费（归属：卡主的介绍人；固定 30%） */
 function pkgPendingCommOf(shId){
   var s=0;
   (DB.packageBuys||[]).forEach(function(b){
@@ -7619,7 +7551,7 @@ function saveCheckout(){
       card.commUsed=Math.round(((+card.commUsed||0)+pkgCommEachOf(card))*100)/100; // 已核销佣金累计（预拿=总佣金−已核销）
       amt=0;
       a.redeemValue=custPrice(sv,cust); // 核销价值：客户消费流水
-      a.commEarned=pkgCommEachOf(card); // 套餐佣金：每次核销 = (成交金额-成本)×购卡当月档位÷总次数（购卡时锁定）
+      a.commEarned=pkgCommEachOf(card); // 套餐服务费：每次核销 = (成交金额-成本)×30%÷总次数
       redeemNote=card.name+"（剩余 "+card.remaining[sv.id]+" "+(sv.isRent?"天":"次")+"）"+(a.commEarned>0?" · 佣金 "+fmtMoney(a.commEarned):"");
     }
   }
@@ -7914,7 +7846,7 @@ function saveDirectBuy(){
     if(card&&card.remaining&&card.remaining[it.serviceId]>0){
       card.remaining[it.serviceId]=Math.max(0,card.remaining[it.serviceId]-it.qty);
       redeemLog.push(card.name+" -"+it.qty);
-      // 套餐佣金：每次核销 = (成交金额-成本)×当前档位÷总次数（实时，不按购卡锁定）
+      // 套餐服务费：每次核销 = (成交金额-成本)×30%÷总次数
       if(card){commEarned+=pkgCommEachOf(card)*it.qty;card.commUsed=Math.round(((+card.commUsed||0)+pkgCommEachOf(card)*it.qty)*100)/100;}
       else{
         var svR=serviceById(it.serviceId);
@@ -8437,7 +8369,7 @@ function saveReturnRent(){
   var method=$("retMethod").value;
   if(!method){toast("请选择收款方式","err");return;}
   var now=new Date();
-  // 套餐核销：扣减剩余天数 + 核销佣金（卡单日平均佣金×免费天数，购卡时已锁定档位）
+  // 套餐核销：扣减剩余天数 + 核销服务费（卡单日平均服务费×免费天数，固定 30%）
   var redeemValue=0,commEarned=null;
   if(card&&freeDays>0){
     card.remaining[sv.id]=(+card.remaining[sv.id]||0)-freeDays;
@@ -8981,13 +8913,13 @@ function renderCustomerConsumptionManager(){
   var c=customerById(ccManagerTargetId);if(!c)return;
   var isAdminRole=isAdmin(),isSh=c.type==="shareholder";
   $("customerConsumptionTitle").textContent=esc(c.name)+" · "+(isSh?"股东详情":"客户详情");
-  // ---- 客户详细信息卡（佣金等级 / 佣金 / 本月消费 / 历史消费） ----
+  // ---- 客户详细信息卡（服务费比例 / 累计服务费 / 本月消费 / 历史消费） ----
   var html='<div style="padding:16px;border-bottom:1px solid var(--border)">'+
     (function(){
       var ym2=curYm();
       var com2=isSh?commissionOf(c.id,ym2):null;
       var csum2=isSh?commissionSummary(c.id):{total:0,withdrawn:0,pending:0};
-      // 个人消费 = 本人作为客户的所有已收款金额（含套餐预存款；退款时扣减退款额）；团队消费 = 名下一级客户已收款金额合计（含预存款）
+      // 个人消费 = 本人作为客户的所有已收款金额（含套餐预存款；退款时扣减退款额）；直推客户消费 = 其直推客户已收款金额合计（含预存款）
       var personalSpent=0,teamSpent=0,lv1set={};
       (DB.customers||[]).forEach(function(x){if(x.referrer===c.id)lv1set[x.id]=1;});
       (DB.appointments||[]).forEach(function(a){
@@ -9025,9 +8957,9 @@ function renderCustomerConsumptionManager(){
           '<div class="role">电话：'+(esc(c.phone)||"-")+'</div></div></div>'+
           '<div style="margin-top:10px;font-size:12.5px;color:var(--text-2);line-height:2">'+
           (isSh?
-            '<div>佣金等级：<b style="font-size:20px;font-weight:800;color:var(--primary)">'+(com2?Math.round(com2.ratio*100):0)+'%</b>　可预拿佣金：<b style="font-size:18px;font-weight:800;color:#d97706">'+fmtMoney(pkgPendingCommOf(c.id))+'</b></div>'+
-            '<div>总佣金：<b style="color:var(--text-1)">'+fmtMoney(csum2.total)+'</b>　已提现 '+fmtMoney(csum2.withdrawn)+' · 待提现 '+fmtMoney(csum2.pending)+'</div>'
-            :'<div>该客户为普通客户，无股东佣金。</div>')+
+            '<div>推广服务费比例：<b style="font-size:20px;font-weight:800;color:var(--primary)">'+(com2?Math.round(com2.ratio*100):0)+'%</b>　可预拿服务费：<b style="font-size:18px;font-weight:800;color:#d97706">'+fmtMoney(pkgPendingCommOf(c.id))+'</b></div>'+
+            '<div>累计服务费：<b style="color:var(--text-1)">'+fmtMoney(csum2.total)+'</b>　已提现 '+fmtMoney(csum2.withdrawn)+' · 待提现 '+fmtMoney(csum2.pending)+'</div>'
+            :'<div>该客户为普通客户，无推广服务费。</div>')+
           '</div></div>'+
         '<div style="min-width:230px;flex:1;display:flex;flex-direction:column;gap:10px">'+
           '<div style="display:flex;gap:10px;flex-wrap:wrap">'+
@@ -9058,16 +8990,16 @@ function renderCustomerConsumptionManager(){
           '</div>';
       }).join("")+"</div>";
   }
-  // ---- 名下一级客户列表（排序 1-n 紧贴姓名，点击姓名可继续下钻查看其名下客户） ----
+  // ---- 直推客户列表（排序 1-n 紧贴姓名，点击姓名可继续下钻查看其名下客户） ----
   var lv1m2=lv1IdsOf(c.id);
   var lv1List=(DB.customers||[]).filter(function(x){return lv1m2[x.id]&&String(x.name||"").indexOf("__DEL__")!==0;});
   if(isAdminRole){
     html+='<div style="display:flex;justify-content:flex-end;padding:12px 16px 0"><button class="btn btn-primary btn-sm" type="button" onclick="addFromLv1=true;closeModal(\'customerConsumptionMask\');openCustomerModal(null,\''+c.id+'\')">＋ 增加下级客户</button></div>';
   }
   if(!lv1List.length){
-    html+='<div class="empty"><div class="big">&#x1F464;</div><h3>暂无名下客户</h3><p>其他客户建档时选择「'+esc(c.name)+'」作为介绍人后，会显示在这里（一级客户=直接介绍人）。</p></div>';
+    html+='<div class="empty"><div class="big">&#x1F464;</div><h3>暂无名下客户</h3><p>其他客户建档时选择「'+esc(c.name)+'」作为介绍人后，会显示在这里（直推客户=建档时介绍人填的是本人）。</p></div>';
   }else{
-    html+='<div style="padding:12px 16px"><div style="font-size:13px;font-weight:700;color:var(--text-1);margin-bottom:8px">名下一级客户（'+lv1List.length+' 人）</div>'+
+    html+='<div style="padding:12px 16px"><div style="font-size:13px;font-weight:700;color:var(--text-1);margin-bottom:8px">名下客户（'+lv1List.length+' 人）</div>'+
       '<table><tr><th style="text-align:left">客户</th><th>身份</th></tr>'+
       lv1List.map(function(x,i){
         return '<tr><td><div class="member-cell">'+
