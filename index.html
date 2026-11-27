@@ -4870,12 +4870,15 @@ function viewShareholderDetail(cid){
   // 1) 个人资料
   var ref=c.referrer?customerById(c.referrer):null;
   var cs=commissionSummary(c.id);
+  var monthFee=promoFeesOf(c.id,curYm()).fee;
   var html='<div style="margin-bottom:16px">'+
     '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">'+
     '<span class="avatar" style="background:'+esc(c.color||"#d97706")+';width:44px;height:44px;font-size:18px">'+esc((c.name||"?")[0])+'</span>'+
     '<div><div style="font-size:16px;font-weight:700">'+esc(c.name)+' <span class="tag tag-warn">共享股东</span></div>'+
     '<div class="hint">电话：'+(esc(c.phone)||"-")+(ref?"　介绍人："+esc(ref.name):"　介绍人：无")+"</div></div></div>"+
     '<div style="display:flex;gap:12px;flex-wrap:wrap">'+
+    '<div style="flex:1;min-width:120px;background:var(--bg-1);border-radius:10px;padding:12px;text-align:center">'+
+    '<div style="font-size:24px;font-weight:800;color:#16a34a">'+fmtMoney(monthFee)+'</div><div class="hint">本月佣金</div></div>'+
     '<div style="flex:1;min-width:120px;background:var(--bg-1);border-radius:10px;padding:12px;text-align:center">'+
     '<div style="font-size:24px;font-weight:800;color:var(--primary)">'+fmtMoney(cs.total)+'</div><div class="hint">累计推广佣金</div></div>'+
     '<div style="flex:1;min-width:120px;background:var(--bg-1);border-radius:10px;padding:12px;text-align:center">'+
@@ -4945,17 +4948,16 @@ function renderShareBoard(){
     '<div class="info"><div class="name">'+esc(me.name)+' <span class="tag tag-warn">共享股东</span></div>'+
     '<div class="role">电话：'+(esc(me.phone)||"-")+(ref?("　介绍人："+esc(ref.name)):("　介绍人：无"))+"</div></div></div>"+
     '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">'+
-    '<div style="flex:1;min-width:100px;background:var(--bg-1);border-radius:10px;padding:12px 10px;text-align:center"><div style="font-size:22px;font-weight:800;color:var(--primary);line-height:1.2">30%</div><div class="hint" style="margin-top:4px">推广服务费率</div></div>'+
-    '<div style="flex:1;min-width:100px;background:var(--bg-1);border-radius:10px;padding:12px 10px;text-align:center"><div style="font-size:22px;font-weight:800;color:#16a34a;line-height:1.2">'+fmtMoney(fInfo.fee)+'</div><div class="hint" style="margin-top:4px">本月服务费</div></div>'+
+    '<div style="flex:1;min-width:100px;background:var(--bg-1);border-radius:10px;padding:12px 10px;text-align:center"><div style="font-size:22px;font-weight:800;color:var(--primary);line-height:1.2">30%</div><div class="hint" style="margin-top:4px">推广佣金比例</div></div>'+
+    '<div style="flex:1;min-width:100px;background:var(--bg-1);border-radius:10px;padding:12px 10px;text-align:center"><div style="font-size:22px;font-weight:800;color:#16a34a;line-height:1.2">'+fmtMoney(fInfo.fee)+'</div><div class="hint" style="margin-top:4px">本月佣金</div></div>'+
     '<div style="flex:1;min-width:100px;background:var(--bg-1);border-radius:10px;padding:12px 10px;text-align:center"><div style="font-size:22px;font-weight:800;color:var(--text-1);line-height:1.2">'+fmtMoney(cs.total)+'</div><div class="hint" style="margin-top:4px">累计推广佣金</div></div>'+
     '</div>'+
     '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">'+
     '<div style="flex:1;min-width:100px;background:var(--bg-1);border-radius:10px;padding:12px 10px;text-align:center"><div style="font-size:22px;font-weight:800;color:var(--text-1);line-height:1.2">'+fmtMoney(cs.withdrawn)+'</div><div class="hint" style="margin-top:4px">已提现</div></div>'+
     '<div style="flex:1;min-width:100px;background:var(--bg-1);border-radius:10px;padding:12px 10px;text-align:center"><div style="font-size:22px;font-weight:800;color:#16a34a;line-height:1.2">'+fmtMoney(cs.pending)+'</div><div class="hint" style="margin-top:4px">待提现</div></div>'+
-    '<div style="flex:1;min-width:100px;background:linear-gradient(135deg,#fff7ed,#ffedd5);border:1px solid #fed7aa;border-radius:10px;padding:12px 10px;text-align:center"><div style="font-size:22px;font-weight:800;color:#d97706;line-height:1.2">'+fmtMoney(pkgPendingCommOf(me.id))+'</div><div class="hint" style="margin-top:4px">可预拿服务费</div></div>'+
+    '<div style="flex:1;min-width:100px;background:linear-gradient(135deg,#fff7ed,#ffedd5);border:1px solid #fed7aa;border-radius:10px;padding:12px 10px;text-align:center"><div style="font-size:22px;font-weight:800;color:#d97706;line-height:1.2">'+fmtMoney(pkgPendingCommOf(me.id))+'</div><div class="hint" style="margin-top:4px">可预拿佣金</div></div>'+
     '</div>'+
-    '<div class="hint" style="margin:10px 0 6px">本月直推成交 '+fInfo.rows.length+' 单'+(fInfo.redeemCount?'（其中套餐核销 '+fInfo.redeemCount+' 次 · 核销价值 '+fmtMoney(fInfo.redeemValue)+'）':'')+' · 实收 '+fmtMoney(fInfo.amount)+(fInfo.redeemCount?'':' · 成本 '+fmtMoney(fInfo.cost)+' · 毛利 '+fmtMoney(fInfo.profit))+' → 服务费 <b>'+fmtMoney(fInfo.fee)+'</b>（线下打款结算）</div>'+
-    '<div id="shareFeeDetail"></div>'+
+    '<div class="hint" style="margin:10px 0 6px">本月直推成交 '+fInfo.rows.length+' 单'+(fInfo.redeemCount?'（其中套餐核销 '+fInfo.redeemCount+' 次 · 核销价值 '+fmtMoney(fInfo.redeemValue)+'）':'')+' · 实收 '+fmtMoney(fInfo.amount)+(fInfo.redeemCount?'':' · 成本 '+fmtMoney(fInfo.cost)+' · 毛利 '+fmtMoney(fInfo.profit))+' → 佣金 <b>'+fmtMoney(fInfo.fee)+'</b>（线下打款结算）</div>'+
     '<div class="hint" style="margin-top:8px">提现需联系门店管理员线下办理，您本人不可自行提现。</div>';
   // 3) 我购买的套餐（套餐卡与剩余次数；已退款不显示）
   var myPkgs=(DB.packageBuys||[]).filter(function(b){return b.customerId===me.id&&!b.refunded;});
@@ -6341,22 +6343,9 @@ function promoLoadGift(){
     try{renderSharePromo(customerById(shareSess.cid),curYm());}catch(e){}
   }).catch(function(){});
 }
-/* 推广服务费明细（数字已并入「我的信息」卡，这里只渲染本月逐单明细） */
+/* 推广佣金与分红点：逐单明细已移除（由「我推广的客户」板块承接），这里只渲染分红点卡 */
 function renderSharePromo(me,ym){
   if(!me)return;
-  var det=$("shareFeeDetail");
-  if(det){
-    var f=promoFeesOf(me.id,ym);
-    det.innerHTML=f.rows.length?('<table><tr><th>日期</th><th>客户</th><th>项目</th><th style="text-align:right">实收</th><th style="text-align:right">成本</th><th style="text-align:right">服务费</th></tr>'+
-      f.rows.map(function(r){
-        var a=r.a,sv=a.serviceId?serviceById(a.serviceId):null,c=customerById(a.customer_id);
-        var nm=sv?sv.name:((a.redeemValue?(a.serviceName||"套餐核销"):"服务"))+(r.redeem?"（套餐核销）":"");
-        if(r.redeem&&nm.indexOf("套餐核销")<0)nm+="（套餐核销）";
-        return '<tr><td>'+esc(a.date)+'</td><td>'+esc(c?c.name:(a.client||"-"))+'</td><td>'+esc(nm)+'</td>'+
-          '<td style="text-align:right">'+fmtMoney(r.value)+'</td><td style="text-align:right;color:var(--text-3)">'+fmtMoney(r.cost)+'</td>'+
-          '<td style="text-align:right"><b style="color:#16a34a">'+fmtMoney(r.fee)+'</b></td></tr>';
-      }).join("")+'</table>'):'';
-  }
   var box2=$("shareBonus");
   if(box2){
     var inc=promoMyIncome(me.id,ym,PROMO_GIFT);
@@ -9015,9 +9004,9 @@ function renderCustomerConsumptionManager(){
           '<div class="role">电话：'+(esc(c.phone)||"-")+'</div></div></div>'+
           '<div style="margin-top:10px;font-size:12.5px;color:var(--text-2);line-height:2">'+
           (isSh?
-            '<div>推广服务费比例：<b style="font-size:20px;font-weight:800;color:var(--primary)">'+(com2?Math.round(com2.ratio*100):0)+'%</b>　可预拿服务费：<b style="font-size:18px;font-weight:800;color:#d97706">'+fmtMoney(pkgPendingCommOf(c.id))+'</b></div>'+
+            '<div>推广佣金比例：<b style="font-size:20px;font-weight:800;color:var(--primary)">'+(com2?Math.round(com2.ratio*100):0)+'%</b>　本月佣金：<b style="font-size:18px;font-weight:800;color:#16a34a">'+fmtMoney(promoFeesOf(c.id,ym2).fee)+'</b>　可预拿佣金：<b style="font-size:18px;font-weight:800;color:#d97706">'+fmtMoney(pkgPendingCommOf(c.id))+'</b></div>'+
             '<div>累计推广佣金：<b style="color:var(--text-1)">'+fmtMoney(csum2.total)+'</b>　已提现 '+fmtMoney(csum2.withdrawn)+' · 待提现 '+fmtMoney(csum2.pending)+'</div>'
-            :'<div>该客户为普通客户，无推广服务费。</div>')+
+            :'<div>该客户为普通客户，无推广佣金。</div>')+
           '</div></div>'+
         '<div style="min-width:230px;flex:1;display:flex;flex-direction:column;gap:10px">'+
           '<div style="display:flex;gap:10px;flex-wrap:wrap">'+
