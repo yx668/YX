@@ -3867,6 +3867,7 @@ var sched=res[3]&&res[3][0];
           if(b.pkg_name!=null){b.name=b.pkg_name;delete b.pkg_name;}
           if(b.customer_name!=null){b.client=b.customer_name;delete b.customer_name;}
           if(b.cost!=null){b.pkgCost=+b.cost;delete b.cost;}
+          if(b.cash!=null){b.cash=(typeof b.cash==="string")?(function(){try{return JSON.parse(b.cash);}catch(e){return {};}})():b.cash;}
           if(b.refunded!=null)b.refunded=!!b.refunded;
           return b;
         }),DB.packageBuys||[]).filter(function(b){return b&&b.id&&!isDeletedLocal("packagebuys",b.id);});
@@ -4000,7 +4001,7 @@ function pushAll(){
       jobs.push(cloudUpsert("packagebuys",(DB.packageBuys||[]).filter(function(b){return b&&b.id&&!isDeletedLocal("packagebuys",b.id);}).map(function(b){
         var o={id:b.id,customerid:b.customerId||null,customer_name:b.client||null,pkgid:b.pkgId||null,pkg_name:b.name||null,
           price:(b.price!=null)?+b.price:0,cost:(b.pkgCost!=null)?+b.pkgCost:0,date:b.date||null,time:b.time||null,
-          isshare:!!b.isShare,remaining:b.remaining||{},totals:b.totals||{},refunded:!!b.refunded,
+          isshare:!!b.isShare,remaining:b.remaining||{},totals:b.totals||{},cash:b.cash||{},refunded:!!b.refunded,
           commeach:(b.commEach!=null)?+b.commEach:0,commtotal:(b.commTotal!=null)?+b.commTotal:0,commused:(b.commUsed!=null)?+b.commUsed:0};
         o.updated_at=now;return o;
       }),"id"));
@@ -5409,12 +5410,12 @@ if(a.due_date!=null){a.dueDate=a.due_date;delete a.due_date;}
       if(b.pkg_name!=null){b.name=b.pkg_name;delete b.pkg_name;}
       if(b.customer_name!=null){b.client=b.customer_name;delete b.customer_name;}
       if(b.cost!=null){b.pkgCost=+b.cost;delete b.cost;}
+      if(b.cash!=null){b.cash=(typeof b.cash==="string")?(function(){try{return JSON.parse(b.cash);}catch(e){return {};}})():b.cash;}
       if(b.refunded!=null)b.refunded=!!b.refunded;
       return b;
     }),DB.packageBuys||[]);
   }else if(d.packageBuys){
-    (DB.packageBuys||[]).forEach(function(_b){if(_b&&_b.id)markDeleted("packagebuys",_b.id);});
-    DB.packageBuys=[]; // 云端套餐卡已清空：股东本地旧卡墓碑化并清除
+    DB.packageBuys=(DB.packageBuys||[]).filter(function(b){return b&&b.id&&!isDeletedLocal("packagebuys",b.id);});
   }
   // 退款记录合并到股东本地（退款后消费/佣金同步调整）
   if(d.refunds&&d.refunds.length){
@@ -6976,6 +6977,8 @@ function addPkgItemRow(it){
     '<select style="flex:1" onchange="pkgItemRow(\'s\',\''+pkgItemRowSeq+'\',this.value)">'+opts+"</select>"+
     '<label id="pkgUnitLbl-'+pkgItemRowSeq+'" style="font-size:12px;color:var(--text-2);white-space:nowrap">'+(it.serviceId&&isRentOf(it.serviceId)?"天数":"次数")+"</label>"+
     '<input type="number" min="1" step="1" value="'+Math.max(1,parseInt(it.count,10)||1)+'" style="width:60px" onchange="pkgItemRow(\'c\',\''+pkgItemRowSeq+'\',this.value)">'+
+    '<label style="font-size:12px;color:var(--text-2);white-space:nowrap">每次核销实收</label>'+
+    '<input type="number" min="0" step="0.01" class="pkgCash" value="'+((it.cash!=null&&it.cash!=="")?it.cash:"")+'" placeholder="不填=按原价" style="width:96px" onchange="pkgItemRow(\'r\',\''+pkgItemRowSeq+'\',this.value)">'+
     '<button class="btn btn-ghost-danger btn-xs" type="button" onclick="this.parentNode.parentNode.removeChild(this.parentNode)">✕</button></div>';
   $("pkgItems").insertAdjacentHTML("beforeend",row);
   pkgItemRowSeq++;
@@ -6990,6 +6993,7 @@ function pkgItemRow(kind,seq,val){
     if(lbl)lbl.textContent=isRentOf(val)?"天数":"次数";
   }
   if(kind==="c")row.querySelector('input[type="number"]').value=val;
+  if(kind==="r"){var ci=row.querySelector('.pkgCash');if(ci)ci.value=val;}
 }
 function openPkgModal(id){
   if(!canEdit()){toast("无权限修改套餐配置","err");return;}
@@ -7016,8 +7020,12 @@ function savePkg(){
   Array.prototype.forEach.call(rows,function(r){
     var sid=r.querySelector("select").value;
     var cnt=Math.max(1,parseInt(r.querySelector('input[type="number"]').value,10)||1);
+    var cashEl=r.querySelector('.pkgCash');
+    var cashV=cashEl?String(cashEl.value).trim():"";
+    var cash=(cashV!==""&&isFinite(parseFloat(cashV)))?Math.max(0,parseFloat(cashV)):null;
     if(!sid)return;
-    if(seen[sid]){seen[sid].count+=cnt;}else{seen[sid]={serviceId:sid,count:cnt};items.push(seen[sid]);}
+    if(seen[sid]){seen[sid].count+=cnt;if(seen[sid].cash==null&&cash!=null)seen[sid].cash=cash;}
+    else{seen[sid]={serviceId:sid,count:cnt,cash:cash};items.push(seen[sid]);}
   });
   if(!items.length){toast("请至少添加一个包含项目","err");return;}
   var price=Math.max(0,parseFloat($("pkgPrice").value)||0);
@@ -7375,6 +7383,12 @@ function confirmRefundPkg(){
   renderAll(); // 全局刷新：杨亚拥等上级的可预拿佣金、统计报表等所有视图同步更新（退款卡已排除）
   if($("customerConsumptionBody"))openCustomerConsumptionManager(b.customerId||"");
 }
+function cashOfCard(card,sid,cust){
+  var v=(card&&card.cash&&card.cash[sid]!=null)?+card.cash[sid]:0;
+  if(v>0)return Math.round(v*100)/100;
+  var sv=sid?serviceById(sid):null;
+  return custPrice(sv,cust);
+}
 /* 套餐卡每次核销服务费：固定 30%（2026-11-27 起取消档位，不再受当月业绩影响）
    (成交金额-成本)×30% ÷ 总次数 */
 function pkgCommEachOf(b){
@@ -7426,7 +7440,7 @@ function pushPkgCards(ids){
       if(!b)return;
       rows.push({id:b.id,customerid:b.customerId||null,customer_name:b.client||null,pkgid:b.pkgId||null,pkg_name:b.name||null,
         price:(b.price!=null)?+b.price:0,cost:(b.pkgCost!=null)?+b.pkgCost:0,date:b.date||null,time:b.time||null,
-        isshare:!!b.isShare,remaining:b.remaining||{},totals:b.totals||{},refunded:!!b.refunded,
+        isshare:!!b.isShare,remaining:b.remaining||{},totals:b.totals||{},cash:b.cash||{},refunded:!!b.refunded,
         commeach:(b.commEach!=null)?+b.commEach:0,commtotal:(b.commTotal!=null)?+b.commTotal:0,commused:(b.commUsed!=null)?+b.commUsed:0,
         updated_at:new Date().toISOString()});
     });
@@ -7575,7 +7589,7 @@ function saveCheckout(){
       pkgUsed=true;
       card.commUsed=Math.round(((+card.commUsed||0)+pkgCommEachOf(card))*100)/100; // 已核销佣金累计（预拿=总佣金−已核销）
       amt=0;
-      a.redeemValue=custPrice(sv,cust); // 核销价值：客户消费流水
+      a.redeemValue=cashOfCard(card,sv.id,cust); // 核销确认实收：优先按套餐里填的每次核销金额
       a.commEarned=pkgCommEachOf(card); // 套餐服务费：每次核销 = (成交金额-成本)×30%÷总次数
       redeemNote=card.name+"（剩余 "+card.remaining[sv.id]+" "+(sv.isRent?"天":"次")+"）"+(a.commEarned>0?" · 佣金 "+fmtMoney(a.commEarned):"");
     }
@@ -7806,7 +7820,7 @@ function saveDirectBuy(){
       var rc=c?pkgCardsOf(c.id,s.id)[0]:null;
       if(rc){
         items.push({kind:"redeem",serviceId:s.id,name:s.name+"（套餐核销）",unitPrice:0,qty:qty,subtotal:0,cardId:rc.id,cardName:rc.name});
-        redeemVal+=custPrice(s,c)*qty; // 核销价值：佣金按此到账
+        redeemVal+=cashOfCard(rc,s.id,c)*qty; // 核销确认实收：按套餐里填的每次核销金额
         if(!mainSvid)mainSvid=s.id;
         return;
       }
@@ -7848,8 +7862,9 @@ function saveDirectBuy(){
   var newCardIds=[];
   pkgSel.forEach(function(p){
     var price=isShare&&p.priceShareholder!=null? +p.priceShareholder : +p.price;
-    var remaining={},totals={};
-    (p.items||[]).forEach(function(it){var c0=Math.max(1,parseInt(it.count,10)||1);totals[it.serviceId]=(totals[it.serviceId]||0)+c0;remaining[it.serviceId]=(remaining[it.serviceId]||0)+c0;});
+    var remaining={},totals={},cashMap={};
+    (p.items||[]).forEach(function(it){var c0=Math.max(1,parseInt(it.count,10)||1);totals[it.serviceId]=(totals[it.serviceId]||0)+c0;remaining[it.serviceId]=(remaining[it.serviceId]||0)+c0;
+      if(it.cash!=null&&+it.cash>0)cashMap[it.serviceId]=Math.round(+it.cash*100)/100;});
     var totalCount=(p.items||[]).reduce(function(s,it){return s+Math.max(1,parseInt(it.count,10)||1);},0);
     var pkgCostTotal=(+p.cost||0);
     if(pkgCostTotal<=0){pkgCostTotal=0;(p.items||[]).forEach(function(it){var svc=serviceById(it.serviceId);pkgCostTotal+=(svc?+svc.cost||0:0)*Math.max(1,parseInt(it.count,10)||1);});}
@@ -7863,7 +7878,7 @@ function saveDirectBuy(){
     var _newId=uid();
     DB.packageBuys.push({id:_newId,pkgId:p.id,name:p.name,customerId:c?c.id:"",client:client,phone:$("buyPhone").value.trim(),
       date:todayStr(),time:pad(now.getHours())+":"+pad(now.getMinutes()),price:Math.round(price*100)/100,
-      isShare:!!isShare,method:method,remaining:remaining,totals:totals,
+      isShare:!!isShare,method:method,remaining:remaining,totals:totals,cash:cashMap,
       commEach:commEach,commTotal:commTotal,pkgCost:pkgCostTotal});
     newCardIds.push(_newId);
   });
