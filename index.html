@@ -5148,7 +5148,7 @@ function renderShareQuotaAdmin(){
           '<button class="btn btn-ghost btn-xs" type="button" onclick="shareQuotaBonus(\''+r.h.id+'\',-1)">兑换 -1</button>'+
         '</td></tr>';
     });
-    html+='</table><div class="hint" style="padding:8px 14px;line-height:1.9">「重置本月」＝清空该股东本月已领名额（可重新分享），不影响已核销记录与兑换次数。<br>「兑换 ±1」＝手工加减累计兑换次数，用于补发或扣回。</div>';
+    html+='</table><div class="hint" style="padding:8px 14px;line-height:1.9">「单独名额」＝给该股东本月单独定名额：填 0 跟随全局（当前全局 '+($("sqLimit")?($("sqLimit").value||"6"):"6")+' 个），填 N 则他本月就是 N 个，其他人不受影响。<br>「重置本月」＝清空该股东本月已领名额（可重新分享），不影响已核销记录与兑换次数。<br>「兑换 ±1」＝手工加减累计兑换次数，用于补发或扣回。</div>';
     box.innerHTML=html;
     var f=rows[0]&&rows[0].q;
     if(f&&f.ok===true){ if($("sqLimit"))$("sqLimit").value=f.limit; if($("sqPrice"))$("sqPrice").value=f.price; }
