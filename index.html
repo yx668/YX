@@ -8366,7 +8366,7 @@ function rpDirectRefresh(){
     var custName=a.client||(a.customer_id?((function(){var c=customerById(a.customer_id);return c?c.name:"";})()):"")||"散客";
     var det=normalizeItems(a.items).map(function(it){
       if(it.kind==="pkg")return "购买套餐 · "+it.name;
-      if(it.kind==="redeem")return "核销套餐 · "+(it.cardName||"")+"( -"+it.qty+" )";
+      if(it.kind==="redeem")return (it.name||it.cardName||"套餐核销").replace("（套餐核销）","")+((+it.qty||1)>1?" ×"+it.qty:"");
       return it.name||"";
     }).join("、")||(a.serviceName||a.item||"-");
     var typ=a.pkgBuyOnly?'<span class="tag tag-warn">套餐购买</span>':((+a.redeemValue||0)>0?'<span class="tag tag-blue" style="background:#ede9fe;color:#7c3aed;border-color:#ddd6fe">直购含核销</span>':'<span class="tag tag-blue">直接购买</span>');
