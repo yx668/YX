@@ -3838,11 +3838,15 @@ var sched=res[3]&&res[3][0];
         if(c.wx==null)c.wx="";
         return c;
       }),DB.customers);
+      // 台账上推/拉取配套：预约被删除的台账行云端 apptid 为空，拉取后回填本地 apptId，避免孤儿台账统计口径丢失
+      var _localConApptId={};
+      (DB.consumptions||[]).forEach(function(o){if(o&&o.id&&o.apptId)_localConApptId[o.id]=o.apptId;});
       DB.consumptions=mergeRows((res[5]||[]).filter(function(r){return !isDeletedLocal("consumptions",r.id);}).map(function(r){
         if(r.apptid!=null){r.apptId=r.apptid;delete r.apptid;}
         if(r.pkgbuy!=null){r.pkgBuy=!!r.pkgbuy;delete r.pkgbuy;}
         return stripRow(r);
       }),DB.consumptions||[]);
+      DB.consumptions.forEach(function(o){if(o&&!o.apptId&&_localConApptId[o.id])o.apptId=_localConApptId[o.id];});
       // 预约已在本地删除（墓碑）→ 关联台账一并删除，保证统计报表/消费详情不残留
       DB.consumptions=(DB.consumptions||[]).filter(function(o){
         return !(o&&o.apptId&&isDeletedLocal("appointments",o.apptId));
@@ -4053,10 +4057,11 @@ function pushAll(){
       // consumptions 依赖 appointments.id 外键，必须等基础表全部成功后再串行推送
       if(isAdmin()){
         var apptIds={};(DB.appointments||[]).forEach(function(a){if(a&&a.id)apptIds[a.id]=true;});
-        var cRows=DB.consumptions.filter(function(o){return !o.apptId||(!isDeletedLocal("appointments",o.apptId)&&apptIds[o.apptId]);}).map(function(o){
+        // 台账全量上推：预约已删除但台账保留（统计口径要求保留）时 apptid 置空（云端外键要求），本地仍保留 apptId
+        var cRows=DB.consumptions.filter(function(o){return !isDeletedLocal("consumptions",o.id);}).map(function(o){
           var r={};
           ["id","date","customer_id","customer","item","amount","method","note","kind"].forEach(function(k){r[k]=(o[k]!==undefined)?o[k]:null;});
-          r.apptid=(o.apptId!==undefined)?o.apptId:null;
+          r.apptid=(o.apptId&&apptIds[o.apptId]&&!isDeletedLocal("appointments",o.apptId))?o.apptId:null;
           r.pkgbuy=!!o.pkgBuy;
           if(r.customer_id!=null&&!isValidUUID(r.customer_id))r.customer_id=null;
           r.updated_at=now;return r;
