@@ -6533,17 +6533,18 @@ function renderPromoAdmin(){
   }
   var tb=$("promoPoints");
   if(tb){
-    tb.innerHTML='<table><tr><th>推广伙伴</th><th>本月直推业绩</th><th>档位</th><th style="text-align:center">注册赠送点</th><th style="text-align:center">直推点</th><th style="text-align:center">自消费点</th><th style="text-align:center">有效点</th></tr>'+
+    tb.innerHTML='<table><tr><th>推广伙伴</th><th>本月直推业绩</th><th>档位</th><th style="text-align:center">注册赠送点</th><th style="text-align:center">直推点</th><th style="text-align:right">本月自消费额</th><th style="text-align:center">自消费点</th><th style="text-align:center">有效点</th></tr>'+
       all.map(function(r){
         var inc=r.inc;
         return '<tr><td><b>'+esc(r.p.name)+'</b><div class="hint">'+esc(r.p.phone||"")+'</div></td>'+
           '<td>'+fmtMoney(inc.perf)+'</td><td>'+inc.mult+' 倍</td>'+
           '<td style="text-align:center">'+inc.gift.toFixed(1)+'</td>'+
           '<td style="text-align:center">'+inc.dpt.toFixed(1)+'</td>'+
+          '<td style="text-align:right;white-space:nowrap">'+fmtMoney(inc.selfSpend||0)+'</td>'+
           '<td style="text-align:center">'+inc.spt.toFixed(1)+'</td>'+
           '<td style="text-align:center"><b style="color:#15803d">'+inc.valid.toFixed(1)+'</b></td></tr>';
       }).join("")+
-      '<tr><td colspan="6" style="text-align:right;font-weight:700">全店总有效点</td><td style="text-align:center;font-weight:800">'+promoTotalPoints(ym,PROMO_GIFT).toFixed(1)+'</td></tr></table>';
+      '<tr><td colspan="7" style="text-align:right;font-weight:700">全店总有效点</td><td style="text-align:center;font-weight:800">'+promoTotalPoints(ym,PROMO_GIFT).toFixed(1)+'</td></tr></table>';
   }
   var pb=$("promoPool");
   if(pb){
