@@ -3516,8 +3516,10 @@ function retryDeleted(table,cloudRows){  if(!tomb[table])return;
     var row=(cloudRows||[]).find(function(r){return r&&r.id===id;});
     if(!row){unmarkDeleted(table,id);return;}
     if(row.name&&String(row.name).indexOf("__DEL__")===0){unmarkDeleted(table,id);return;}
-    if(table==="appointments")cloudDeleteRows(table,[id]).catch(function(){});
-    else cloudSoftDelete(table,id).catch(function(){});
+    /* 预约：拉取侧一律不再向云端补删。预约的删除只允许由用户手动操作触发（带明确 id）；
+       拉取侧补删一旦碰上接口偶发空响应就会被放大成"整表清空"，数据找不回来。 */
+    if(table==="appointments"){return;}
+    cloudSoftDelete(table,id).catch(function(){});
   });
 }
 /* 过期/异常墓碑自动清除：墓碑只应短期存在（云端删除请求的兜底），超过时限还留着说明删除没成功，
@@ -3730,9 +3732,27 @@ function cloudPullAll(){
   DB.appointments.forEach(function(a){if(a&&a.id)localApptIds[a.id]=1;});
   return Promise.all([cloudSelect("members").catch(__pullFail("members")),cloudSelect("services").catch(__pullFail("services")),cloudSelect("appointments").catch(__pullFail("appointments")),cloudSelect("schedule").catch(__pullFail("schedule")),cloudSelect("customers").catch(__pullFail("customers")),cloudSelect("consumptions").catch(__pullFail("consumptions")),cloudSelect("packages").catch(__pullFail("packages")),cloudSelect("packagebuys").catch(__pullFail("packagebuys")),cloudSelect("refunds").catch(__pullFail("refunds")),cloudSelect("withdrawals").catch(__pullFail("withdrawals"))])
     .then(function(res){
-      retryDeleted("members",res[0]);
-      retryDeleted("services",res[1]);
-      retryDeleted("customers",res[4]);
+      /* 空响应保护（关键，必须放在任何跟随删除之前）：单次拉取某张表返回 0 行、而本地还有数据时，
+         绝不能当成「云端已删」去本地墓碑化——一次接口偶发空响应就会让全部预约/客户被判成"云端已无"，
+         下一轮 retryDeleted 还会把它们从云端真删掉（数据凭空消失）。只有连续两轮都空才允许跟随删除。 */
+      var _emptyPull={};
+      var _noFail=function(k){return !cloudPullFail.some(function(m){return m.indexOf(k)===0;});};
+      if((res[2]||[]).length===0&&(DB.appointments||[]).length>0&&_noFail("appointments"))_emptyPull.appointments=1;
+      if((res[4]||[]).length===0&&(DB.customers||[]).length>0&&_noFail("customers"))_emptyPull.customers=1;
+      if((res[0]||[]).length===0&&(DB.members||[]).length>0&&_noFail("members"))_emptyPull.members=1;
+      if((res[1]||[]).length===0&&(DB.services||[]).length>0&&_noFail("services"))_emptyPull.services=1;
+      if((res[6]||[]).length===0&&(DB.packages||[]).length>0&&_noFail("packages"))_emptyPull.packages=1;
+      var _emptyPrev={};
+      try{_emptyPrev=JSON.parse(sessionStorage.getItem("bk_empty_v1")||"{}")||{};}catch(e){_emptyPrev={};}
+      var _streakNext={};
+      ["appointments","customers","members","services","packages"].forEach(function(k){
+        _streakNext[k]=_emptyPull[k]?((+_emptyPrev[k]||0)+1):0;
+      });
+      try{sessionStorage.setItem("bk_empty_v1",JSON.stringify(_streakNext));}catch(e){}
+      var _allowFollow=function(k){return !_emptyPull[k]||_streakNext[k]>=2;};
+      if(_allowFollow("members"))retryDeleted("members",res[0]);
+      if(_allowFollow("services"))retryDeleted("services",res[1]);
+      if(_allowFollow("customers"))retryDeleted("customers",res[4]);
       var dropSoftDel=function(table,cloudRows){
         (cloudRows||[]).forEach(function(r){
           if(r&&r.name&&String(r.name).indexOf("__DEL__")===0){
@@ -3752,7 +3772,7 @@ function cloudPullAll(){
       // 成员删除跟随：云端确认过但现在已不存在（其他设备删除）→ 本地同步删（墓碑防复活）
       var memCloudIds={};
       (res[0]||[]).forEach(function(r){if(r&&r.id)memCloudIds[r.id]=1;});
-      DB.members.forEach(function(m){if(m&&m.id&&!memCloudIds[m.id]&&cloudSelectedMemIds.indexOf(m.id)>=0)markDeleted("members",m.id);});
+      DB.members.forEach(function(m){if(_allowFollow("members")&&m&&m.id&&!memCloudIds[m.id]&&cloudSelectedMemIds.indexOf(m.id)>=0)markDeleted("members",m.id);});
       DB.members=DB.members.filter(function(m){return !(m&&m.name&&String(m.name).indexOf("__DEL__")===0);});
       cloudSelectedMemIds=(res[0]||[]).filter(function(r){return r&&r.id;}).map(function(r){return r.id;});
       DB.members=mergeRows((res[0]||[]).filter(function(r){return !isDeletedLocal("members",r.id);}).map(stripRow),DB.members);
@@ -3776,7 +3796,7 @@ function cloudPullAll(){
       // 服务删除跟随：云端确认过但现在已不存在（硬删除）→ 本地同步删（墓碑防复活，避免旧项目被本机重新上推）
       if(!cloudPullFail.some(function(m){return m.indexOf("services")===0;})){
         var svcCloudIds={};(res[1]||[]).forEach(function(r){if(r&&r.id)svcCloudIds[r.id]=1;});
-        DB.services.forEach(function(s){if(s&&s.id&&!svcCloudIds[s.id]&&cloudSelectedSvcIds.indexOf(s.id)>=0)markDeleted("services",s.id);});
+        DB.services.forEach(function(s){if(_allowFollow("services")&&s&&s.id&&!svcCloudIds[s.id]&&cloudSelectedSvcIds.indexOf(s.id)>=0)markDeleted("services",s.id);});
         DB.services=DB.services.filter(function(s){return !(s&&s.id&&isDeletedLocal("services",s.id));});
         cloudSelectedSvcIds=(res[1]||[]).filter(function(r){return r&&r.id;}).map(function(r){return r.id;});
       }
@@ -3814,7 +3834,10 @@ if(r.returned_at!=null){r.returnedAt=r.returned_at;delete r.returned_at;}
         if(r.customer_id!=null&&!isValidUUID(r.customer_id))delete r.customer_id;
         return r;
       }).filter(function(r){return !isDeletedLocal("appointments",r.id);});
-      retryDeleted("appointments",res[2]);
+      /* 空响应保护（关键）：单次拉取某张表返回 0 行、而本地还有数据时，绝不能当成「云端已删」
+         去本地墓碑化——否则一次接口偶发空响应就会把全部预约/客户判成"云端已无"，
+         下次拉取 retryDeleted 还会把这些行从云端真删掉（数据凭空消失）。只有连续两轮都空才跟随删除。 */
+      if(_allowFollow("appointments"))retryDeleted("appointments",res[2]);
       var cloudIds={};
       cloudRows.forEach(function(r){cloudIds[r.id]=1;});
       var lmap={};
@@ -3834,7 +3857,7 @@ if(r.returned_at!=null){r.returnedAt=r.returned_at;delete r.returned_at;}
         }
       });
       // 云端确认过但现在已不存在（其他设备删除）→ 本地跟随删除（墓碑防复活，避免手机/其他设备残留旧预约）
-      DB.appointments.forEach(function(a){
+      if(_allowFollow("appointments"))DB.appointments.forEach(function(a){
         if(a&&a.id&&!cloudIds[a.id]&&cloudSelectedApptIds.indexOf(a.id)>=0)markDeleted("appointments",a.id);
       });
       DB.appointments=pending;
@@ -3865,7 +3888,7 @@ var sched=res[3]&&res[3][0];
       // 客户删除跟随：云端确认过但现在已不存在（其他设备删除）→ 本地同步删（墓碑防复活）
       var custCloudIds={};
       (res[4]||[]).forEach(function(r){if(r&&r.id)custCloudIds[r.id]=1;});
-      DB.customers.forEach(function(c){if(c&&c.id&&!custCloudIds[c.id]&&cloudSelectedCustIds.indexOf(c.id)>=0)markDeleted("customers",c.id);});
+      DB.customers.forEach(function(c){if(_allowFollow("customers")&&c&&c.id&&!custCloudIds[c.id]&&cloudSelectedCustIds.indexOf(c.id)>=0)markDeleted("customers",c.id);});
       DB.customers=DB.customers.filter(function(c){return !(c&&c.name&&String(c.name).indexOf("__DEL__")===0);});
       cloudSelectedCustIds=(res[4]||[]).filter(function(r){return r&&r.id;}).map(function(r){return r.id;});
       DB.customers=mergeRows((res[4]||[]).filter(function(r){return !isDeletedLocal("customers",r.id);}).map(stripRow).map(function(c){
@@ -3888,7 +3911,7 @@ var sched=res[3]&&res[3][0];
       // 套餐定义：删除跟随（云端已硬删且本机确认过存在 → 本地同步删，防被重新上推）
       if(!cloudPullFail.some(function(m){return m.indexOf("packages")===0;})){
         var pkgCloudIds={};(res[6]||[]).forEach(function(r){if(r&&r.id)pkgCloudIds[r.id]=1;});
-        DB.packages.forEach(function(p){if(p&&p.id&&!pkgCloudIds[p.id]&&cloudSelectedPkgIds.indexOf(p.id)>=0)markDeleted("packages",p.id);});
+        DB.packages.forEach(function(p){if(_allowFollow("packages")&&p&&p.id&&!pkgCloudIds[p.id]&&cloudSelectedPkgIds.indexOf(p.id)>=0)markDeleted("packages",p.id);});
         DB.packages=(DB.packages||[]).filter(function(p){return !(p&&p.id&&isDeletedLocal("packages",p.id));});
         cloudSelectedPkgIds=(res[6]||[]).filter(function(r){return r&&r.id;}).map(function(r){return r.id;});
       }
