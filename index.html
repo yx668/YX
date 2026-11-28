@@ -5337,6 +5337,67 @@ function shareQuotaBonus(cid,d){
     if(r&&r.ok===true){toast("已调整兑换次数 "+(d>0?"+":"")+d);renderShareQuotaAdmin();}else toast("调整失败，请稍后重试","err");
   });
 }
+
+/* ---------- 股东详情内的额度管理卡（免费次数 / 兑换次数 / 专属分享名额） ---------- */
+var _cqCache={};
+function loadCustQuotaCard(cid){
+  var box=$("custQuotaCard"); if(!box)return;
+  shareQuotaCall("share_quota_info",{p_ref:cid}).then(function(q){
+    if(q&&q.ok===true)_cqCache[cid]=q;
+    paintCustQuotaCard(cid,q||{});
+  }).catch(function(){box.innerHTML='<div class="hint">额度读取失败，稍后自动重试</div>';});
+}
+function paintCustQuotaCard(cid,q){
+  var box=$("custQuotaCard"); if(!box)return;
+  var fl=+q.free_left||0,fb=+q.free_base||4,fu=+q.free_used||0,fo=(q.free_override!=null?+q.free_override:null);
+  var bl=+q.bonus_left||0,bt=+q.bonus_total||0,bu=+q.bonus_used||0;
+  var rem=+q.remaining||0,lim=+q.limit||6,used=+q.used||0,ladj=+q.limit_adj||0;
+  function cell(title,mainVal,sub,ops){return '<div style="flex:1;min-width:200px;background:var(--bg-1);border-radius:10px;padding:12px">'+
+    '<div style="font-size:12px;font-weight:700;color:var(--text-2);margin-bottom:6px">'+title+'</div>'+
+    '<div style="font-size:20px;font-weight:800;color:var(--primary)">'+mainVal+'</div>'+
+    '<div class="hint" style="margin:4px 0 8px">'+sub+'</div>'+ops+'</div>';}
+  box.innerHTML='<div style="font-size:13px;font-weight:700;color:var(--text-1);margin-bottom:8px">额度管理（本月）</div>'+
+    '<div style="display:flex;gap:10px;flex-wrap:wrap">'+
+      cell('免费洗脸（每月赠送）', fl+' 次', '每月 '+fb+' 次 · 本月已核销 '+fu+' 次'+(fo!=null?'（本月单独设为 '+fo+' 次）':'（跟随全局）'),
+        '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><input id="cqFree-'+cid+'" type="number" min="0" step="1" style="width:64px" value="'+(fo!=null?fo:'')+'" placeholder="'+(fb)+'">'+
+        '<button class="btn btn-ghost btn-xs" type="button" onclick="custQuotaSetFree(\''+cid+'\')">设置本月免费</button>'+
+        (fo!=null?'<button class="btn btn-ghost btn-xs" type="button" onclick="custQuotaSetFree(\''+cid+'\',0)">恢复全局</button>':'')+'</div>')+
+      cell('累计兑换次数', bl+' 次', '累计 '+bt+' 次 · 已用 '+bu+' 次（不清零，可累计到下月）',
+        '<div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-ghost btn-xs" type="button" onclick="custQuotaBonus(\''+cid+'\',1)">兑换 +1</button>'+
+        '<button class="btn btn-ghost btn-xs" type="button" onclick="custQuotaBonus(\''+cid+'\',-1)">兑换 -1</button></div>')+
+      cell('专属分享名额', rem+' 个', '每月 '+lim+' 个 · 本月已领 '+used+' 个',
+        '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><input id="cqLimit-'+cid+'" type="number" min="0" step="1" style="width:64px" value="'+(ladj>0?ladj:'')+'" placeholder="0=全局'+lim+'">'+
+        '<button class="btn btn-ghost btn-xs" type="button" onclick="custQuotaLimitSet(\''+cid+'\')">保存名额</button>'+
+        '<button class="btn btn-ghost btn-xs" type="button" onclick="custQuotaReset(\''+cid+'\')">重置本月</button></div>')+
+    '</div>'+
+    '<div class="hint" style="margin-top:8px;line-height:1.9">顺序：先用本月免费次数 → 再用累计兑换次数 → 都没有按股东价 '+fmtMoney(+q.price||19.9)+'/次收费（免费不计佣金，收费才计佣金）。免费次数每月 1 号自动重置；兑换次数不清零。专属分享名额：客户领取即占 1 个，7 天未到店核销自动退回。</div>';
+}
+function custQuotaSetFree(cid,forceZero){
+  var el=$("cqFree-"+cid);var v=forceZero?0:parseInt(el&&el.value,10);
+  if(!forceZero&&(isNaN(v)||v<0)){toast("请填 0 或正整数","err");return;}
+  shareQuotaCall("share_quota_free_set",{p_owner:cid,p_free:v}).then(function(r){
+    if(r&&r.ok===true){toast(v>0?("本月免费次数已设为 "+v+" 次"):"已恢复跟随全局免费次数");loadCustQuotaCard(cid);}
+    else toast("设置失败，请稍后重试","err");
+  });
+}
+function custQuotaBonus(cid,d){
+  shareQuotaCall("share_quota_admin",{p_owner:cid,p_limit:null,p_price:null,p_bonus_delta:d,p_reset:false}).then(function(r){
+    if(r&&r.ok===true){toast("兑换次数 "+(d>0?"+":"")+d);loadCustQuotaCard(cid);}else toast("调整失败，请稍后重试","err");
+  });
+}
+function custQuotaLimitSet(cid){
+  var el=$("cqLimit-"+cid);var v=parseInt(el&&el.value,10);if(isNaN(v)||v<0)v=0;
+  shareQuotaCall("share_quota_limit_set",{p_owner:cid,p_limit:v}).then(function(r){
+    if(r&&r.ok===true){toast(v>0?("专属分享名额已设为每月 "+v+" 个"):"已恢复跟随全局名额");loadCustQuotaCard(cid);}
+    else toast("设置失败，请稍后重试","err");
+  });
+}
+function custQuotaReset(cid){
+  if(!confirm("确定把这名股东本月的已领名额清零吗？已核销记录与兑换次数不变。"))return;
+  shareQuotaCall("share_quota_admin",{p_owner:cid,p_limit:null,p_price:null,p_bonus_delta:0,p_reset:true}).then(function(r){
+    if(r&&r.ok===true){toast("已重置本月名额");loadCustQuotaCard(cid);}else toast("重置失败，请稍后重试","err");
+  });
+}
 window.renderShareQuotaAdmin=renderShareQuotaAdmin;
 window.saveShareQuotaCfg=saveShareQuotaCfg;
 window.shareQuotaReset=shareQuotaReset;
@@ -9351,6 +9412,10 @@ function renderCustomerConsumptionManager(){
         '</div></div>';
     })()+
     '</div>';
+  // ---- 股东额度管理（免费次数 / 兑换次数 / 专属分享名额，仅管理员可见） ----
+  if(isSh&&isAdminRole){
+    html+='<div id="custQuotaCard" style="padding:12px 16px;border-bottom:1px solid var(--border)"><div class="hint">额度读取中…</div></div>';
+  }
   // ---- 套餐卡（预存卡：已购套餐与剩余次数；已退款的卡也显示，便于核对与删除测试数据） ----
   var pbList=(DB.packageBuys||[]).filter(function(b){return b.customerId===c.id;});
   if(pbList.length){
@@ -9389,6 +9454,7 @@ function renderCustomerConsumptionManager(){
       }).join("")+"</table></div>";
   }
   $("customerConsumptionBody").innerHTML=html;
+  if(isSh&&isAdminRole&&$("custQuotaCard"))loadCustQuotaCard(c.id);
   $("customerConsumptionFoot").innerHTML='<button class="btn btn-ghost" type="button" onclick="closeModal(\'customerConsumptionMask\')">关闭</button>';
 }
 /* 股东详情：个人 / 团队预约消费记录查看 */
