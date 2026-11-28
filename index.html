@@ -6435,7 +6435,7 @@ function renderSharePromo(me,ym){
     var myNet=S?(+S.net_amount||0):promoR2(myGross-myTax);
     var giftPts=S?(+S.points_gift||0):inc.gift,dptPts=S?(+S.points_direct||0):inc.dpt,sptPts=S?(+S.points_self||0):inc.spt;
     var online=false;try{online=!!(cloudMode&&sess);}catch(e){online=false;}
-    var settleTxt=S?('按云端结算单 '+S.month+(S.settled_at?('（结算于 '+String(S.settled_at).replace('T',' ').slice(0,16)+'）'):'')+'显示'):'';
+    var settleTxt=S?('按云端结算单 '+S.month+(S.settled_at?('（结算于 '+(function(ts){var d=new Date(ts);if(isNaN(d.getTime()))return String(ts).replace('T',' ').slice(0,16);function p(n){return (n<10?'0':'')+n;}return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes());})(S.settled_at)+'）'):'')+'显示'):'';
     var syncTxt=settleTxt||(PROMO_SYNC_AT
       ?('全店数据已于 '+new Date(PROMO_SYNC_AT).toTimeString().slice(0,5)+' 从云端同步')
       :(online?'尚未同步全店数据，当前为打开页面时的本机缓存':'离线：当前为本机缓存数据'));
