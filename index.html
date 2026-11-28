@@ -6386,6 +6386,25 @@ function promoLoadGift(){
 /* 全店数据（奖金池 / 全店总有效点）：股东端只用本机已同步数据会偏低（少同步一条订单池就少算），
    打开共享板块时先向云端重拉一次全店数据再算；离线或拉取失败时明确标注为测算值 */
 var PROMO_SYNC_AT=0,PROMO_SYNC_BUSY=false;
+/* 云端结算单读取：股东端分红卡应以管理员发布的结算结果为准（bonus_settlement / bonus_pool_monthly），
+   本机重算只作兜底——否则股东端只拉到自己的数据，全店总点/奖金池必然算小。 */
+var PROMO_SETTLE=null,PROMO_SETTLE_AT=0,PROMO_SETTLE_BUSY=false;
+function promoLoadSettle(force){
+  if(!cloudMode||!shareSess||!shareSess.phone||!shareSess.pwdHash)return Promise.resolve(false);
+  if(PROMO_SETTLE_BUSY)return Promise.resolve(false);
+  if(!force&&PROMO_SETTLE_AT&&(Date.now()-PROMO_SETTLE_AT)<60000)return Promise.resolve(!!PROMO_SETTLE);
+  PROMO_SETTLE_BUSY=true;
+  return sFetch("/rest/v1/rpc/share_bonus_info",{method:"POST",body:{p_phone:shareSess.phone,p_pwd_hash:shareSess.pwdHash}}).then(function(r){
+    PROMO_SETTLE_BUSY=false;PROMO_SETTLE_AT=Date.now();
+    if(r&&r.ok&&r.json&&r.json.month){PROMO_SETTLE=r.json;return true;}
+    PROMO_SETTLE=null;return false;
+  }).catch(function(){PROMO_SETTLE_BUSY=false;PROMO_SETTLE_AT=Date.now();return false;});
+}
+function promoRefreshShare(force){
+  return Promise.all([promoLoadSettle(force),promoRefreshStore(force)]).then(function(){
+    try{if(shareSess&&shareSess.cid)renderSharePromo(customerById(shareSess.cid),curYm());}catch(e){}
+  });
+}
 function promoRefreshStore(force){
   if(PROMO_SYNC_BUSY)return Promise.resolve(false);
   var online=false;try{online=!!(cloudMode&&sess);}catch(e){online=false;}
@@ -6405,38 +6424,44 @@ function renderSharePromo(me,ym){
   var box2=$("shareBonus");
   if(box2){
     var inc=promoMyIncome(me.id,ym,PROMO_GIFT);
-    /* 全店总有效点 / 奖金池：按本机已同步数据算；卡片标注同步状态，并提供手动刷新（防少条订单算低） */
-    var storeTotal=inc.total,storePool=inc.pool.pool;
-    var myRatio=storeTotal>0?inc.valid/storeTotal:0;
-    var myGross=promoR2(storePool*myRatio);
-    var myTax=promoR2(myGross*PROMO.taxRate);
-    var myNet=promoR2(myGross-myTax);
+    /* 优先用云端结算单（管理员发布）：奖金池/全店总点/占比/分红/税/实发都取结算值；
+       没有结算单时才退回本机数据测算，并标注「测算值」。 */
+    var S=(PROMO_SETTLE&&String(PROMO_SETTLE.month||"")===ym)?PROMO_SETTLE:null;
+    var validPts=S?(+S.valid_points||0):inc.valid;
+    var storeTotal=S?(+S.total_points||0):inc.total,storePool=S?(+S.pool_amount||0):inc.pool.pool;
+    var myRatio=S?(+S.ratio||0):(storeTotal>0?inc.valid/storeTotal:0);
+    var myGross=S?(+S.gross_amount||0):promoR2(storePool*myRatio);
+    var myTax=S?(+S.tax_amount||0):promoR2(myGross*PROMO.taxRate);
+    var myNet=S?(+S.net_amount||0):promoR2(myGross-myTax);
+    var giftPts=S?(+S.points_gift||0):inc.gift,dptPts=S?(+S.points_direct||0):inc.dpt,sptPts=S?(+S.points_self||0):inc.spt;
     var online=false;try{online=!!(cloudMode&&sess);}catch(e){online=false;}
-    var syncTxt=PROMO_SYNC_AT
+    var settleTxt=S?('按云端结算单 '+S.month+(S.settled_at?('（结算于 '+String(S.settled_at).replace('T',' ').slice(0,16)+'）'):'')+'显示'):'';
+    var syncTxt=settleTxt||(PROMO_SYNC_AT
       ?('全店数据已于 '+new Date(PROMO_SYNC_AT).toTimeString().slice(0,5)+' 从云端同步')
-      :(online?'尚未同步全店数据，当前为打开页面时的本机缓存':'离线：当前为本机缓存数据');
-    var warnTxt=(!PROMO_SYNC_AT&&online)?'⚠ 本机可能少同步了订单/股东，先点「刷新全店数据」再核数。':'';
-    var singleTxt=(storeTotal>0&&Math.abs(storeTotal-inc.valid)<0.01&&(promoPartners()||[]).length<3)
+      :(online?'尚未同步全店数据，当前为打开页面时的本机缓存':'离线：当前为本机缓存数据'));
+    var warnTxt=(!S&&!PROMO_SYNC_AT&&online)?'⚠ 本机可能少同步了订单/股东，先点「刷新全店数据」再核数。':'';
+    var singleTxt=(!S&&storeTotal>0&&Math.abs(storeTotal-validPts)<0.01&&(promoPartners()||[]).length<3)
       ?'⚠ 全店总有效点只有你个人点数：其他股东数据没同步到，占比 100% 不可信，请点「刷新全店数据」。':'';
     box2.innerHTML=
       '<div style="display:flex;gap:10px;flex-wrap:wrap">'+
-      '<div style="flex:1;min-width:130px;background:var(--bg-1);border-radius:10px;padding:10px"><div class="hint">注册赠送点 · 90 天</div><div style="font-size:20px;font-weight:800">'+inc.gift.toFixed(1)+' 点</div></div>'+
-      '<div style="flex:1;min-width:130px;background:var(--bg-1);border-radius:10px;padding:10px"><div class="hint">本月直推业绩点 · 当月有效</div><div style="font-size:20px;font-weight:800;color:var(--primary)">'+inc.dpt.toFixed(1)+' 点</div><div class="hint">业绩 '+fmtMoney(inc.perf)+' × '+inc.mult+' 倍</div></div>'+
-      '<div style="flex:1;min-width:130px;background:var(--bg-1);border-radius:10px;padding:10px"><div class="hint">本人自消费点 · 365 天</div><div style="font-size:20px;font-weight:800">'+inc.spt.toFixed(1)+' 点</div></div>'+
+      '<div style="flex:1;min-width:130px;background:var(--bg-1);border-radius:10px;padding:10px"><div class="hint">注册赠送点 · 90 天</div><div style="font-size:20px;font-weight:800">'+giftPts.toFixed(1)+' 点</div></div>'+
+      '<div style="flex:1;min-width:130px;background:var(--bg-1);border-radius:10px;padding:10px"><div class="hint">本月直推业绩点 · 当月有效</div><div style="font-size:20px;font-weight:800;color:var(--primary)">'+dptPts.toFixed(1)+' 点</div><div class="hint">'+(S?'结算单口径':'业绩 '+fmtMoney(inc.perf)+' × '+inc.mult+' 倍')+'</div></div>'+
+      '<div style="flex:1;min-width:130px;background:var(--bg-1);border-radius:10px;padding:10px"><div class="hint">本人自消费点 · 365 天</div><div style="font-size:20px;font-weight:800">'+sptPts.toFixed(1)+' 点</div></div>'+
       '</div>'+
       '<div style="margin-top:10px;background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1px solid #bbf7d0;border-radius:10px;padding:12px 14px">'+
       '<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:baseline">'+
-      '<div><div class="hint">我的有效点</div><div style="font-size:22px;font-weight:800;color:#15803d;line-height:1.3">'+inc.valid.toFixed(1)+' 点</div></div>'+
+      '<div><div class="hint">我的有效点</div><div style="font-size:22px;font-weight:800;color:#15803d;line-height:1.3">'+validPts.toFixed(1)+' 点</div></div>'+
       '<div><div class="hint">全店总有效点</div><div style="font-size:22px;font-weight:800;color:var(--text-1);line-height:1.3">'+storeTotal.toFixed(1)+' 点</div></div>'+
       '<div><div class="hint">我的占比</div><div style="font-size:22px;font-weight:800;color:var(--text-1);line-height:1.3">'+(storeTotal>0?(myRatio*100).toFixed(2):"0.00")+'%</div></div>'+
       '</div>'+
       '<div style="margin-top:10px;border-top:1px dashed #86efac;padding-top:10px;display:flex;gap:14px;flex-wrap:wrap;align-items:baseline">'+
       '<div><div class="hint">本月奖金池</div><div style="font-size:22px;font-weight:800;color:var(--text-1);line-height:1.3">'+fmtMoney(storePool)+'</div></div>'+
-      '<div><div class="hint">本月可分红（预计）</div><div style="font-size:22px;font-weight:800;color:#15803d;line-height:1.3">'+fmtMoney(myGross)+'</div></div>'+
+      '<div><div class="hint">'+(S?'本月可分红':'本月可分红（预计）')+'</div><div style="font-size:22px;font-weight:800;color:#15803d;line-height:1.3">'+fmtMoney(myGross)+'</div></div>'+
       '<div><div class="hint">代扣个税 / 实发</div><div style="font-size:22px;font-weight:800;color:var(--text-1);line-height:1.3">'+fmtMoney(myTax)+' / '+fmtMoney(myNet)+'</div></div>'+
       '</div>'+
-      '<div class="hint" style="margin-top:8px">'+syncTxt+'。'+singleTxt+warnTxt+' 月中显示为按当前累计毛利测算的预计值；当月无毛利则池为 0，无分红、不保底。分红点是分配权重标记，不是股权，不可转让、不可变现。 <button class="btn btn-ghost btn-xs" type="button" onclick="promoRefreshStore(true)">刷新全店数据</button></div>'+
+      '<div class="hint" style="margin-top:8px">'+syncTxt+'。'+singleTxt+warnTxt+' 未发布结算单时按当前累计毛利测算；当月无毛利则池为 0，无分红、不保底。分红点是分配权重标记，不是股权，不可转让、不可变现。 <button class="btn btn-ghost btn-xs" type="button" onclick="promoRefreshShare(true)">刷新全店数据</button></div>'+
       '</div>';
+    if(shareSess&&!PROMO_SETTLE&&!S)promoLoadSettle().then(function(ok){if(ok)renderSharePromo(customerById(shareSess.cid),curYm());});
   }
 }
 /* ================= 管理员：推广结算页 ================= */
