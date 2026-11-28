@@ -3905,10 +3905,19 @@ var sched=res[3]&&res[3][0];
       DB.customers.forEach(function(c){if(_allowFollow("customers")&&c&&c.id&&!custCloudIds[c.id]&&cloudSelectedCustIds.indexOf(c.id)>=0)markDeleted("customers",c.id);});
       DB.customers=DB.customers.filter(function(c){return !(c&&c.name&&String(c.name).indexOf("__DEL__")===0);});
       cloudSelectedCustIds=(res[4]||[]).filter(function(r){return r&&r.id;}).map(function(r){return r.id;});
+      var _custLocalSnap={};
+      DB.customers.forEach(function(c){if(c&&c.id)_custLocalSnap[c.id]=c;});
       DB.customers=mergeRows((res[4]||[]).filter(function(r){return !isDeletedLocal("customers",r.id);}).map(stripRow).map(function(c){
         if(c.wx==null)c.wx="";
         return c;
       }),DB.customers);
+      // 本地刚编辑（updatedAt 比云端 updated_at 新）→ 保留本地，避免"改完一秒又退回"
+      DB.customers=DB.customers.map(function(c){
+        var l=_custLocalSnap[c&&c.id];if(!l)return c;
+        var lu=Date.parse(l.updatedAt)||0;
+        var cu=Date.parse((c&&(c.updated_at||c.updatedAt))||"")||0;
+        return (lu&&(!cu||lu>cu+2000))?l:c;
+      });
       // 台账上推/拉取配套：预约被删除的台账行云端 apptid 为空，拉取后回填本地 apptId，避免孤儿台账统计口径丢失
       var _localConApptId={};
       (DB.consumptions||[]).forEach(function(o){if(o&&o.id&&o.apptId)_localConApptId[o.id]=o.apptId;});
@@ -7062,6 +7071,19 @@ function openCustomerModal(id,presetReferrer){
   syncReferrerOptions();
   showModal("customerMask");
 }
+function cloudOps_pushCustomer(c){
+  if(!c||!c.id||!cloudMode||!sess||!navigator.onLine)return;
+  if(isDeletedLocal("customers",c.id))return;
+  var o={};
+  ["id","name","phone","type","referrer","account_email","note","wx","login_enabled","login_pwd","login_pwd_plain"].forEach(function(k){
+    if(k==="login_enabled")o.login_enabled=(c.login_enabled===undefined||c.login_enabled==null)?false:!!c.login_enabled;
+    else if(k==="login_pwd")o.login_pwd=(c.login_pwd==null)?"":c.login_pwd;
+    else if(k==="login_pwd_plain")o.login_pwd_plain=(c.login_pwd_plain==null)?"":c.login_pwd_plain;
+    else o[k]=(c[k]!==undefined)?c[k]:null;
+  });
+  o.updated_at=new Date().toISOString();
+  cloudUpsert("customers",[o],"id").catch(function(){});
+}
 function saveCustomer(){
   if(!canEdit()){toast("无权限操作客户档案","err");return;}
   var name=$("cName").value.trim();
@@ -7087,11 +7109,13 @@ function saveCustomer(){
     var c=customerById(editingCustomerId);
     c.name=name;c.phone=phone;c.type=type;c.referrer=referrer;c.note=note;
     c.login_enabled=loginEnabled;c.login_pwd=loginEnabled?loginPwdVal:"";c.login_pwd_plain=loginEnabled?plainPwdVal:"";
+    c.updatedAt=new Date().toISOString(); // 编辑必须打时间戳：否则云端旧 updated_at 更新，本机会被判"过期"不再上推，拉取又覆盖回旧身份
     saveDB();toast("客户信息已更新");
+    cloudOps_pushCustomer(c);
   }else{
     DB.customers=DB.customers||[];
     DB.customers.push({id:uid(),name:name,phone:phone,type:type,referrer:referrer,account_email:"",note:note,color:"#6b7280",
-      login_enabled:loginEnabled,login_pwd:loginEnabled?loginPwdVal:"",login_pwd_plain:loginEnabled?plainPwdVal:""});
+      login_enabled:loginEnabled,login_pwd:loginEnabled?loginPwdVal:"",login_pwd_plain:loginEnabled?plainPwdVal:"",updatedAt:new Date().toISOString()});
     saveDB();toast("客户已添加");
   }
   closeModal("customerMask");
