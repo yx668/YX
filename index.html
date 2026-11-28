@@ -4718,7 +4718,7 @@ function loadSiteContent(){
 }
 function saveSiteContent(){
   if(!cloudCfg||!cloudCfg.url){toast("先到「备份与恢复」配置云端地址与密钥","err");return;}
-  var data={},n=0;
+  var data=Object.assign({},siteData||{}),n=0; // 保留云端已有其它字段（如图片、promo_snap 快照），只覆盖本次编辑项
   SITE_FIELDS.forEach(function(f){
     var el=$(siteId(f.k));if(!el)return;
     var v=el.value==null?"":String(el.value);
@@ -4973,28 +4973,41 @@ function renderShareBoard(){
     '</div>'+
     '<div class="hint" style="margin:10px 0 6px">本月直推成交 '+fInfo.rows.length+' 单'+(fInfo.redeemCount?'（其中套餐核销 '+fInfo.redeemCount+' 次 · 核销价值 '+fmtMoney(fInfo.redeemValue)+'）':'')+' · 实收 '+fmtMoney(fInfo.amount)+(fInfo.redeemCount?'':' · 成本 '+fmtMoney(fInfo.cost)+' · 毛利 '+fmtMoney(fInfo.profit))+' → 佣金 <b>'+fmtMoney(fInfo.fee)+'</b>（线下打款结算）</div>'+
     '<div class="hint" style="margin-top:8px">提现需联系门店管理员线下办理，您本人不可自行提现。</div>';
-  // 3) 我的套餐与预约：套餐卡与剩余次数（已退款不显示）
-  var myPkgs=(DB.packageBuys||[]).filter(function(b){return b.customerId===me.id&&!b.refunded;});
+  // 3) 我的套餐与预约：套餐卡、购买与退款记录（已退款的卡也保留显示）
+  var myPkgsAll=(DB.packageBuys||[]).filter(function(b){return b.customerId===me.id;})
+    .sort(function(x,y){
+      var A=(x.date||"")+" "+(x.time||""),B=(y.date||"")+" "+(y.time||"");
+      return A<B?1:(A>B?-1:0);
+    });
+  var myPkgs=myPkgsAll.filter(function(b){return !b.refunded;});
   var pkgBox2=$("shareMyPkgs");
   if(pkgBox2){
-    if(!myPkgs.length){
+    if(!myPkgsAll.length){
       pkgBox2.innerHTML='<div class="empty"><div class="big">🎫</div><h3>暂无套餐卡</h3><p>您购买的套餐卡会显示在这里，可到店直接核销使用（用一次扣一次）。</p></div>';
     }else{
-      pkgBox2.innerHTML='<table><tr><th>套餐</th><th>购于</th><th>剩余</th></tr>'+
-        myPkgs.map(function(b){
+      pkgBox2.innerHTML='<table><tr><th>套餐</th><th>购买 / 退款</th><th style="text-align:right">金额</th><th>状态</th></tr>'+
+        myPkgsAll.map(function(b){
           var arr=[];
           for(var k in b.remaining){var svp=serviceById(k);if(b.remaining[k]>0)arr.push((svp?svp.name:"?")+"×"+b.remaining[k]+(svp&&svp.isRent?"天":"次"));}
           var rem=arr.join("、")||"已用完";
-          return '<tr><td><b style="color:var(--primary)">🎫 '+esc(b.name)+'</b></td>'+
-            '<td>'+esc(b.date)+'</td>'+
-            '<td>'+(rem==="已用完"?'<span class="tag tag-gray" style="font-size:11px">已用完</span>':'<span class="tag tag-blue" style="font-size:11px">剩余 '+esc(rem)+'</span>')+'</td></tr>';
-        }).join("")+'</table>';
+          var rAmt=+b.refundAmount||0;
+          var buyLine='购于 '+esc(b.date)+(b.time?(' '+esc(b.time)):'');
+          var refundLine=b.refunded?('<div class="hint" style="color:#dc2626;margin-top:2px">退款于 '+esc(String(b.refundAt||"").replace(" "," "))+(rAmt?' · 退 '+fmtMoney(rAmt):'')+'</div>'):"";
+          var statusCell=b.refunded
+            ?'<span class="tag" style="background:#fee2e2;color:#dc2626;border-color:#fecaca">已退款'+(rAmt?' '+fmtMoney(rAmt):'')+'</span>'
+            :(rem==="已用完"?'<span class="tag tag-gray" style="font-size:11px">已用完</span>':'<span class="tag tag-blue" style="font-size:11px">剩余 '+esc(rem)+'</span>');
+          return '<tr><td><b style="color:'+(b.refunded?"var(--text-3)":"var(--primary)")+'">🎫 '+esc(b.name)+'</b></td>'+
+            '<td>'+buyLine+refundLine+'</td>'+
+            '<td style="text-align:right">'+fmtMoney(b.price||0)+'</td>'+
+            '<td>'+statusCell+'</td></tr>';
+        }).join("")+'</table>'+
+        '<div class="hint" style="margin-top:6px">已退款的套餐卡保留记录，不再可核销；剩余次数与预拿佣金同步取消。</div>';
     }
   }
   // 4) 我的套餐与预约：本人作为客户的记录（管理员/他人可代登记；含苗衣出租）
   var selfApps=DB.appointments.filter(function(a){return a.customer_id===me.id&&a.status!=="cancelled"&&a.kind!=="direct";})
     .sort(function(x,y){return x.date<y.date?-1:1;});
-  if($("shareSelfCnt"))$("shareSelfCnt").textContent="套餐 "+myPkgs.length+" 张 · 预约 "+selfApps.length+" 条";
+  if($("shareSelfCnt"))$("shareSelfCnt").textContent="套餐 "+myPkgs.length+" 张"+(myPkgsAll.length-myPkgs.length?("（已退款 "+(myPkgsAll.length-myPkgs.length)+" 张）"):"")+" · 预约 "+selfApps.length+" 条";
   if(!selfApps.length){
     $("shareSelf").innerHTML='<div class="empty"><div class="big">📅</div><h3>暂无本人预约记录</h3><p>您作为客户的预约与消费会显示在这里（由门店管理员或他人为您登记）。</p></div>';
   }else{
@@ -5014,6 +5027,7 @@ function renderShareBoard(){
   // 3) 我的推广佣金（固定 30%）+ 分红点与本月分红
   renderSharePromo(me,ym);
   promoLoadGift();
+  promoLoadSnap(); // 拉门店快照（全店总有效点 / 奖金池），到位后自动重渲分红卡
   // 4) 名下客户预约与消费（原「快捷操作」模块已移除；支持搜索过滤）
   var ym0=curYm(); // 当前年月：名下客户消费与业绩卡片均按本月统计，次月自动清零
   var lv1Ids=lv1IdsOf(me.id);
@@ -6362,12 +6376,58 @@ function promoLoadGift(){
     try{renderSharePromo(customerById(shareSess.cid),curYm());}catch(e){}
   }).catch(function(){});
 }
+/* 门店快照：全店奖金池与全店总有效点由管理员端写入 site_content.data.promo_snap，
+   股东端读取该快照计算占比与分红（股东本机只有部分订单，自算会偏低） */
+var PROMO_SNAP=null,PROMO_SNAP_AT=0,PROMO_SNAP_BUSY=false,PROMO_SNAP_SIG="";
+function promoSnapSigOf(s){return [s&&s.month,s&&s.pool,s&&s.total_points].join("|");}
+function promoLoadSnap(force){
+  var cfg=null;try{cfg=cloudCfg;}catch(e){}
+  if(!cfg||!cfg.url)return Promise.resolve(false);
+  if(PROMO_SNAP_BUSY)return Promise.resolve(false);
+  if(!force&&PROMO_SNAP&&(Date.now()-PROMO_SNAP_AT)<60000)return Promise.resolve(true);
+  PROMO_SNAP_BUSY=true;
+  return sFetch("/rest/v1/site_content?id=eq.1&select=data").then(function(r){
+    PROMO_SNAP_BUSY=false;
+    var arr=r.json||[],s=arr[0]&&arr[0].data&&arr[0].data["promo_snap"];
+    if(s&&s.month){PROMO_SNAP=s;PROMO_SNAP_AT=Date.now();}
+    try{if(shareSess&&shareSess.cid)renderSharePromo(customerById(shareSess.cid),curYm());}catch(e){}
+    return true;
+  }).catch(function(){PROMO_SNAP_BUSY=false;return false;});
+}
+function promoPublishSnap(){
+  if(!isAdmin())return;
+  var cfg=null;try{cfg=cloudCfg;}catch(e){}
+  if(!cfg||!cfg.url||!sess)return;
+  var ym=curYm(),pool=promoPoolOf(ym),tot=promoTotalPoints(ym,PROMO_GIFT);
+  var snap={month:ym,pool:promoR2(pool.pool),total_points:promoR2(tot),revenue:pool.revenue,cost:pool.cost,gross:pool.gross,
+    updated_at:new Date().toISOString()};
+  var sig=promoSnapSigOf(snap);
+  if(sig===PROMO_SNAP_SIG)return;
+  PROMO_SNAP_SIG=sig;
+  sFetch("/rest/v1/site_content?id=eq.1&select=data").then(function(r){
+    var arr=r.json||[],data=(arr[0]&&arr[0].data)||{};
+    if(data["promo_snap"]&&promoSnapSigOf(data["promo_snap"])===sig)return;
+    data["promo_snap"]=snap;
+    return sFetch("/rest/v1/site_content?id=eq.1",{method:"PATCH",body:{data:data,updated_at:new Date().toISOString()},headers:{"Prefer":"return=minimal"}});
+  }).catch(function(){PROMO_SNAP_SIG="";});
+}
 /* 推广佣金与分红点：逐单明细已移除（由「我推广的客户」板块承接），这里只渲染分红点卡 */
 function renderSharePromo(me,ym){
   if(!me)return;
   var box2=$("shareBonus");
   if(box2){
     var inc=promoMyIncome(me.id,ym,PROMO_GIFT);
+    /* 全店总有效点与奖金池：以门店（管理员端）同步的快照为准；股东本地数据不全，只能用快照才对得上全店 */
+    var snap=(PROMO_SNAP&&PROMO_SNAP.month===ym)?PROMO_SNAP:null;
+    var storeTotal=snap?promoR2(+snap.total_points||0):inc.total;
+    var storePool=snap?promoR2(+snap.pool||0):inc.pool.pool;
+    var myRatio=storeTotal>0?inc.valid/storeTotal:0;
+    var myGross=promoR2(storePool*myRatio);
+    var myTax=promoR2(myGross*PROMO.taxRate);
+    var myNet=promoR2(myGross-myTax);
+    var snapHint=snap
+      ?('全店数据同步于 '+String(snap.updated_at||"").replace("T"," ").slice(0,16)+'（门店周结以云端结算单为准）')
+      :'⚠ 未取到门店同步值：本机只同步到部分订单，下面全店总点/奖金池/可分红为测算值（会偏低），请等门店管理员打开「推广结算」页后自动同步。';
     box2.innerHTML=
       '<div style="display:flex;gap:10px;flex-wrap:wrap">'+
       '<div style="flex:1;min-width:130px;background:var(--bg-1);border-radius:10px;padding:10px"><div class="hint">注册赠送点 · 90 天</div><div style="font-size:20px;font-weight:800">'+inc.gift.toFixed(1)+' 点</div></div>'+
@@ -6377,15 +6437,15 @@ function renderSharePromo(me,ym){
       '<div style="margin-top:10px;background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1px solid #bbf7d0;border-radius:10px;padding:12px 14px">'+
       '<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:baseline">'+
       '<div><div class="hint">我的有效点</div><div style="font-size:22px;font-weight:800;color:#15803d;line-height:1.3">'+inc.valid.toFixed(1)+' 点</div></div>'+
-      '<div><div class="hint">全店总有效点</div><div style="font-size:22px;font-weight:800;color:var(--text-1);line-height:1.3">'+inc.total.toFixed(1)+' 点</div></div>'+
-      '<div><div class="hint">我的占比</div><div style="font-size:22px;font-weight:800;color:var(--text-1);line-height:1.3">'+(inc.total>0?(inc.ratio*100).toFixed(2):"0.00")+'%</div></div>'+
+      '<div><div class="hint">全店总有效点</div><div style="font-size:22px;font-weight:800;color:var(--text-1);line-height:1.3">'+storeTotal.toFixed(1)+' 点</div></div>'+
+      '<div><div class="hint">我的占比</div><div style="font-size:22px;font-weight:800;color:var(--text-1);line-height:1.3">'+(storeTotal>0?(myRatio*100).toFixed(2):"0.00")+'%</div></div>'+
       '</div>'+
       '<div style="margin-top:10px;border-top:1px dashed #86efac;padding-top:10px;display:flex;gap:14px;flex-wrap:wrap;align-items:baseline">'+
-      '<div><div class="hint">本月奖金池</div><div style="font-size:22px;font-weight:800;color:var(--text-1);line-height:1.3">'+fmtMoney(inc.pool.pool)+'</div></div>'+
-      '<div><div class="hint">本月可分红（预计）</div><div style="font-size:22px;font-weight:800;color:#15803d;line-height:1.3">'+fmtMoney(inc.gross)+'</div></div>'+
-      '<div><div class="hint">代扣个税 / 实发</div><div style="font-size:22px;font-weight:800;color:var(--text-1);line-height:1.3">'+fmtMoney(inc.tax)+' / '+fmtMoney(inc.net)+'</div></div>'+
+      '<div><div class="hint">本月奖金池</div><div style="font-size:22px;font-weight:800;color:var(--text-1);line-height:1.3">'+fmtMoney(storePool)+'</div></div>'+
+      '<div><div class="hint">本月可分红（预计）</div><div style="font-size:22px;font-weight:800;color:#15803d;line-height:1.3">'+fmtMoney(myGross)+'</div></div>'+
+      '<div><div class="hint">代扣个税 / 实发</div><div style="font-size:22px;font-weight:800;color:var(--text-1);line-height:1.3">'+fmtMoney(myTax)+' / '+fmtMoney(myNet)+'</div></div>'+
       '</div>'+
-      '<div class="hint" style="margin-top:8px">全店总有效点按本机已同步数据测算，月结以云端结算单为准；月中显示为按当前累计毛利测算的预计值；当月无毛利则池为 0，无分红、不保底。分红点是分配权重标记，不是股权，不可转让、不可变现。</div>'+
+      '<div class="hint" style="margin-top:8px">'+snapHint+'；月中为按当前累计毛利测算的预计值；当月无毛利则池为 0，无分红、不保底。分红点是分配权重标记，不是股权，不可转让、不可变现。</div>'+
       '</div>';
   }
 }
@@ -6414,6 +6474,7 @@ function renderPromoAdmin(){
       '<div style="flex:1;min-width:120px;background:var(--bg-1);border-radius:10px;padding:12px;text-align:center"><div style="font-size:24px;font-weight:800;color:#16a34a">'+fmtMoney(pool.pool)+'</div><div class="hint">奖金池（毛利×20%）</div></div>'+
       '</div><div class="hint" style="margin-top:10px">口径：佣金 30%（实收−成本）。售卡时按（套餐价−套餐成本）×30% 全额锁进该股东「预拿佣金」，不计本月；客户每核销一次，按本次（核销实收−成本）×30% 从预拿里减出，计入本月佣金与累计推广佣金；非套餐成交当场计入本月。奖金池 ＝（实收−成本）×20%；本人自消费不进直推档位；不存在间推/下线/团队层级。</div>';
   }
+  promoPublishSnap(); // 把全店奖金池/总有效点写成门店快照，供股东端读取（股东端本机数据不全）
   var flat=[];
   all.forEach(function(r){r.fees.rows.forEach(function(x){flat.push({p:r.p,x:x});});});
   flat.sort(function(a,b){
