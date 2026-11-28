@@ -4452,7 +4452,7 @@ function repairPkgFlags(){
      另外新买的卡（24 小时内）一律豁免，避免刚下单还没生成直购单就被当孤儿删掉。 */
   var oriCards=[];
   var _apptPullOK=!cloudPullFail.some(function(m){return m.indexOf("appointments")===0;});
-  if(isAdmin()&&_apptPullOK){
+  if(isAdmin()&&_apptPullOK&&(DB.appointments||[]).length>0){
     var _cardCut=Date.now()-24*3600*1000;
     (DB.packageBuys||[]).forEach(function(b){
       if(b.refunded)return;
