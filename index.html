@@ -3953,6 +3953,9 @@ var sched=res[3]&&res[3][0];
       if(!cloudPullFail.some(function(m){return m.indexOf("appointments")===0;}))expireDeleted("appointments",30*60*1000); // 管理端预约墓碑同样 30 分钟失效，避免误标永久隐藏
       // 拉取前快照本地已退款卡，merge 后强制恢复（防云端旧值 refunded=false 覆盖本地刚执行的退款标记 → 卡/预拿佣金复活）
       var _localRefunded={};(DB.packageBuys||[]).forEach(function(_b){if(_b&&_b.refunded)_localRefunded[_b.id]=1;});
+      // 拉取前快照本地剩余次数/已核销佣金：merge 后若本地已核销更多（remaining 更小、commUsed 更大）必须保留本地，
+      // 否则刚做完的归还/结账核销会被云端旧值回滚（次数没减、佣金重复）
+      var _localRem={};(DB.packageBuys||[]).forEach(function(_b){if(_b&&_b.id)_localRem[_b.id]={rem:_b.remaining||{},used:+(_b.commUsed||0)};});
       if(res[7]&&res[7].length){
         DB.packageBuys=mergeRows((res[7]||[]).map(stripRow).map(function(b){
           if(b.customerid!=null){b.customerId=b.customerid;delete b.customerid;}
@@ -3969,6 +3972,22 @@ var sched=res[3]&&res[3][0];
           return b;
         }),DB.packageBuys||[]).filter(function(b){return b&&b.id&&!isDeletedLocal("packagebuys",b.id);});
         (DB.packageBuys||[]).forEach(function(_b){if(_b&&_localRefunded[_b.id])_b.refunded=true;});
+        // 本地已核销的剩余次数/佣金不被云端旧值覆盖（取更小的剩余、更大的已核销）
+        (DB.packageBuys||[]).forEach(function(_b){
+          var L=_b&&_localRem[_b.id];if(!L)return;
+          var changed=false;
+          if(L.rem&&_b.remaining){
+            Object.keys(L.rem).forEach(function(k){
+              var lv=+L.rem[k]||0,cv=+(_b.remaining[k]||0);
+              if(cv>lv){_b.remaining[k]=lv;changed=true;}
+            });
+          }
+          if(L.used>+(_b.commUsed||0)){_b.commUsed=L.used;changed=true;}
+          if(changed){
+            _b.updatedAt=new Date().toISOString();
+            if(typeof queuePush==="function")queuePush();
+          }
+        });
       }else if(res[7]){
         // 云端暂时为空：只清掉本地已标记删除的卡，其余保留并随本轮 queuePush 重新上推
         // （旧逻辑无差别墓碑化，会把刚售出但尚未推送成功的套餐卡清掉 → 预拿佣金/核销次数全部丢失）
@@ -8677,6 +8696,7 @@ function saveReturnRent(){
   if(card&&freeDays>0){
     card.remaining[sv.id]=(+card.remaining[sv.id]||0)-freeDays;
     if(card.remaining[sv.id]<=0)delete card.remaining[sv.id];
+    card.updatedAt=now.toISOString(); // 扣次后打时间戳，防止拉取合并时被云端旧值回滚
     // 本次佣金 = (核销实收 − 项目成本) × 30%（按天累计），不再用卡内平摊佣金
     var cashD=cashOfCard(card,sv.id,cust);
     var costD=Math.max(0,+((sv&&sv.cost)||0));
@@ -8693,6 +8713,10 @@ function saveReturnRent(){
   a.dueDate=addDays(a.date||todayStr(),days-1);
   if(normalizeItems(a.items)[0]){var its=normalizeItems(a.items);its[0].qty=days;its[0].subtotal=expectFee;a.items=its;}
   a.chargeDays=chargeDays; // 收费天数（佣金拆分用）
+  // 出租是「按天计成本」：整单成本 = 单次成本×实际出租天数（不是只算 1 次），否则月毛利/奖金池会被高估
+  var svCostDay=Math.max(0,+((sv&&sv.cost)||0));
+  a.unitPrice=unit;
+  a.serviceCost=Math.round(svCostDay*days*100)/100;
   a.status="returned";a.amount=Math.round(amount*100)/100;a.payMethod=method;a.paidAt=now.toISOString();a.returnedAt=now.toISOString();a.updatedAt=now.toISOString();
   a.redeemValue=redeemValue; // 套餐免费部分服务价值
   a.commEarned=commEarned; // 核销佣金（有免费部分才写，归卡主上级）
