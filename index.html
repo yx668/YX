@@ -6441,6 +6441,8 @@ function promoOrderCost(a){var p=apptProfit(a);return promoR2(p.cost);}
 /* 是否属于该推广伙伴的直推客户订单（本人自消费不算，也不向上找上级 → 无间推） */
 function promoIsDirect(a,pid){
   if(!a||!a.customer_id||a.customer_id===pid)return false;
+  // 下单时留存的介绍人快照优先：散客时期（未绑定）下的单 referrer 为空，之后绑定股东也不追溯计佣
+  if(a.referrer!==undefined&&a.referrer!==null)return String(a.referrer)===pid;
   var c=customerById(a.customer_id);
   return !!(c&&c.referrer===pid);
 }
@@ -6927,6 +6929,18 @@ function doWithdraw(){
 
 /* ================= 客户档案 ================= */
 function customerById(id){return (DB.customers||[]).find(function(c){return c.id===id;});}
+/* 散客下单自动建档：散客预约/直购/出租时按姓名建档（普通客户、无介绍人）；
+   之后可在客户档案里把身份改成共享股东/普通客户，并绑定到任意股东名下。
+   注意：绑定前已产生的订单在预约单上留有 referrer 快照，不计佣金；绑定后新单才计。 */
+function ensureCustFromOrder(name,phone){
+  name=String(name||"").trim(); if(!name)return "";
+  var hit=(DB.customers||[]).find(function(c){return c.name===name&&String(c.name||"").indexOf("__DEL__")!==0;});
+  if(hit)return hit.id;
+  var c={id:uid(),name:name,phone:String(phone||"").trim(),type:"normal",referrer:"",note:"散客自动建档（"+todayStr()+"）",color:"#6b7280",updatedAt:new Date().toISOString()};
+  DB.customers.push(c);
+  toast("已自动录入客户档案："+name);
+  return c.id;
+}
 function referrerName(cid){
   var c=customerById(cid);
   return c?c.name:"";
@@ -7554,11 +7568,12 @@ function saveAppt(){
   var dur=Math.max(5,parseInt($("aDuration").value,10)||60);
   var mid=$("aMember").value,svid=$("aService").value,status=$("aStatus").value;
   var custId=$("aCustPick").value||"";
-  // 未显式关联时按姓名自动匹配客户档案
+  // 未显式关联时按姓名自动匹配客户档案；仍没有则自动建档（散客也要进客户档案）
   if(!custId){
     var hitC=(DB.customers||[]).find(function(c){return c.name===client;});
     if(hitC)custId=hitC.id;
   }
+  if(!custId&&isAdmin())custId=ensureCustFromOrder(client,$("aPhone").value.trim());
   var prev=editingApptId?DB.appointments.find(function(x){return x.id===editingApptId;}):null;
   var data={id:editingApptId||uid(),date:date,time:time,duration:dur,serviceId:svid,memberId:mid,client:client,phone:$("aPhone").value.trim(),note:$("aNote").value.trim(),status:status,
     amount:prev?(+prev.amount||0):0,payMethod:prev?prev.payMethod||"":"",paidAt:prev?prev.paidAt||"":"",customer_id:custId,kind:"appt",referrer:custId?((customerById(custId)||{}).referrer||""):"",updatedAt:new Date().toISOString()};
@@ -7925,6 +7940,7 @@ function saveCheckout(){
       var rvR=cashOfCard(card,sv.id,cust); // 本次核销确认实收：优先按套餐里填的每次核销金额
       var costR=Math.max(0,+((sv&&sv.cost)||0)); // 该项目单次成本
       var feeR=promoR2(Math.max(0,rvR-costR)*PROMO.feeRate); // 本次佣金 = (核销实收 − 成本) × 30%
+      if((+card.commTotal||0)<=0)feeR=0; // 售卡时未产生佣金（客户当时未绑定介绍人）→ 核销不追溯计佣
       a.redeemValue=rvR;
       a.commEarned=feeR;
       card.commUsed=Math.round(((+card.commUsed||0)+feeR)*100)/100; // 已核销佣金累计（预拿=总佣金−已核销）
@@ -8175,6 +8191,10 @@ function saveDirectBuy(){
   var client=$("buyClient").value.trim();
   if(!client){toast("请填写客户姓名","err");return;}
   var c=buyCust(),isShare=!!(c&&c.type==="shareholder");
+  if(!c&&isAdmin()){
+    var _ncid=ensureCustFromOrder(client,$("buyPhone").value.trim());
+    if(_ncid){c=customerById(_ncid)||null;isShare=false;}
+  }
   var items=[],total=0,cost=0,mainSvid="",redeemVal=0;
   DB.services.filter(function(s){return !s.isRent&&String(s.name||"").indexOf("__DEL__")!==0;}).forEach(function(s){
     var sel=buySelections[s.id];
@@ -8279,6 +8299,7 @@ function saveDirectBuy(){
         var rvF=cashOfCard(card,it.serviceId,c);
         var costF=Math.max(0,+((svF&&svF.cost)||0));
         var feeF=promoR2(Math.max(0,rvF-costF)*PROMO.feeRate)*it.qty;
+        if((+card.commTotal||0)<=0)feeF=0; // 售卡时无佣金基数（当时未绑定）→ 核销不追溯计佣
         commEarned+=feeF;
         card.commUsed=Math.round(((+card.commUsed||0)+feeF)*100)/100;
       }
@@ -8672,6 +8693,10 @@ function saveRent(){
   if(!client){toast("请填写租借人姓名","err");return;}
   if(!rentSvid){toast("请选择出租项目","err");return;}
   var s=serviceById(rentSvid),c=rentCust();
+  if(!c&&canEdit()){
+    var _rentCid=ensureCustFromOrder(client,$("rentPhone").value.trim());
+    if(_rentCid)c=customerById(_rentCid)||null;
+  }
   var days=Math.max(1,parseInt($("rentDays").value,10)||1);
   var date=$("rentDate").value||todayStr();
   var isSh=c&&c.type==="shareholder";
@@ -8810,6 +8835,7 @@ function saveReturnRent(){
     var costD=Math.max(0,+((sv&&sv.cost)||0));
     redeemValue=Math.round(cashD*freeDays*100)/100;
     commEarned=Math.round(Math.max(0,cashD-costD)*PROMO.feeRate*freeDays*100)/100;
+    if((+card.commTotal||0)<=0)commEarned=0; // 售卡时未绑定介绍人（无佣金基数）→ 核销不追溯计佣
     card.commUsed=Math.round(((+card.commUsed||0)+commEarned)*100)/100; // 已核销佣金累计（预拿=总佣金−已核销）
     // 备注与预约结账一致：套餐核销·套餐名（剩余X天）·佣金XX.XX
     var redeemNote=card.name+"（剩余 "+((card.remaining[sv.id]!==undefined)?card.remaining[sv.id]:0)+" "+(sv.isRent?"天":"次")+"）"+(commEarned>0?" · 佣金 "+fmtMoney(commEarned):"");
