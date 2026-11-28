@@ -6421,7 +6421,7 @@ function renderPromoAdmin(){
       flat.map(function(o){
         var x=o.x,a=x.a,sv=a.serviceId?serviceById(a.serviceId):null;
         var ccx=a.customer_id?customerById(a.customer_id):null;
-        var nm=sv?sv.name:(x.a.serviceName||"套餐核销")+(x.redeem?"（套餐核销）":"");
+        var nm=x.pkgBuy?("售卡·"+((((x.a.items||[]).filter(function(i2){return i2.kind==="pkg";})[0]||{}).name)||"套餐")):(sv?sv.name:(x.a.serviceName||"套餐核销"));
         if(x.redeem&&nm.indexOf("套餐核销")<0)nm+="（套餐核销·佣金售卡已计提）";
         return '<tr><td>'+esc(a.date)+'</td><td>'+esc(o.p.name)+'</td><td>'+esc(ccx?ccx.name:(a.client||"-"))+'</td><td>'+esc(nm)+'</td>'+
           '<td style="text-align:right">'+fmtMoney(x.value)+'</td><td style="text-align:right;color:var(--text-3)">'+fmtMoney(x.cost)+'</td>'+
