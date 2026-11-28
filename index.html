@@ -7900,9 +7900,32 @@ function saveCheckout(){
 var buyCustId="";
 var buySelections={}; // serviceId -> {qty:number}
 var buyRedeems={}; // serviceId -> true（用套餐卡核销，不收款）
+/* 股东面部清洁「本月免费次数 → 兑换次数 → 收费」：直购与预约同一套口径 */
+var FACE_SV_ID="52ee8a1e-e7dc-4b88-b387-96e25d8665fa";
+var _buyQuota=null,_buyQuotaAt=0;
+function ensureBuyQuota(){
+  var c=buyCust();
+  if(!c||c.type!=="shareholder")return;
+  if(_buyQuota&&_buyQuota.cid===c.id&&Date.now()-_buyQuotaAt<15000)return;
+  _buyQuotaAt=Date.now();
+  shareQuotaCall("share_quota_info",{p_ref:c.id}).then(function(q){
+    if(q&&q.ok===true){_buyQuota={cid:c.id,q:q,at:Date.now()};_buyQuotaAt=Date.now();updateBuyTotal();}
+  }).catch(function(){});
+}
+/* qty 次面部清洁在股东额度内的免费拆分：先用本月免费，再用兑换，剩下才收费 */
+function shareFaceSplit(c,qty){
+  var freeN=0,bonusN=0;
+  if(c&&c.type==="shareholder"&&_buyQuota&&_buyQuota.cid===c.id&&Date.now()-_buyQuotaAt<15000){
+    var q=_buyQuota.q||{};
+    freeN=Math.min(qty,Math.max(0,+q.free_left||0));
+    bonusN=Math.min(qty-freeN,Math.max(0,+q.bonus_left||0));
+  }
+  return {freeN:freeN,bonusN:bonusN,paidQty:Math.max(0,qty-freeN-bonusN)};
+}
 function renderBuy(){
   var custSel=$("buyCustPick"),proj=$("buyProjects");
   if(!custSel||!proj)return;
+  setTimeout(function(){try{ensureBuyQuota();}catch(e){}},50);
   // 客户下拉（保留原选中）
   var opts='<option value="">（散客）</option>'+(DB.customers||[]).map(function(c){
     return '<option value="'+c.id+'">'+esc(c.name)+(c.type==="shareholder"?"（共享股东）":"")+(c.phone?" · "+esc(c.phone):"")+"</option>";
@@ -8014,6 +8037,7 @@ function onBuyCustPick(){
   buyCustId=$("buyCustPick").value;
   syncBuyClient(true);
   updateBuyPriceNote();
+  ensureBuyQuota();
   renderBuyProjects();
 }
 function updateBuyPriceNote(){
@@ -8053,9 +8077,13 @@ function updateBuyTotal(){
     }
     var price=isShare&&s.priceShareholder!=null? +s.priceShareholder : +s.price;
     if(priceEl)priceEl.textContent=fmtMoney(price);
-    var sub=price*qty;
+    // 股东面部清洁：先用本月免费次数、再用兑换次数，剩下才收费（与预约结账同一口径）
+    var split={freeN:0,bonusN:0,paidQty:qty};
+    if(isShare&&s.id===FACE_SV_ID)split=shareFaceSplit(c,qty);
+    var sub=price*split.paidQty;
     total+=sub;cnt++;
-    if(lineEl)lineEl.textContent=fmtMoney(sub);
+    if(lineEl)lineEl.textContent=(split.freeN||split.bonusN)?
+      ((split.freeN?"免费 "+split.freeN+" 次":"")+(split.bonusN?(split.freeN?" · ":"")+"兑换 "+split.bonusN+" 次":"")+(split.paidQty?" · 收 "+fmtMoney(sub):"")):fmtMoney(sub);
     rows.push(s.name+" ×"+qty);
     if(qtyEl)qtyEl.disabled=false;
   });
@@ -8103,8 +8131,16 @@ function saveDirectBuy(){
     }
     var price=isShare&&s.priceShareholder!=null? +s.priceShareholder : +s.price;
     var sub=price*qty;
+    // 股东面部清洁：先扣本月免费次数，再扣兑换次数，剩余按股东价收费（与预约结账一致，免费部分不计佣金）
+    if(isShare&&c&&s.id===FACE_SV_ID){
+      var sp=shareFaceSplit(c,qty);
+      if(sp.freeN>0){items.push({kind:"free",serviceId:s.id,name:s.name+"（股东免费次数核销）",unitPrice:0,qty:sp.freeN,subtotal:0});}
+      if(sp.bonusN>0){items.push({kind:"bonus",serviceId:s.id,name:s.name+"（股东兑换次数核销）",unitPrice:0,qty:sp.bonusN,subtotal:0});}
+      qty=sp.paidQty;sub=price*qty;
+    }
     items.push({serviceId:s.id,name:s.name,unitPrice:price,qty:qty,subtotal:sub});
-    total+=sub;cost+=(+s.cost||0)*qty;
+    if(qty>0){total+=sub;}
+    cost+=(+s.cost||0)*qty;
     if(!mainSvid)mainSvid=s.id;
   });
   // 套餐（预存卡）金额与成本
@@ -8119,11 +8155,19 @@ function saveDirectBuy(){
   if(!method){toast("请选择收款方式","err");return;}
   var now=new Date();
   var pkgFirstName=pkgSel.length?pkgSel[0].name:"";
+  // 股东额度核销标记：免费/兑换次数按单记账（×N 让云端按次数计）
+  var fqNote="";
+  (function(){
+    var fN=0,bN=0;
+    items.forEach(function(it){if(it.kind==="free")fN+=it.qty;if(it.kind==="bonus")bN+=it.qty;});
+    if(fN>0)fqNote+=(fqNote?" · ":"")+"股东免费次数核销"+(fN>1?" ×"+fN:"");
+    if(bN>0)fqNote+=(fqNote?" · ":"")+"股东兑换次数核销"+(bN>1?" ×"+bN:"");
+  })();
   var rec={
     id:uid(),date:todayStr(),time:pad(now.getHours())+":"+pad(now.getMinutes()),
     duration:0,serviceId:mainSvid,memberId:"",
     client:client,phone:$("buyPhone").value.trim(),
-    note:c?("直接购买 · "+esc(c.name)):"直接购买 · 散客",
+    note:(c?("直接购买 · "+esc(c.name)):"直接购买 · 散客")+(fqNote?" · "+fqNote:""),
     status:"done",amount:Math.round(total*100)/100,payMethod:method,paidAt:now.toISOString(),
     customer_id:c?c.id:"",referrer:c?c.referrer:"",kind:"direct",
     pkgBuyOnly:!!pkgSel.length, // 套餐购买：预存款不计佣金，核销时才到账
@@ -8190,6 +8234,7 @@ function saveDirectBuy(){
   closeModal("checkoutMask");
   toast(redeemLog.length?("已收款 "+fmtMoney(total)+"（"+(PAY_METHODS[method]||method)+"）· 核销："+redeemLog.join("、")):("已收款 "+fmtMoney(total)+"（"+(PAY_METHODS[method]||method)+"）"));
   upsertConsumptionFromAppt(rec,"buy");
+  _buyQuotaAt=0;_buyQuota=null; // 额度已消耗，下次重新取
   resetBuy();
   openReceipt(rec.id);
 }
