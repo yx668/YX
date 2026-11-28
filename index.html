@@ -6458,13 +6458,16 @@ function renderSharePromo(me,ym){
     /* 优先用云端结算单（管理员发布）：奖金池/全店总点/占比/分红/税/实发都取结算值；
        没有结算单时才退回本机数据测算，并标注「测算值」。 */
     var S=(PROMO_SETTLE&&String(PROMO_SETTLE.month||"")===ym)?PROMO_SETTLE:null;
-    var validPts=S?(+S.valid_points||0):inc.valid;
+    /* 点位（注册赠送/直推/自消费/有效点）按本机实时口径算：股东本月新购买套餐、核销消费后点数要立刻跟着涨，
+       不能停在结算单快照上；奖金池/占比/分红/税/实发仍取结算单（那才是已发布的分配结果）。 */
+    var sDelta=S?promoR2(inc.spt-(+S.points_self||0)):0;
+    var validPts=S?promoR2((+S.points_gift||0)+(+S.points_direct||0)+inc.spt):inc.valid;
     var storeTotal=S?(+S.total_points||0):inc.total,storePool=S?(+S.pool_amount||0):inc.pool.pool;
     var myRatio=S?(+S.ratio||0):(storeTotal>0?inc.valid/storeTotal:0);
     var myGross=S?(+S.gross_amount||0):promoR2(storePool*myRatio);
     var myTax=S?(+S.tax_amount||0):promoR2(myGross*PROMO.taxRate);
     var myNet=S?(+S.net_amount||0):promoR2(myGross-myTax);
-    var giftPts=S?(+S.points_gift||0):inc.gift,dptPts=S?(+S.points_direct||0):inc.dpt,sptPts=S?(+S.points_self||0):inc.spt;
+    var giftPts=S?(+S.points_gift||0):inc.gift,dptPts=S?(+S.points_direct||0):inc.dpt,sptPts=inc.spt;
     var selfSpend=inc.selfSpend||0;
     var online=false;try{online=!!(cloudMode&&sess);}catch(e){online=false;}
     var settleTxt=S?('按云端结算单 '+S.month+(S.settled_at?('（结算于 '+(function(ts){var d=new Date(ts);if(isNaN(d.getTime()))return String(ts).replace('T',' ').slice(0,16);function p(n){return (n<10?'0':'')+n;}return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes());})(S.settled_at)+'）'):'')+'显示'):'';
@@ -6479,7 +6482,7 @@ function renderSharePromo(me,ym){
       '<div style="flex:1;min-width:130px;background:var(--bg-1);border-radius:10px;padding:10px"><div class="hint">注册赠送点 · 90 天</div><div style="font-size:20px;font-weight:800">'+giftPts.toFixed(1)+' 点</div></div>'+
       '<div style="flex:1;min-width:130px;background:var(--bg-1);border-radius:10px;padding:10px"><div class="hint">本月直推业绩点 · 当月有效</div><div style="font-size:20px;font-weight:800;color:var(--primary)">'+dptPts.toFixed(1)+' 点</div><div class="hint">'+(S?'结算单口径':'业绩 '+fmtMoney(inc.perf)+' × '+inc.mult+' 倍')+'</div></div>'+
       '<div style="flex:1;min-width:130px;background:var(--bg-1);border-radius:10px;padding:10px"><div class="hint">本月自消费额 · 已扣退款</div><div style="font-size:20px;font-weight:800">'+fmtMoney(selfSpend)+'</div><div class="hint">每满 '+PROMO.selfStep+' 元 1 点</div></div>'+
-      '<div style="flex:1;min-width:130px;background:var(--bg-1);border-radius:10px;padding:10px"><div class="hint">本人自消费点 · 365 天</div><div style="font-size:20px;font-weight:800">'+sptPts.toFixed(1)+' 点</div></div>'+
+      '<div style="flex:1;min-width:130px;background:var(--bg-1);border-radius:10px;padding:10px"><div class="hint">本人自消费点 · 365 天</div><div style="font-size:20px;font-weight:800">'+sptPts.toFixed(1)+' 点</div><div class="hint">'+(S?(Math.abs(sDelta)>0.01?('结算单 '+(+S.points_self||0).toFixed(1)+' + 本月新增 '+sDelta.toFixed(1)+' 点'):'与结算单一致'):'本月累计')+'</div></div>'+
       '</div>'+
       '<div style="margin-top:10px;background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1px solid #bbf7d0;border-radius:10px;padding:12px 14px">'+
       '<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:baseline">'+
@@ -6492,7 +6495,7 @@ function renderSharePromo(me,ym){
       '<div><div class="hint">'+(S?'本月可分红':'本月可分红（预计）')+'</div><div style="font-size:22px;font-weight:800;color:#15803d;line-height:1.3">'+fmtMoney(myGross)+'</div></div>'+
       '<div><div class="hint">代扣个税 / 实发</div><div style="font-size:22px;font-weight:800;color:var(--text-1);line-height:1.3">'+fmtMoney(myTax)+' / '+fmtMoney(myNet)+'</div></div>'+
       '</div>'+
-      '<div class="hint" style="margin-top:8px">'+syncTxt+'。'+singleTxt+warnTxt+' 未发布结算单时按当前累计毛利测算；当月无毛利则池为 0，无分红、不保底。分红点是分配权重标记，不是股权，不可转让、不可变现。 <button class="btn btn-ghost btn-xs" type="button" onclick="promoRefreshShare(true)">刷新全店数据</button></div>'+
+      '<div class="hint" style="margin-top:8px">'+syncTxt+'。'+singleTxt+warnTxt+((S&&Math.abs(sDelta)>0.01)?(' 点数为实时累计（本月新增 '+sDelta.toFixed(1)+' 点），分红金额仍按该结算单，新增点数在下次结算时计入。'):'')+' 未发布结算单时按当前累计毛利测算；当月无毛利则池为 0，无分红、不保底。分红点是分配权重标记，不是股权，不可转让、不可变现。 <button class="btn btn-ghost btn-xs" type="button" onclick="promoRefreshShare(true)">刷新全店数据</button></div>'+
       '</div>';
     if(shareSess&&!PROMO_SETTLE&&!S)promoLoadSettle().then(function(ok){if(ok)renderSharePromo(customerById(shareSess.cid),curYm());});
   }
