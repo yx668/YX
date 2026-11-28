@@ -3925,6 +3925,7 @@ var sched=res[3]&&res[3][0];
       }),DB.packages||[]);
       // 拉取前先清掉过期/异常（时钟超前）的套餐卡墓碑，避免真实卡被本地删除名单永久挡住
       if(!cloudPullFail.some(function(m){return m.indexOf("packagebuys")===0;}))expireDeleted("packagebuys",3*60*1000);
+      if(!cloudPullFail.some(function(m){return m.indexOf("appointments")===0;}))expireDeleted("appointments",30*60*1000); // 管理端预约墓碑同样 30 分钟失效，避免误标永久隐藏
       // 拉取前快照本地已退款卡，merge 后强制恢复（防云端旧值 refunded=false 覆盖本地刚执行的退款标记 → 卡/预拿佣金复活）
       var _localRefunded={};(DB.packageBuys||[]).forEach(function(_b){if(_b&&_b.refunded)_localRefunded[_b.id]=1;});
       if(res[7]&&res[7].length){
@@ -4444,13 +4445,16 @@ function repairPkgFlags(){
         else if(!c.apptId)cDup[k]=1;
       }
     });
-    // buy 台账同单去重：同客户+同日+同金额+同项目保留 1 条（历史 apptid 上推丢失导致的重复台账）
+    // buy 台账同单去重：同客户+同日+同金额+同项目，且两条都没有 apptId、写入时间相差 60 秒内 才判为重复（同一天真买两次同款不会误删）
     var buyIdx={};
     DB.consumptions.forEach(function(c){
       if(!c||c.kind!=="buy")return;
+      if(c.apptId||c.apptid)return; // 有预约关联的真实单据一律保留
       var custId=c.customer_id||c.customerId||"";
       var k=custId+"|"+(c.date||"")+"|"+(+c.amount||0)+"|"+(c.item||"");
-      if(buyIdx[k])dupCons.push(c.id);else buyIdx[k]=1;
+      var ts=Date.parse(c.created_at||c.createdAt||c.createdAtStr||"");
+      if(buyIdx[k]&&(!ts||!buyIdx[k].ts||Math.abs(ts-buyIdx[k].ts)<60000))dupCons.push(c.id);
+      else buyIdx[k]={ts:ts};
     });
     if(dupCons.length){
       DB.consumptions=DB.consumptions.filter(function(c){return dupCons.indexOf(c.id)<0;});
@@ -5485,13 +5489,17 @@ if(a.due_date!=null){a.dueDate=a.due_date;delete a.due_date;}
     byId[x.id]=x;
   });
   // 股东端删除同步：上次拉取确认过、本次云端已不存在的预约 → 本地跟随删除（防手机残留已删预约/消费）
+  // 关键防护：本次返回 0 条一律视为"接口偶发空响应"，不做跟随删除，也不覆盖确认名单
   var SHARE_CONF_KEY="bkgbook_share_conf_v1",shareConf=[];
   try{shareConf=JSON.parse(localStorage.getItem(SHARE_CONF_KEY)||"[]");}catch(e){shareConf=[];}
-  var cloudApptIds={};
-  appt.forEach(function(x){if(x&&x.id)cloudApptIds[x.id]=1;});
-  (DB.appointments||[]).forEach(function(x){
-    if(x&&x.id&&!cloudApptIds[x.id]&&shareConf.indexOf(x.id)>=0)markDeleted("appointments",x.id);
-  });
+  if(appt.length>0){
+    var cloudApptIds={};
+    appt.forEach(function(x){if(x&&x.id)cloudApptIds[x.id]=1;});
+    (DB.appointments||[]).forEach(function(x){
+      if(x&&x.id&&!cloudApptIds[x.id]&&shareConf.indexOf(x.id)>=0)markDeleted("appointments",x.id);
+    });
+    try{localStorage.setItem(SHARE_CONF_KEY,JSON.stringify(appt.map(function(x){return x.id;})));}catch(e){}
+  }
   // 预约墓碑 → 关联台账本地删
   if(DB.consumptions)DB.consumptions=DB.consumptions.filter(function(o){
     return !(o&&o.apptId&&isDeletedLocal("appointments",o.apptId));
@@ -5500,6 +5508,7 @@ if(a.due_date!=null){a.dueDate=a.due_date;delete a.due_date;}
   try{localStorage.setItem(SHARE_CONF_KEY,JSON.stringify(appt.map(function(x){return x.id;})));}catch(e){}
   sweepGhostMemberIds(); // 清除已删除成员残留引用
   expireDeleted("packagebuys",3*60*1000); // 股东端同样先清过期/异常套餐卡墓碑，否则新买的卡永远被过滤掉（点数不涨）
+  expireDeleted("appointments",30*60*1000); // 预约墓碑 30 分钟后自动失效：误标不会永久挡住真实预约（云端已删的也拉不回来，安全）
   repairPkgFlags(); // 云端拉回的直购套餐单同样自愈
   cloudSelectedApptIds=appt.map(function(x){return x.id;});
   (d.customers||[]).forEach(function(c){
