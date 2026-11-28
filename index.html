@@ -5093,7 +5093,6 @@ function renderShareBoard(){
     '<div class="info"><div class="name">'+esc(me.name)+' <span class="tag tag-warn">共享股东</span></div>'+
     '<div class="role">电话：'+(esc(me.phone)||"-")+(ref?("　介绍人："+esc(ref.name)):("　介绍人：无"))+"</div></div></div>"+
     '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">'+
-    '<div style="flex:1;min-width:100px;background:var(--bg-1);border-radius:10px;padding:12px 10px;text-align:center"><div style="font-size:22px;font-weight:800;color:var(--primary);line-height:1.2">30%</div><div class="hint" style="margin-top:4px">推广佣金比例</div></div>'+
     '<div style="flex:1;min-width:100px;background:var(--bg-1);border-radius:10px;padding:12px 10px;text-align:center"><div style="font-size:22px;font-weight:800;color:#16a34a;line-height:1.2">'+fmtMoney(fInfo.fee)+'</div><div class="hint" style="margin-top:4px">本月佣金</div></div>'+
     '<div style="flex:1;min-width:100px;background:var(--bg-1);border-radius:10px;padding:12px 10px;text-align:center"><div style="font-size:22px;font-weight:800;color:var(--text-1);line-height:1.2">'+fmtMoney(cs.total)+'</div><div class="hint" style="margin-top:4px">累计推广佣金</div></div>'+
     '</div>'+
@@ -9396,7 +9395,7 @@ function renderCustomerConsumptionManager(){
           '<div class="role">电话：'+(esc(c.phone)||"-")+'</div></div></div>'+
           '<div style="margin-top:10px;font-size:12.5px;color:var(--text-2);line-height:2">'+
           (isSh?
-            '<div>推广佣金比例：<b style="font-size:20px;font-weight:800;color:var(--primary)">'+(com2?Math.round(com2.ratio*100):0)+'%</b>　本月佣金：<b style="font-size:18px;font-weight:800;color:#16a34a">'+fmtMoney(promoFeesOf(c.id,ym2).fee)+'</b>　可预拿佣金：<b style="font-size:18px;font-weight:800;color:#d97706">'+fmtMoney(pkgPendingCommOf(c.id))+'</b></div>'+
+            '<div>本月佣金：<b style="font-size:18px;font-weight:800;color:#16a34a">'+fmtMoney(promoFeesOf(c.id,ym2).fee)+'</b>　可预拿佣金：<b style="font-size:18px;font-weight:800;color:#d97706">'+fmtMoney(pkgPendingCommOf(c.id))+'</b></div>'+
             '<div>累计推广佣金：<b style="color:var(--text-1)">'+fmtMoney(csum2.total)+'</b>　已提现 '+fmtMoney(csum2.withdrawn)+' · 待提现 '+fmtMoney(csum2.pending)+'</div>'
             :'<div>该客户为普通客户，无推广佣金。</div>')+
           '</div></div>'+
