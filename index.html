@@ -6228,14 +6228,13 @@ function promoFeesOf(pid,ym){
   (DB.appointments||[]).forEach(function(a){
     if((a.date||"").slice(0,7)!==ym)return;
     if(!promoIsDirect(a,pid))return;
-    // 套餐核销单：佣金 = 该次核销的实算佣金（a.commEarned =（本次核销实收−项目成本）×30%），不再按 30% 重算
-    // （旧逻辑把核销价值 399 再乘 30% 得 89.7，与套餐实收−成本的预拿佣金重复计算）
+    // 套餐核销单：只释放预拿佣金，不再计佣金（售卡时已按套餐价−套餐成本一次性计提，避免算两次）
     if((+a.commEarned||0)>0&&(+a.redeemValue||0)>0&&!promoIsPkgBuy(a)){
-      var fee=promoR2(+a.commEarned),vv=promoR2(+a.redeemValue||0);
-      var prof=promoR2(fee/PROMO.feeRate),cst=promoR2(Math.max(0,vv-prof));
-      out.rows.push({a:a,value:vv,cost:cst,profit:prof,fee:fee,redeem:true});
+      var vv=promoR2(+a.redeemValue||0);
+      var cst=promoR2(promoOrderCost(a));
+      if(!(cst>0))cst=promoR2(Math.max(0,vv-promoR2((+a.commEarned||0)/PROMO.feeRate)));
+      out.rows.push({a:a,value:vv,cost:cst,profit:promoR2(Math.max(0,vv-cst)),fee:0,redeem:true});
       out.redeemCount=(out.redeemCount||0)+1;out.redeemValue=promoR2((out.redeemValue||0)+vv);
-      out.fee+=fee; // 核销单不计入实收/成本/毛利（不是当次收款），佣金按卡锁定值计
       return;
     }
     var v=promoOrderValue(a);if(v<=0)return;
@@ -6393,9 +6392,10 @@ function renderPromoAdmin(){
       '<div style="flex:1;min-width:120px;background:var(--bg-1);border-radius:10px;padding:12px;text-align:center"><div style="font-size:24px;font-weight:800;color:var(--primary)">'+fmtMoney(totalFee)+'</div><div class="hint">本月佣金合计</div></div>'+
       '<div style="flex:1;min-width:120px;background:var(--bg-1);border-radius:10px;padding:12px;text-align:center"><div style="font-size:24px;font-weight:800">'+ordersN+'</div><div class="hint">直推成交单数</div></div>'+
       '<div style="flex:1;min-width:120px;background:var(--bg-1);border-radius:10px;padding:12px;text-align:center"><div style="font-size:24px;font-weight:800">'+fmtMoney(pool.revenue)+'</div><div class="hint">本月实收（含核销）</div></div>'+
-      '<div style="flex:1;min-width:120px;background:var(--bg-1);border-radius:10px;padding:12px;text-align:center"><div style="font-size:24px;font-weight:800">'+fmtMoney(pool.gross)+'</div><div class="hint">本月毛利</div></div>'+
+      '<div style="flex:1;min-width:120px;background:var(--bg-1);border-radius:10px;padding:12px;text-align:center"><div style="font-size:24px;font-weight:800;color:var(--text-3)">'+fmtMoney(pool.cost)+'</div><div class="hint">本月成本（含核销项目）</div></div>'+
+      '<div style="flex:1;min-width:120px;background:var(--bg-1);border-radius:10px;padding:12px;text-align:center"><div style="font-size:24px;font-weight:800">'+fmtMoney(pool.gross)+'</div><div class="hint">本月毛利（实收−成本）</div></div>'+
       '<div style="flex:1;min-width:120px;background:var(--bg-1);border-radius:10px;padding:12px;text-align:center"><div style="font-size:24px;font-weight:800;color:#16a34a">'+fmtMoney(pool.pool)+'</div><div class="hint">奖金池（毛利×20%）</div></div>'+
-      '</div><div class="hint" style="margin-top:10px">口径：佣金 30%（实收−成本）；奖金池 20%（毛利）；本人自消费不进直推档位；不存在间推/下线/团队层级。</div>';
+      '</div><div class="hint" style="margin-top:10px">口径：佣金 30%（实收−成本），在成交/售卡时一次性计提；套餐核销只释放卡上预拿佣金、不再重复计佣；奖金池 ＝（实收−成本）×20%；本人自消费不进直推档位；不存在间推/下线/团队层级。</div>';
   }
   var flat=[];
   all.forEach(function(r){r.fees.rows.forEach(function(x){flat.push({p:r.p,x:x});});});
@@ -6407,7 +6407,7 @@ function renderPromoAdmin(){
         var x=o.x,a=x.a,sv=a.serviceId?serviceById(a.serviceId):null;
         var ccx=a.customer_id?customerById(a.customer_id):null;
         var nm=sv?sv.name:(x.a.serviceName||"套餐核销")+(x.redeem?"（套餐核销）":"");
-        if(x.redeem&&nm.indexOf("套餐核销")<0)nm+="（套餐核销）";
+        if(x.redeem&&nm.indexOf("套餐核销")<0)nm+="（套餐核销·佣金售卡已计提）";
         return '<tr><td>'+esc(a.date)+'</td><td>'+esc(o.p.name)+'</td><td>'+esc(ccx?ccx.name:(a.client||"-"))+'</td><td>'+esc(nm)+'</td>'+
           '<td style="text-align:right">'+fmtMoney(x.value)+'</td><td style="text-align:right;color:var(--text-3)">'+fmtMoney(x.cost)+'</td>'+
           '<td style="text-align:right"><b style="color:#16a34a">'+fmtMoney(x.fee)+'</b></td></tr>';
@@ -6498,18 +6498,13 @@ function calcCommission(list){
     else{shId2=cust.referrer||"";}
     var sh=customerById(shId2);
     if(!sh||sh.type!=="shareholder")return;
-    if((+a.commEarned||0)>0){c+=+a.commEarned||0;return;} // 套餐核销单：固定佣金
+    if((+a.commEarned||0)>0)return; // 套餐核销单：佣金在售卡时已按（套餐价−成本）×30% 一次性计提，核销只释放预拿，不再重复计佣
     var p=apptProfit(a);
     if(p.amount<=0)return;
     var com=commissionOf(sh.id,(a.date||"").slice(0,7));
     if(com&&com.ratio>0)c+=Math.round(p.profit*com.ratio*100)/100;
   }
   list.forEach(acc);
-  // 套餐核销单（金额 0 但核销价值>0）：核销一次佣金到账一次
-  (DB.appointments||[]).forEach(function(a){
-    if(a.pkgBuyOnly)return;
-    if((+a.redeemValue||0)>0&&a.status==="done")acc(a);
-  });
   return Math.round(c*100)/100;
 }
 function apptProfit(a){
@@ -6519,6 +6514,11 @@ function apptProfit(a){
   if(a.serviceCost!=null){cost=+a.serviceCost||0;}
   else{var sv=a.serviceId?serviceById(a.serviceId):null;cost=sv?(+sv.cost||0):0;}
   if(cost<0)cost=0;
+  // 套餐核销单兜底：成本缺失（未存 serviceCost、项目也已停用）时，按佣金反推真实成本：
+  // commEarned =（本次核销实收 − 项目成本）× 30%，所以 成本 = 核销实收 − 佣金 ÷ 30%
+  if(cost<=0&&(+a.commEarned||0)>0&&(+a.redeemValue||0)>0){
+    cost=Math.max(0,Math.round(((+a.redeemValue)-(+a.commEarned)/PROMO.feeRate)*100)/100);
+  }
   return {amount:amount,cost:cost,profit:Math.max(0,amount-cost)};
 }
 function doneApptsInMonth(ym){
