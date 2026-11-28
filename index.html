@@ -9090,7 +9090,9 @@ if(cloudCfg&&cloudCfg.url&&cloudCfg.anonKey){
           },3000);
         }
         renderAll();startCloudSync();
-        try{flushHiddenCustToCloud();}catch(e){}
+        /* 已停用「登录即删除隐藏客户」：这段旧迁移逻辑会在每次管理员登录时把名单里的客户
+           从云端真删，名单过期后就会反复删真实客户。隐藏名单只在本地清空，绝不再自动删云端。 */
+        try{adminHideCust=[];saveHideCust();}catch(e){}
       });
     });
   }else if(shareSess){
