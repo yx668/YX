@@ -3908,6 +3908,17 @@ var sched=res[3]&&res[3][0];
       DB.consumptions=(DB.consumptions||[]).filter(function(o){
         return !(o&&o.apptId&&isDeletedLocal("appointments",o.apptId));
       });
+      // 台账删除跟随（本地清理，不动云端）：拉取成功、云端确实没有、且这条是 10 分钟前就建的旧记录
+      // → 说明它在别处被清掉了，本地跟着去掉，避免残留台账被 pushAll 重新推回云端
+      if(res[5]&&!cloudPullFail.some(function(m){return m.indexOf("consumptions")===0;})){
+        var consCloudIds={};(res[5]||[]).forEach(function(r){if(r&&r.id)consCloudIds[r.id]=1;});
+        var _nowTs=Date.now();
+        DB.consumptions=(DB.consumptions||[]).filter(function(o){
+          if(!o||!o.id||consCloudIds[o.id])return true;
+          var ts=Date.parse(o.created_at||o.createdAt||"");
+          return (!ts||(_nowTs-ts)<10*60*1000);
+        });
+      }
       // 套餐定义：删除跟随（云端已硬删且本机确认过存在 → 本地同步删，防被重新上推）
       if(!cloudPullFail.some(function(m){return m.indexOf("packages")===0;})){
         var pkgCloudIds={};(res[6]||[]).forEach(function(r){if(r&&r.id)pkgCloudIds[r.id]=1;});
