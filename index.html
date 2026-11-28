@@ -5029,7 +5029,7 @@ function renderShareBoard(){
   // 3) 我的推广佣金（固定 30%）+ 分红点与本月分红
   renderSharePromo(me,ym);
   promoLoadGift();
-  promoLoadSnap(); // 拉门店快照（全店总有效点 / 奖金池），到位后自动重渲分红卡
+  promoRefreshStore(); // 打开共享板块先向云端重拉全店数据，避免用少条订单的本机缓存算分红
   // 4) 名下客户预约与消费（原「快捷操作」模块已移除；支持搜索过滤）
   var ym0=curYm(); // 当前年月：名下客户消费与业绩卡片均按本月统计，次月自动清零
   var lv1Ids=lv1IdsOf(me.id);
@@ -6378,40 +6378,21 @@ function promoLoadGift(){
     try{renderSharePromo(customerById(shareSess.cid),curYm());}catch(e){}
   }).catch(function(){});
 }
-/* 门店快照：全店奖金池与全店总有效点由管理员端写入 site_content.data.promo_snap，
-   股东端读取该快照计算占比与分红（股东本机只有部分订单，自算会偏低） */
-var PROMO_SNAP=null,PROMO_SNAP_AT=0,PROMO_SNAP_BUSY=false,PROMO_SNAP_SIG="";
-function promoSnapSigOf(s){return [s&&s.month,s&&s.pool,s&&s.total_points].join("|");}
-function promoLoadSnap(force){
-  var cfg=null;try{cfg=cloudCfg;}catch(e){}
-  if(!cfg||!cfg.url)return Promise.resolve(false);
-  if(PROMO_SNAP_BUSY)return Promise.resolve(false);
-  if(!force&&PROMO_SNAP&&(Date.now()-PROMO_SNAP_AT)<60000)return Promise.resolve(true);
-  PROMO_SNAP_BUSY=true;
-  return sFetch("/rest/v1/site_content?id=eq.1&select=data").then(function(r){
-    PROMO_SNAP_BUSY=false;
-    var arr=r.json||[],s=arr[0]&&arr[0].data&&arr[0].data["promo_snap"];
-    if(s&&s.month){PROMO_SNAP=s;PROMO_SNAP_AT=Date.now();}
+/* 全店数据（奖金池 / 全店总有效点）：股东端只用本机已同步数据会偏低（少同步一条订单池就少算），
+   打开共享板块时先向云端重拉一次全店数据再算；离线或拉取失败时明确标注为测算值 */
+var PROMO_SYNC_AT=0,PROMO_SYNC_BUSY=false;
+function promoRefreshStore(force){
+  if(PROMO_SYNC_BUSY)return Promise.resolve(false);
+  var online=false;try{online=!!(cloudMode&&sess);}catch(e){online=false;}
+  if(!online)return Promise.resolve(false);
+  if(!force&&PROMO_SYNC_AT&&(Date.now()-PROMO_SYNC_AT)<30000)return Promise.resolve(true);
+  PROMO_SYNC_BUSY=true;
+  return cloudPullAll().then(function(ok){
+    PROMO_SYNC_BUSY=false;
+    if(ok)PROMO_SYNC_AT=Date.now();
     try{if(shareSess&&shareSess.cid)renderSharePromo(customerById(shareSess.cid),curYm());}catch(e){}
-    return true;
-  }).catch(function(){PROMO_SNAP_BUSY=false;return false;});
-}
-function promoPublishSnap(){
-  if(!isAdmin())return;
-  var cfg=null;try{cfg=cloudCfg;}catch(e){}
-  if(!cfg||!cfg.url||!sess)return;
-  var ym=curYm(),pool=promoPoolOf(ym),tot=promoTotalPoints(ym,PROMO_GIFT);
-  var snap={month:ym,pool:promoR2(pool.pool),total_points:promoR2(tot),revenue:pool.revenue,cost:pool.cost,gross:pool.gross,
-    updated_at:new Date().toISOString()};
-  var sig=promoSnapSigOf(snap);
-  if(sig===PROMO_SNAP_SIG)return;
-  PROMO_SNAP_SIG=sig;
-  sFetch("/rest/v1/site_content?id=eq.1&select=data").then(function(r){
-    var arr=r.json||[],data=(arr[0]&&arr[0].data)||{};
-    if(data["promo_snap"]&&promoSnapSigOf(data["promo_snap"])===sig)return;
-    data["promo_snap"]=snap;
-    return sFetch("/rest/v1/site_content?id=eq.1",{method:"PATCH",body:{data:data,updated_at:new Date().toISOString()},headers:{"Prefer":"return=minimal"}});
-  }).catch(function(){PROMO_SNAP_SIG="";});
+    return !!ok;
+  }).catch(function(){PROMO_SYNC_BUSY=false;return false;});
 }
 /* 推广佣金与分红点：逐单明细已移除（由「我推广的客户」板块承接），这里只渲染分红点卡 */
 function renderSharePromo(me,ym){
@@ -6419,17 +6400,19 @@ function renderSharePromo(me,ym){
   var box2=$("shareBonus");
   if(box2){
     var inc=promoMyIncome(me.id,ym,PROMO_GIFT);
-    /* 全店总有效点与奖金池：以门店（管理员端）同步的快照为准；股东本地数据不全，只能用快照才对得上全店 */
-    var snap=(PROMO_SNAP&&PROMO_SNAP.month===ym)?PROMO_SNAP:null;
-    var storeTotal=snap?promoR2(+snap.total_points||0):inc.total;
-    var storePool=snap?promoR2(+snap.pool||0):inc.pool.pool;
+    /* 全店总有效点 / 奖金池：按本机已同步数据算；卡片标注同步状态，并提供手动刷新（防少条订单算低） */
+    var storeTotal=inc.total,storePool=inc.pool.pool;
     var myRatio=storeTotal>0?inc.valid/storeTotal:0;
     var myGross=promoR2(storePool*myRatio);
     var myTax=promoR2(myGross*PROMO.taxRate);
     var myNet=promoR2(myGross-myTax);
-    var snapHint=snap
-      ?('全店数据同步于 '+String(snap.updated_at||"").replace("T"," ").slice(0,16)+'（门店周结以云端结算单为准）')
-      :'⚠ 未取到门店同步值：本机只同步到部分订单，下面全店总点/奖金池/可分红为测算值（会偏低），请等门店管理员打开「推广结算」页后自动同步。';
+    var online=false;try{online=!!(cloudMode&&sess);}catch(e){online=false;}
+    var syncTxt=PROMO_SYNC_AT
+      ?('全店数据已于 '+new Date(PROMO_SYNC_AT).toTimeString().slice(0,5)+' 从云端同步')
+      :(online?'尚未同步全店数据，当前为打开页面时的本机缓存':'离线：当前为本机缓存数据');
+    var warnTxt=(!PROMO_SYNC_AT&&online)?'⚠ 本机可能少同步了订单/股东，先点「刷新全店数据」再核数。':'';
+    var singleTxt=(storeTotal>0&&Math.abs(storeTotal-inc.valid)<0.01&&(promoPartners()||[]).length<3)
+      ?'⚠ 全店总有效点只有你个人点数：其他股东数据没同步到，占比 100% 不可信，请点「刷新全店数据」。':'';
     box2.innerHTML=
       '<div style="display:flex;gap:10px;flex-wrap:wrap">'+
       '<div style="flex:1;min-width:130px;background:var(--bg-1);border-radius:10px;padding:10px"><div class="hint">注册赠送点 · 90 天</div><div style="font-size:20px;font-weight:800">'+inc.gift.toFixed(1)+' 点</div></div>'+
@@ -6447,7 +6430,7 @@ function renderSharePromo(me,ym){
       '<div><div class="hint">本月可分红（预计）</div><div style="font-size:22px;font-weight:800;color:#15803d;line-height:1.3">'+fmtMoney(myGross)+'</div></div>'+
       '<div><div class="hint">代扣个税 / 实发</div><div style="font-size:22px;font-weight:800;color:var(--text-1);line-height:1.3">'+fmtMoney(myTax)+' / '+fmtMoney(myNet)+'</div></div>'+
       '</div>'+
-      '<div class="hint" style="margin-top:8px">'+snapHint+'；月中为按当前累计毛利测算的预计值；当月无毛利则池为 0，无分红、不保底。分红点是分配权重标记，不是股权，不可转让、不可变现。</div>'+
+      '<div class="hint" style="margin-top:8px">'+syncTxt+'。'+singleTxt+warnTxt+' 月中显示为按当前累计毛利测算的预计值；当月无毛利则池为 0，无分红、不保底。分红点是分配权重标记，不是股权，不可转让、不可变现。 <button class="btn btn-ghost btn-xs" type="button" onclick="promoRefreshStore(true)">刷新全店数据</button></div>'+
       '</div>';
   }
 }
@@ -6476,7 +6459,6 @@ function renderPromoAdmin(){
       '<div style="flex:1;min-width:120px;background:var(--bg-1);border-radius:10px;padding:12px;text-align:center"><div style="font-size:24px;font-weight:800;color:#16a34a">'+fmtMoney(pool.pool)+'</div><div class="hint">奖金池（毛利×20%）</div></div>'+
       '</div><div class="hint" style="margin-top:10px">口径：佣金 30%（实收−成本）。售卡时按（套餐价−套餐成本）×30% 全额锁进该股东「预拿佣金」，不计本月；客户每核销一次，按本次（核销实收−成本）×30% 从预拿里减出，计入本月佣金与累计推广佣金；非套餐成交当场计入本月。奖金池 ＝（实收−成本）×20%；本人自消费不进直推档位；不存在间推/下线/团队层级。</div>';
   }
-  promoPublishSnap(); // 把全店奖金池/总有效点写成门店快照，供股东端读取（股东端本机数据不全）
   var flat=[];
   all.forEach(function(r){r.fees.rows.forEach(function(x){flat.push({p:r.p,x:x});});});
   flat.sort(function(a,b){
