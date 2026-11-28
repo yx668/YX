@@ -7505,6 +7505,26 @@ function pkgCardsOf(cid,serviceId){
   if(!cid||!serviceId)return [];
   return (DB.packageBuys||[]).filter(function(b){return b.customerId===cid&&!b.refunded&&b.remaining&&b.remaining[serviceId]>0;});
 }
+/* 删除套餐卡（含已退款的测试卡）：本地+墓碑+云端硬删，连带该卡的退款记录一并删除，保证各视图一致 */
+function delPkgCard(bid){
+  if(!canEdit()){toast("仅管理员可以删除套餐卡","err");return;}
+  var b=(DB.packageBuys||[]).find(function(x){return x.id===bid;});
+  if(!b){toast("套餐卡不存在","err");return;}
+  if(!confirm("确定删除这张套餐卡？\n"+(b.name||b.pkgName||"套餐卡")+" · "+fmtMoney(b.price)+" · "+b.date+"\n该卡关联的退款记录会一并删除，其他数据不受影响。"))return;
+  var refIds=(DB.refunds||[]).filter(function(r){return r&&r.cardId===bid;}).map(function(r){return r.id;});
+  DB.packageBuys=(DB.packageBuys||[]).filter(function(x){return x.id!==bid;});
+  DB.refunds=(DB.refunds||[]).filter(function(r){return !(r&&r.cardId===bid);});
+  markDeleted("packagebuys",bid);
+  refIds.forEach(function(id){markDeleted("refunds",id);});
+  saveDB();
+  if(cloudMode&&sess&&isValidUUID(bid)){
+    cloudDeleteRows("packagebuys",[bid]).catch(function(e){toast("云端删除套餐卡失败："+((e&&e.message)||"请检查登录后重试"),"err");});
+    if(refIds.length)cloudDeleteRows("refunds",refIds).catch(function(){});
+  }
+  toast("套餐卡已删除");
+  if(typeof renderAll==="function")renderAll();
+  if(b.customerId&&typeof openCustomerConsumptionManager==="function")openCustomerConsumptionManager(b.customerId);
+}
 /* 套餐卡退款：先结算已核销次数（按市价），剩余未核销金额退款 */
 var refundPkgId=null;
 function refundPkg(bid){
@@ -9195,8 +9215,8 @@ function renderCustomerConsumptionManager(){
         '</div></div>';
     })()+
     '</div>';
-  // ---- 套餐卡（预存卡：已购套餐与剩余次数；已退款自动移除不显示） ----
-  var pbList=(DB.packageBuys||[]).filter(function(b){return b.customerId===c.id&&!b.refunded;});
+  // ---- 套餐卡（预存卡：已购套餐与剩余次数；已退款的卡也显示，便于核对与删除测试数据） ----
+  var pbList=(DB.packageBuys||[]).filter(function(b){return b.customerId===c.id;});
   if(pbList.length){
     html+='<div style="padding:12px 16px;border-bottom:1px solid var(--border)">'+
       '<div style="font-size:13px;font-weight:700;color:var(--text-1);margin-bottom:8px">套餐卡（'+pbList.length+' 张）</div>'+
@@ -9205,10 +9225,11 @@ function renderCustomerConsumptionManager(){
         for(var k in b.remaining){var sv=serviceById(k);if(b.remaining[k]>0)arr.push((sv?sv.name:"?")+"×"+b.remaining[k]+(sv&&sv.isRent?"天":"次"));}
         var rem=arr.join("、")||"已用完";
         return '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--bg-1);border-radius:8px;padding:8px 10px;margin-bottom:8px">'+
-          '<b style="color:'+(b.refunded?"var(--text-3)":"var(--primary)")+'">🎫 '+esc(b.name)+'</b>'+
-          '<span class="hint">'+esc(b.date)+' 购 · '+fmtMoney(b.price)+'</span>'+
+          '<b style="color:'+(b.refunded?"var(--text-3)":"var(--primary)")+'">🎫 '+esc(b.name||b.pkgName||"套餐卡")+'</b>'+
+          '<span class="hint">'+esc(b.date)+(b.time?" "+esc(b.time):"")+' 购 · '+fmtMoney(b.price)+'</span>'+
           (b.refunded?'<span class="tag tag-gray" style="font-size:11px">已退款 '+fmtMoney(b.refundAmount||b.price)+'</span>':'<span class="tag tag-blue" style="font-size:11px">剩余 '+esc(rem)+'</span>')+
           (canEdit()&&!b.refunded?'<button class="btn btn-ghost-danger btn-xs" type="button" onclick="refundPkg(\''+b.id+'\')">退款</button>':"")+
+          (canEdit()?'<button class="btn btn-ghost-danger btn-xs" type="button" onclick="delPkgCard(\''+b.id+'\')">删除</button>':"")+
           '</div>';
       }).join("")+"</div>";
   }
