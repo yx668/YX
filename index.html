@@ -3507,8 +3507,7 @@ function unmarkDeleted(table,id){if(tomb[table]){delete tomb[table][id];saveTomb
 function scheduleUnmark(table,id){setTimeout(function(){unmarkDeleted(table,id);},30000);}
 function isDeletedLocal(table,id){return !!(tomb[table]&&tomb[table][id]);}
 /* pull 时若发现墓碑 id 在云端仍存在（上次删除请求失败/断网），自动补删直到成功 */
-function retryDeleted(table,cloudRows){
-  if(!tomb[table])return;
+function retryDeleted(table,cloudRows){  if(!tomb[table])return;
   var _now=Date.now(),_LIM=20*60*1000;
   Object.keys(tomb[table]).forEach(function(id){
     var _ts=Number(tomb[table][id])||0;
@@ -3520,6 +3519,18 @@ function retryDeleted(table,cloudRows){
     if(table==="appointments")cloudDeleteRows(table,[id]).catch(function(){});
     else cloudSoftDelete(table,id).catch(function(){});
   });
+}
+/* 过期/异常墓碑自动清除：墓碑只应短期存在（云端删除请求的兜底），超过时限还留着说明删除没成功，
+   会让真实数据永久被过滤掉（如套餐卡云端明明存在，本机却永远看不到）。
+   另外其他设备时钟走快会让墓碑时间戳落在"未来"，这种一律视为无效墓碑清掉。 */
+function expireDeleted(table,ms){
+  if(!tomb[table])return 0;
+  var now=Date.now(),n=0;
+  Object.keys(tomb[table]).forEach(function(id){
+    var ts=Number(tomb[table][id])||0;
+    if(!ts||(now-ts)>ms||ts>now+60000){unmarkDeleted(table,id);n++;}
+  });
+  return n;
 }
 
 var DEFAULT_CLOUD=null; // 公网版不内置密钥：新设备须先「扫码自动配置」或「手动填密钥」才能连接云端登录
@@ -3889,6 +3900,8 @@ var sched=res[3]&&res[3][0];
         if(p.cost==null)p.cost=0;
         return p;
       }),DB.packages||[]);
+      // 拉取前先清掉过期/异常（时钟超前）的套餐卡墓碑，避免真实卡被本地删除名单永久挡住
+      if(!cloudPullFail.some(function(m){return m.indexOf("packagebuys")===0;}))expireDeleted("packagebuys",20*60*1000);
       // 拉取前快照本地已退款卡，merge 后强制恢复（防云端旧值 refunded=false 覆盖本地刚执行的退款标记 → 卡/预拿佣金复活）
       var _localRefunded={};(DB.packageBuys||[]).forEach(function(_b){if(_b&&_b.refunded)_localRefunded[_b.id]=1;});
       if(res[7]&&res[7].length){
@@ -4434,12 +4447,22 @@ function repairPkgFlags(){
     }
   });
   // 孤儿卡清理：套餐卡对应的直购单（同客户+同日+同时刻）已不存在 → 卡一并取消（本地+云端），未核销预拿佣金随之清 0；退款卡保留统计记录
+  /* 只在管理员端、且预约表确实拉取成功时才清理：股东端只拉到本人范围的预约，数据不全，
+     会把本人真实的套餐卡误判成「孤儿」→ 卡被本地墓碑屏蔽、云端被删，股东端就再也看不到新买的卡（点数也不涨）。
+     另外新买的卡（24 小时内）一律豁免，避免刚下单还没生成直购单就被当孤儿删掉。 */
   var oriCards=[];
-  (DB.packageBuys||[]).forEach(function(b){
-    if(b.refunded)return;
-    var has=(DB.appointments||[]).some(function(a){return a&&a.id&&a.kind==="direct"&&a.customer_id===b.customerId&&a.date===b.date&&a.time===b.time;});
-    if(!has)oriCards.push(b.id);
-  });
+  var _apptPullOK=!cloudPullFail.some(function(m){return m.indexOf("appointments")===0;});
+  if(isAdmin()&&_apptPullOK){
+    var _cardCut=Date.now()-24*3600*1000;
+    (DB.packageBuys||[]).forEach(function(b){
+      if(b.refunded)return;
+      var _ct=0;
+      try{_ct=b.createdAt?new Date(b.createdAt).getTime():(new Date((b.date||"")+"T"+((b.time&&b.time.length>5?b.time:"00:00"))+":00").getTime());}catch(e){_ct=0;}
+      if(_ct&&!isNaN(_ct)&&_ct>_cardCut)return; // 新卡豁免
+      var has=(DB.appointments||[]).some(function(a){return a&&a.id&&a.kind==="direct"&&a.customer_id===b.customerId&&a.date===b.date&&a.time===b.time;});
+      if(!has)oriCards.push(b.id);
+    });
+  }
   if(oriCards.length){
     DB.packageBuys=(DB.packageBuys||[]).filter(function(b){return oriCards.indexOf(b.id)<0;});
     oriCards.forEach(function(id){markDeleted("packagebuys",id);});
@@ -5453,6 +5476,7 @@ if(a.due_date!=null){a.dueDate=a.due_date;delete a.due_date;}
   DB.appointments=Object.keys(byId).map(function(k){return byId[k];}).filter(function(a){return !isDeletedLocal("appointments",a.id);});
   try{localStorage.setItem(SHARE_CONF_KEY,JSON.stringify(appt.map(function(x){return x.id;})));}catch(e){}
   sweepGhostMemberIds(); // 清除已删除成员残留引用
+  expireDeleted("packagebuys",20*60*1000); // 股东端同样先清过期/异常套餐卡墓碑，否则新买的卡永远被过滤掉（点数不涨）
   repairPkgFlags(); // 云端拉回的直购套餐单同样自愈
   cloudSelectedApptIds=appt.map(function(x){return x.id;});
   (d.customers||[]).forEach(function(c){
