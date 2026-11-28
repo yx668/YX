@@ -3691,6 +3691,22 @@ function mergeRows(cloudRows,localRows){
 var cloudPullFail=[];
 function __pullFail(t){return function(e){var m=t+"："+String((e&&e.message)||e).slice(0,40);if(cloudPullFail.indexOf(m)<0)cloudPullFail.push(m);return [];};}
 function cloudPullFailMsg(){return cloudPullFail.length?("（"+cloudPullFail.join("；")+"）"):"";}
+/* 有同步正在进行时不要再静默丢弃拉取请求：排队等它结束再真正拉一次。
+   否则登录后/点刷新时若正好撞上一次上推，cloudPullAll 会直接返回 false，
+   页面停留在旧（甚至空）本地数据 → 台账业绩、佣金明细全变 0。 */
+function cloudPullQueue(){
+  if(!cloudMode||!sess)return Promise.resolve(false);
+  if(!syncBusy)return cloudPullAll();
+  return new Promise(function(rs){
+    var waited=0;
+    (function step(){
+      if(!syncBusy){cloudPullAll().then(function(ok){rs(ok);}).catch(function(){rs(false);});return;}
+      waited+=200;
+      if(waited>10000){rs(false);return;}
+      setTimeout(step,200);
+    })();
+  });
+}
 function cloudPullAll(){
   cloudPullFail=[];
   if(!cloudMode||!sess)return Promise.resolve(false);
@@ -5682,7 +5698,7 @@ function afterLogin(){
   closeModal("loginMask");
   if(typeof clearShareSess==="function")clearShareSess(); // 管理员登录成功：清除可能残留的股东会话，确保以管理员身份操作（否则清空/删除等管理功能被判定为无权限）
   fetchMyProfile().catch(function(){myRole="user";}).then(function(){
-    cloudPullAll().then(function(ok){
+    cloudPullQueue().then(function(ok){
       if(!ok)toast("云端数据拉取失败，当前显示本地缓存","err");
       else toast("欢迎，"+(sess.user.email||"")+"（"+(myRole==="admin"?"管理员":"普通用户")+"）");
       renderAll();startCloudSync();updateCloudUI();
@@ -6426,7 +6442,7 @@ function promoRefreshStore(force){
   if(!online)return Promise.resolve(false);
   if(!force&&PROMO_SYNC_AT&&(Date.now()-PROMO_SYNC_AT)<30000)return Promise.resolve(true);
   PROMO_SYNC_BUSY=true;
-  return cloudPullAll().then(function(ok){
+  return cloudPullQueue().then(function(ok){
     PROMO_SYNC_BUSY=false;
     if(ok)PROMO_SYNC_AT=Date.now();
     try{if(shareSess&&shareSess.cid)renderSharePromo(customerById(shareSess.cid),curYm());}catch(e){}
