@@ -6416,17 +6416,25 @@ function renderPromoAdmin(){
   }
   var flat=[];
   all.forEach(function(r){r.fees.rows.forEach(function(x){flat.push({p:r.p,x:x});});});
-  flat.sort(function(a,b){return (a.x.a.date<b.x.a.date)?1:-1;});
+  flat.sort(function(a,b){
+    var A=(a.x.a.date||"")+" "+(a.x.a.time||"00:00");
+    var B=(b.x.a.date||"")+" "+(b.x.a.time||"00:00");
+    if(A===B){ // 同一分钟再按写入时间/序号兜底，保持稳定
+      A=(a.x.a.paidAt||a.x.a.updatedAt||a.x.a.created_at||"");
+      B=(b.x.a.paidAt||b.x.a.updatedAt||b.x.a.created_at||"");
+    }
+    return (A<B)?1:((A>B)?-1:0);
+  });
   var fb=$("promoFees");
   if(fb){
-    fb.innerHTML=flat.length?('<table><tr><th>日期</th><th>推广伙伴</th><th>客户</th><th>项目</th><th style="text-align:right">实收</th><th style="text-align:right">成本</th><th style="text-align:right">佣金</th></tr>'+
+    fb.innerHTML=flat.length?('<table><tr><th>日期 / 时间</th><th>推广伙伴</th><th>客户</th><th>项目</th><th style="text-align:right">实收</th><th style="text-align:right">成本</th><th style="text-align:right">佣金</th></tr>'+
       flat.map(function(o){
         var x=o.x,a=x.a,sv=a.serviceId?serviceById(a.serviceId):null;
         var ccx=a.customer_id?customerById(a.customer_id):null;
         var nm=x.pkgBuy?("售卡·"+((((x.a.items||[]).filter(function(i2){return i2.kind==="pkg";})[0]||{}).name)||"套餐")):(sv?sv.name:(x.a.serviceName||"套餐核销"));
         if(x.redeem&&nm.indexOf("套餐核销")<0)nm+="（套餐核销·释放预拿）";
         if(x.pkgBuy&&x.prepaid>0)nm+="（佣金进预拿）";
-        return '<tr><td>'+esc(a.date)+'</td><td>'+esc(o.p.name)+'</td><td>'+esc(ccx?ccx.name:(a.client||"-"))+'</td><td>'+esc(nm)+'</td>'+
+        return '<tr><td style="white-space:nowrap">'+esc(a.date)+(a.time?(' <span style="color:var(--text-3)">'+esc(a.time)+'</span>'):'')+'</td><td>'+esc(o.p.name)+'</td><td>'+esc(ccx?ccx.name:(a.client||"-"))+'</td><td>'+esc(nm)+'</td>'+
           '<td style="text-align:right">'+fmtMoney(x.value)+'</td><td style="text-align:right;color:var(--text-3)">'+fmtMoney(x.cost)+'</td>'+
           '<td style="text-align:right"><b style="color:#16a34a">'+fmtMoney(x.fee)+'</b>'+(x.pkgBuy&&x.prepaid>0?'<div class="hint">预拿 '+fmtMoney(x.prepaid)+'</div>':'')+'</td></tr>';
       }).join("")+'</table>'):'<div class="hint">本月暂无直推成交。</div>';
