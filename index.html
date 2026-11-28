@@ -4093,11 +4093,11 @@ function pushAll(){
   var jobs=[];
   if(isAdmin()){
     // 管理员：全表 upsert 双向合并，保留本地离线数据上推
-    jobs.push(cloudUpsert("members",DB.members.filter(function(m){return !isDeletedLocal("members",m.id)&&!(m.name&&String(m.name).indexOf("__DEL__")===0);}).map(function(m){
+    var memberRows=DB.members.filter(function(m){return !isDeletedLocal("members",m.id)&&!(m.name&&String(m.name).indexOf("__DEL__")===0);}).map(function(m){
       var o={};
       ["id","name","role","phone","status","color"].forEach(function(k){o[k]=(m[k]!==undefined)?m[k]:null;});
       o.updated_at=now;return o;
-    }),"id"));
+    });
     jobs.push(cloudUpsert("services",DB.services.filter(function(s){return !isDeletedLocal("services",s.id)&&!(s.name&&String(s.name).indexOf("__DEL__")===0);}).map(function(s){
       var o={};
       ["id","name","duration","price","price_shareholder","cost","color","is_rent","rent_days"].forEach(function(k){
@@ -4109,7 +4109,9 @@ function pushAll(){
       o.updated_at=now;return o;
     }),"id"));
     var memSet={};DB.members.forEach(function(m){if(m&&m.name&&String(m.name).indexOf("__DEL__")===0)return;memSet[m.id]=1;});
-    jobs.push(cloudUpsert("appointments",DB.appointments.filter(function(a){return !isDeletedLocal("appointments",a.id)&&!cloudRowNewer("appointments",a);}).map(function(a){var x=apptToCloudRow(a,now);if(x.memberId&&!memSet[x.memberId])x.memberId=null;return x;}),"id"));
+    var apptRows=DB.appointments.filter(function(a){return !isDeletedLocal("appointments",a.id)&&!cloudRowNewer("appointments",a);}).map(function(a){var x=apptToCloudRow(a,now);if(x.memberId&&!memSet[x.memberId])x.memberId=null;return x;});
+    // 成员必须先落库再写预约：云端 members 为空时预约的 member_id 外键会失败，导致整批同步失败
+    jobs.push(cloudUpsert("members",memberRows,"id").then(function(){return cloudUpsert("appointments",apptRows,"id");}));
     jobs.push(cloudUpsert("customers",DB.customers.filter(function(c){return !isDeletedLocal("customers",c.id)&&!(c.name&&String(c.name).indexOf("__DEL__")===0)&&!cloudRowNewer("customers",c);}).map(function(c){
       var o={};
 ["id","name","phone","type","referrer","account_email","note","wx","login_enabled","login_pwd","login_pwd_plain"].forEach(function(k){
