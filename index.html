@@ -415,7 +415,7 @@ tr:hover td{background:#fafbfc}
           <div class="section-body no-pad" id="promoFees"></div>
         </div>
         <div class="section">
-          <div class="section-head"><div><h2>分红点台账</h2><div class="desc">注册赠送 90 天 · 直推业绩点当月有效 · 本人自消费 365 天；不冻结、不做现金兑换</div></div></div>
+          <div class="section-head"><div><h2>分红点台账</h2><div class="desc">注册赠送 90 天 · 直推业绩点当月有效 · 本人自消费按本月累计（每满 50 元 1 点）；不冻结、不做现金兑换</div></div></div>
           <div class="section-body no-pad" id="promoPoints"></div>
         </div>
         <div class="section">
@@ -6323,7 +6323,7 @@ function renderReports(){
 /* ================= 推广佣金 30% + 贡献分红点（2026-11-27 口径） ================= */
 /* ① 佣金：直推客户订单（实收 − 成本）× 30%，订单结账/套餐核销时实时生成
    ② 分红点：注册赠送 1 点/90 天、直推业绩点（每满 100 元，按当月档位全额倍率，当月有效）、
-      本人自消费点（每满 50 元，365 天）；自消费不计直推业绩档位
+      本人自消费点（本月累计，每满 50 元 1 点）；自消费不计直推业绩档位
    ③ 奖金池：当月（实收 − 成本）毛利 × 20%，按个人有效点 ÷ 全店总有效点分配
    ④ 不存在间推/下线/团队层级：只认客户本人 referrer 指向的推广伙伴 */
 var PROMO={feeRate:0.30,poolRate:0.20,giftPoints:1,giftDays:90,selfStep:50,selfDays:365,selfDirectStep:100,
@@ -6549,7 +6549,7 @@ function renderSharePromo(me,ym){
       '<div style="flex:1;min-width:130px;background:var(--bg-1);border-radius:10px;padding:10px"><div class="hint">注册赠送点 · 90 天</div><div style="font-size:20px;font-weight:800">'+giftPts.toFixed(1)+' 点</div></div>'+
       '<div style="flex:1;min-width:130px;background:var(--bg-1);border-radius:10px;padding:10px"><div class="hint">本月直推业绩点 · 当月有效</div><div style="font-size:20px;font-weight:800;color:var(--primary)">'+dptPts.toFixed(1)+' 点</div><div class="hint">'+(S?'结算单口径':'业绩 '+fmtMoney(inc.perf)+' × '+inc.mult+' 倍')+'</div></div>'+
       '<div style="flex:1;min-width:130px;background:var(--bg-1);border-radius:10px;padding:10px"><div class="hint">本月自消费额 · 已扣退款</div><div style="font-size:20px;font-weight:800">'+fmtMoney(selfSpend)+'</div><div class="hint">每满 '+PROMO.selfStep+' 元 1 点</div></div>'+
-      '<div style="flex:1;min-width:130px;background:var(--bg-1);border-radius:10px;padding:10px"><div class="hint">本人自消费点 · 365 天</div><div style="font-size:20px;font-weight:800">'+sptPts.toFixed(1)+' 点</div><div class="hint">'+(S?(Math.abs(sDelta)>0.01?('结算单 '+(+S.points_self||0).toFixed(1)+' + 本月新增 '+sDelta.toFixed(1)+' 点'):'与结算单一致'):'本月累计')+'</div></div>'+
+      '<div style="flex:1;min-width:130px;background:var(--bg-1);border-radius:10px;padding:10px"><div class="hint">本人自消费点 · 本月累计（每满 50 元 1 点）</div><div style="font-size:20px;font-weight:800">'+sptPts.toFixed(1)+' 点</div><div class="hint">'+(S?(Math.abs(sDelta)>0.01?('结算单 '+(+S.points_self||0).toFixed(1)+' + 本月新增 '+sDelta.toFixed(1)+' 点'):'与结算单一致'):'本月累计')+'</div></div>'+
       '</div>'+
       '<div style="margin-top:10px;background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1px solid #bbf7d0;border-radius:10px;padding:12px 14px">'+
       '<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:baseline">'+
