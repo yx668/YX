@@ -6369,6 +6369,7 @@ function promoTotalPoints(ym,giftMap){
 function promoMyIncome(pid,ym,giftMap){
   var gift=promoGiftOf(pid,giftMap);
   var dpt=promoDirectPointsOf(pid,ym);
+  var selfSpend=promoSelfSpendOf(pid,ym);
   var spt=promoSelfPointsOf(pid,ym);
   var perf=promoDirectPerfOf(pid,ym);
   var valid=promoR2(gift+dpt+spt);
@@ -6377,7 +6378,7 @@ function promoMyIncome(pid,ym,giftMap){
   var ratio=total>0?valid/total:0;
   var gross=promoR2(pool.pool*ratio);
   var tax=promoR2(gross*PROMO.taxRate);
-  return {gift:gift,dpt:dpt,spt:spt,valid:valid,perf:perf,mult:promoMultOf(perf),pool:pool,
+  return {gift:gift,dpt:dpt,spt:spt,selfSpend:selfSpend,valid:valid,perf:perf,mult:promoMultOf(perf),pool:pool,
     total:total,ratio:ratio,gross:gross,tax:tax,net:promoR2(gross-tax)};
 }
 var PROMO_GIFT={};
@@ -6448,6 +6449,7 @@ function renderSharePromo(me,ym){
     var myTax=S?(+S.tax_amount||0):promoR2(myGross*PROMO.taxRate);
     var myNet=S?(+S.net_amount||0):promoR2(myGross-myTax);
     var giftPts=S?(+S.points_gift||0):inc.gift,dptPts=S?(+S.points_direct||0):inc.dpt,sptPts=S?(+S.points_self||0):inc.spt;
+    var selfSpend=inc.selfSpend||0;
     var online=false;try{online=!!(cloudMode&&sess);}catch(e){online=false;}
     var settleTxt=S?('按云端结算单 '+S.month+(S.settled_at?('（结算于 '+(function(ts){var d=new Date(ts);if(isNaN(d.getTime()))return String(ts).replace('T',' ').slice(0,16);function p(n){return (n<10?'0':'')+n;}return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes());})(S.settled_at)+'）'):'')+'显示'):'';
     var syncTxt=settleTxt||(PROMO_SYNC_AT
@@ -6460,6 +6462,7 @@ function renderSharePromo(me,ym){
       '<div style="display:flex;gap:10px;flex-wrap:wrap">'+
       '<div style="flex:1;min-width:130px;background:var(--bg-1);border-radius:10px;padding:10px"><div class="hint">注册赠送点 · 90 天</div><div style="font-size:20px;font-weight:800">'+giftPts.toFixed(1)+' 点</div></div>'+
       '<div style="flex:1;min-width:130px;background:var(--bg-1);border-radius:10px;padding:10px"><div class="hint">本月直推业绩点 · 当月有效</div><div style="font-size:20px;font-weight:800;color:var(--primary)">'+dptPts.toFixed(1)+' 点</div><div class="hint">'+(S?'结算单口径':'业绩 '+fmtMoney(inc.perf)+' × '+inc.mult+' 倍')+'</div></div>'+
+      '<div style="flex:1;min-width:130px;background:var(--bg-1);border-radius:10px;padding:10px"><div class="hint">本月自消费额 · 已扣退款</div><div style="font-size:20px;font-weight:800">'+fmtMoney(selfSpend)+'</div><div class="hint">每满 '+PROMO.selfStep+' 元 1 点</div></div>'+
       '<div style="flex:1;min-width:130px;background:var(--bg-1);border-radius:10px;padding:10px"><div class="hint">本人自消费点 · 365 天</div><div style="font-size:20px;font-weight:800">'+sptPts.toFixed(1)+' 点</div></div>'+
       '</div>'+
       '<div style="margin-top:10px;background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1px solid #bbf7d0;border-radius:10px;padding:12px 14px">'+
