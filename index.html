@@ -8577,9 +8577,10 @@ function pickRentCard(cust,svId){
   var list=(DB.packageBuys||[]).filter(function(b){return b&&b.customerId===cust.id&&!b.refunded&&b.remaining&&(+b.remaining[svId]||0)>0;});
   if(!list.length)return null;
   list.sort(function(a,b){
+    var ra=(+a.remaining[svId]||0), rb=(+b.remaining[svId]||0);
+    if(ra!==rb)return rb-ra;                       // 剩余多的卡先用
     var ka=(a.date||"")+" "+(a.time||""), kb=(b.date||"")+" "+(b.time||"");
-    if(ka!==kb)return ka<kb?1:-1;
-    return (+b.remaining[svId]||0)-(+a.remaining[svId]||0);
+    return ka<kb?1:-1;                             // 剩余相同用较新的卡
   });
   return list[0];
 }
