@@ -3901,7 +3901,7 @@ var sched=res[3]&&res[3][0];
         return p;
       }),DB.packages||[]);
       // 拉取前先清掉过期/异常（时钟超前）的套餐卡墓碑，避免真实卡被本地删除名单永久挡住
-      if(!cloudPullFail.some(function(m){return m.indexOf("packagebuys")===0;}))expireDeleted("packagebuys",20*60*1000);
+      if(!cloudPullFail.some(function(m){return m.indexOf("packagebuys")===0;}))expireDeleted("packagebuys",3*60*1000);
       // 拉取前快照本地已退款卡，merge 后强制恢复（防云端旧值 refunded=false 覆盖本地刚执行的退款标记 → 卡/预拿佣金复活）
       var _localRefunded={};(DB.packageBuys||[]).forEach(function(_b){if(_b&&_b.refunded)_localRefunded[_b.id]=1;});
       if(res[7]&&res[7].length){
@@ -5476,7 +5476,7 @@ if(a.due_date!=null){a.dueDate=a.due_date;delete a.due_date;}
   DB.appointments=Object.keys(byId).map(function(k){return byId[k];}).filter(function(a){return !isDeletedLocal("appointments",a.id);});
   try{localStorage.setItem(SHARE_CONF_KEY,JSON.stringify(appt.map(function(x){return x.id;})));}catch(e){}
   sweepGhostMemberIds(); // 清除已删除成员残留引用
-  expireDeleted("packagebuys",20*60*1000); // 股东端同样先清过期/异常套餐卡墓碑，否则新买的卡永远被过滤掉（点数不涨）
+  expireDeleted("packagebuys",3*60*1000); // 股东端同样先清过期/异常套餐卡墓碑，否则新买的卡永远被过滤掉（点数不涨）
   repairPkgFlags(); // 云端拉回的直购套餐单同样自愈
   cloudSelectedApptIds=appt.map(function(x){return x.id;});
   (d.customers||[]).forEach(function(c){
