@@ -5093,6 +5093,7 @@ function renderShareBoard(){
     '<div class="info"><div class="name">'+esc(me.name)+' <span class="tag tag-warn">共享股东</span></div>'+
     '<div class="role">电话：'+(esc(me.phone)||"-")+(ref?("　介绍人："+esc(ref.name)):("　介绍人：无"))+"</div></div></div>"+
     '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">'+
+    '<div style="flex:1;min-width:100px;background:var(--bg-1);border-radius:10px;padding:12px 10px;text-align:center"><div style="font-size:22px;font-weight:800;color:var(--primary);line-height:1.2">30%</div><div class="hint" style="margin-top:4px">推广佣金比例</div></div>'+
     '<div style="flex:1;min-width:100px;background:var(--bg-1);border-radius:10px;padding:12px 10px;text-align:center"><div style="font-size:22px;font-weight:800;color:#16a34a;line-height:1.2">'+fmtMoney(fInfo.fee)+'</div><div class="hint" style="margin-top:4px">本月佣金</div></div>'+
     '<div style="flex:1;min-width:100px;background:var(--bg-1);border-radius:10px;padding:12px 10px;text-align:center"><div style="font-size:22px;font-weight:800;color:var(--text-1);line-height:1.2">'+fmtMoney(cs.total)+'</div><div class="hint" style="margin-top:4px">累计推广佣金</div></div>'+
     '</div>'+
