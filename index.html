@@ -4990,9 +4990,11 @@ function renderShareBoard(){
           var arr=[];
           for(var k in b.remaining){var svp=serviceById(k);if(b.remaining[k]>0)arr.push((svp?svp.name:"?")+"×"+b.remaining[k]+(svp&&svp.isRent?"天":"次"));}
           var rem=arr.join("、")||"已用完";
-          var rAmt=+b.refundAmount||0;
+          var rrec=(DB.refunds||[]).filter(function(r){return r.cardId===b.id;})[0];
+          var rAmt=+b.refundAmount||(rrec?(+rrec.amount||0):0);
+          var rAt=b.refundAt||(rrec?((rrec.date||"")+(rrec.time?(" "+rrec.time):"")):"");
           var buyLine='购于 '+esc(b.date)+(b.time?(' '+esc(b.time)):'');
-          var refundLine=b.refunded?('<div class="hint" style="color:#dc2626;margin-top:2px">退款于 '+esc(String(b.refundAt||"").replace(" "," "))+(rAmt?' · 退 '+fmtMoney(rAmt):'')+'</div>'):"";
+          var refundLine=b.refunded?('<div class="hint" style="color:#dc2626;margin-top:2px">退款于 '+esc(rAt||"-")+(rAmt?' · 退 '+fmtMoney(rAmt):'')+'</div>'):"";
           var statusCell=b.refunded
             ?'<span class="tag" style="background:#fee2e2;color:#dc2626;border-color:#fecaca">已退款'+(rAmt?' '+fmtMoney(rAmt):'')+'</span>'
             :(rem==="已用完"?'<span class="tag tag-gray" style="font-size:11px">已用完</span>':'<span class="tag tag-blue" style="font-size:11px">剩余 '+esc(rem)+'</span>');
