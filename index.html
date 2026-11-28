@@ -3674,10 +3674,16 @@ return sFetch("/rest/v1/"+table+"?id=in.("+q+")",{method:"DELETE"})
 /* 云端删除：直接物理删除（DELETE）——本地删除必须让云端同时删除，不在云端留 "__DEL__" 墓碑行。
    防复活由本地墓碑（bkgbook_tomb_v1）+ 拉取时 isDeletedLocal 过滤承担。 */
 function cloudSoftDelete(table,id){
-  return tokenReady().then(function(ok){
-    if(!ok)throw new Error("请先登录");
-    return sFetch("/rest/v1/"+table+"?id=eq."+encodeURIComponent(id),{method:"DELETE",headers:{"Prefer":"return=minimal"}})
-      .then(function(r){if(!r.ok)throw new Error(errMsg(r)||"云端删除失败");});
+  var once=function(){
+    return tokenReady().then(function(ok){
+      if(!ok)throw new Error("请先登录");
+      return sFetch("/rest/v1/"+table+"?id=eq."+encodeURIComponent(id),{method:"DELETE",headers:{"Prefer":"return=minimal"}})
+        .then(function(r){if(!r.ok)throw new Error(errMsg(r)||"云端删除失败");});
+    });
+  };
+  // 网络偶发失败重试一次：删客户/删卡是"删了就必须删干净"的动作，单次失败会留下本地看不到、云端还在的孤儿行
+  return once().catch(function(e){
+    return new Promise(function(res,rej){setTimeout(function(){res(once());},1500);}).catch(function(){throw e;});
   });
 }
 function fetchMyProfile(){
