@@ -8570,6 +8570,19 @@ function saveRent(){
   resetRent();
 }
 var returnRentId=null;
+/* 出租核销选卡：同一客户可能有多张含该项目的卡，按「购买时间新→旧」优先，其次剩余多优先；
+   避免随手取到旧卡/已失效卡，导致该扣的卡不扣、反而收现金 */
+function pickRentCard(cust,svId){
+  if(!cust||!svId)return null;
+  var list=(DB.packageBuys||[]).filter(function(b){return b&&b.customerId===cust.id&&!b.refunded&&b.remaining&&(+b.remaining[svId]||0)>0;});
+  if(!list.length)return null;
+  list.sort(function(a,b){
+    var ka=(a.date||"")+" "+(a.time||""), kb=(b.date||"")+" "+(b.time||"");
+    if(ka!==kb)return ka<kb?1:-1;
+    return (+b.remaining[svId]||0)-(+a.remaining[svId]||0);
+  });
+  return list[0];
+}
 function retUnitPrice(a){
   var sv=a.serviceId?serviceById(a.serviceId):null;
   if(sv){var c=a.customer_id?customerById(a.customer_id):null;var isSh=c&&c.type==="shareholder";
@@ -8589,7 +8602,7 @@ function retDaysChanged(){
   // 优先扣套餐卡剩余天数：应收=超出天数×单价
   var freeDays=0;
   if(cust&&sv&&sv.isRent){
-    var crd=(DB.packageBuys||[]).find(function(b){return b.customerId===cust.id&&!b.refunded&&b.remaining&&(+b.remaining[sv.id]||0)>0;});
+    var crd=pickRentCard(cust,sv?sv.id:"");
     if(crd)freeDays=Math.min(days,Math.max(0,+crd.remaining[sv.id]||0));
   }
   var unit=retUnitPrice(a);
@@ -8608,7 +8621,13 @@ function openReturnRent(id){
   var svcName=sv?sv.name:"苗衣出租";
   var registDays=Math.max(1,parseInt(a.rentDays,10)||1);
   var unit=retUnitPrice(a);
-  var fee=Math.round(unit*registDays*100)/100;
+  // 先扣套餐剩余天数，再算应收：否则默认填全额，会出现「套餐次数已扣、同时又收全款」的重复收费
+  var freeDays=0;
+  if(c&&sv&&sv.isRent){
+    var crd0=pickRentCard(c,sv.id);
+    if(crd0)freeDays=Math.min(registDays,Math.max(0,+crd0.remaining[sv.id]||0));
+  }
+  var fee=Math.round(unit*Math.max(0,registDays-freeDays)*100)/100;
   var ctypeTxt=c?(c.type==="shareholder"?"（共享股东 · 股东价）":"（普通客户 · 普通价）"):"（散客）";
   var pkgTip="";
   if(c&&sv&&sv.isRent){
@@ -8617,7 +8636,7 @@ function openReturnRent(id){
   }
   $("retInfo").innerHTML='<b style="color:var(--text-1)">'+esc(a.client||"")+'</b> 租借「'+esc(svcName)+"」<br>"+
     "借出 "+a.date+" · 租期 "+registDays+" 天 · 应还 <b>"+esc(a.dueDate||"-")+"</b><br>"+
-    "单价 <b style=\"color:var(--primary)\">"+fmtMoney(unit)+"/天</b> · 按登记天数应收 <b style=\"color:var(--primary)\">"+fmtMoney(fee)+"</b>"+ctypeTxt+"<br>"+
+    "单价 <b style=\"color:var(--primary)\">"+fmtMoney(unit)+"/天</b> · "+(freeDays>0?("套餐抵扣 <b>"+freeDays+"</b> 天 · 本次应收 <b style=\"color:var(--primary)\">"+fmtMoney(fee)+"</b>"):("按登记天数应收 <b style=\"color:var(--primary)\">"+fmtMoney(fee)+"</b>"))+ctypeTxt+"<br>"+
     '<span style="color:var(--danger);font-size:12px">如实际天数与登记不同，请在上方修改「实际出租天数」，应收将自动重算。</span>'+pkgTip;
   $("retDays").value=registDays;
   $("retCalc").value=fmtMoney(fee);
@@ -8637,7 +8656,7 @@ function saveReturnRent(){
   // 优先使用套餐卡剩余（苗衣出租按天）：免费部分=套餐核销，超出部分按单价收费
   var card=null;
   if(cust&&sv&&sv.isRent){
-    card=(DB.packageBuys||[]).find(function(b){return b.customerId===cust.id&&!b.refunded&&b.remaining&&(+b.remaining[sv.id]||0)>0;});
+    card=pickRentCard(cust,sv.id);
   }
   var freeDays=0;
   if(card)freeDays=Math.min(days,Math.max(0,+card.remaining[sv.id]||0));
@@ -8647,6 +8666,10 @@ function saveReturnRent(){
   var amount=Math.max(0,parseFloat($("retAmount").value)||0);
   var method=$("retMethod").value;
   if(!method){toast("请选择收款方式","err");return;}
+  // 双保险：套餐已抵扣的天数不能再重复收钱。金额高于「应收」时必须二次确认，防止手输回全额。
+  if(freeDays>0&&amount>expectFee+0.01){
+    if(!confirm("本次有 "+freeDays+" 天由套餐抵扣，应只收 "+fmtMoney(expectFee)+"；你填的是 "+fmtMoney(amount)+"，相当于套餐次数和现金都收了一遍。确定按 "+fmtMoney(amount)+" 收款？"))return;
+  }
   var now=new Date();
   // 套餐核销：扣减剩余天数 + 核销佣金（卡单日平均佣金×免费天数，固定 30%）
   var redeemValue=0,commEarned=null;
