@@ -3933,7 +3933,14 @@ function apptToCloudRow(a,now){
   for(var i=0;i<APPT_COLS.length;i++){
     var k=APPT_COLS[i];
     if(k==="unitprice"){o.unitprice=(a.unitprice!=null)?a.unitprice:(a.unitPrice!=null?a.unitPrice:null);}
-    else if(k==="servicecost"){o.servicecost=(a.servicecost!=null)?a.servicecost:(a.serviceCost!=null?a.serviceCost:null);}
+    else if(k==="servicecost"){
+      var _sc=(a.servicecost!=null)?a.servicecost:(a.serviceCost!=null?a.serviceCost:null);
+      // 核销单历史上可能成本写成 0：按（核销实收−佣金÷30%）反推真实成本后再上云，避免云端成本永远为 0
+      if(!(_sc>0)&&(+a.commEarned||0)>0&&(+a.redeemValue||0)>0){
+        _sc=Math.max(0,Math.round(((+a.redeemValue)-(+a.commEarned)/0.30)*100)/100);
+      }
+      o.servicecost=_sc;
+    }
     else if(k==="rent_days"){o.rent_days=(a.rent_days!=null)?a.rent_days:(a.rentDays!=null?a.rentDays:null);}
     else if(k==="rented_at"){o.rented_at=(a.rented_at!=null)?a.rented_at:(a.rentedAt!=null?a.rentedAt:null);}
     else if(k==="due_date"){o.due_date=(a.due_date!=null)?a.due_date:(a.dueDate!=null?a.dueDate:null);}
