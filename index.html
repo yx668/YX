@@ -3596,9 +3596,25 @@ function cloudSelect(tableSel){
     if(!ok)throw new Error("请先登录");
     return sFetch("/rest/v1/"+tableSel).then(function(r){
       if(!r.ok)throw new Error(errMsg(r)||"读取数据失败");
-      return r.json||[];
+      var rows=r.json||[];
+      noteCloudTs(String(tableSel).split("?")[0],rows);
+      return rows;
     });
   });
+}
+/* 云端时间戳快照：推送前判断「本地这行是否已被云端更新」，防止旧标签页/旧手机把云端的新数据覆盖回旧值 */
+var _cloudTs={};
+function noteCloudTs(tbl,rows){
+  if(!tbl||!rows||!rows.length)return;
+  var m=_cloudTs[tbl]||(_cloudTs[tbl]={});
+  rows.forEach(function(r){if(r&&r.id&&r.updated_at){var v=Date.parse(r.updated_at);if(!isNaN(v))m[r.id]=v;}});
+}
+function cloudRowNewer(tbl,row){
+  var m=_cloudTs[tbl];
+  if(!m||!row||!row.id)return false;
+  var ct=m[row.id];if(!ct)return false;
+  var lu=row.updatedAt?(Date.parse(row.updatedAt)||0):0;
+  return ct>lu+2000; // 云端比本地新 2 秒以上 → 本地这条已过期，不推
 }
 function errMsg(r){
   if(!r||!r.json)return "";
@@ -3846,7 +3862,7 @@ if(r.returned_at!=null){r.returnedAt=r.returned_at;delete r.returned_at;}
         var l=lmap[r.id];
         if(!l)return r;
         // 本地刚结账/刚修改（updatedAt 较新）→ 本地优先，防止云端旧值覆盖实时状态；否则以云端为准
-        if(l.updatedAt&&r.updated_at&&String(l.updatedAt)>String(r.updated_at))return l;
+        if(l.updatedAt&&r.updated_at&&Date.parse(l.updatedAt)>=Date.parse(r.updated_at))return l; // 时间戳统一按毫秒比较（云端带+08:00，字符串比较会误判）
         return r;
       });
       var seen={};
@@ -3958,7 +3974,7 @@ var sched=res[3]&&res[3][0];
       }else if(res[7]){
         // 云端暂时为空：只清掉本地已标记删除的卡，其余保留并随本轮 queuePush 重新上推
         // （旧逻辑无差别墓碑化，会把刚售出但尚未推送成功的套餐卡清掉 → 预拿佣金/核销次数全部丢失）
-        DB.packageBuys=(DB.packageBuys||[]).filter(function(b){return b&&b.id&&!isDeletedLocal("packagebuys",b.id);});
+        DB.packageBuys=(DB.packageBuys||[]).filter(function(b){return b&&b.id&&!isDeletedLocal("packagebuys",b.id)&&!cloudRowNewer("packagebuys",b);});
       }
       if(res[8]&&res[8].length){
         DB.refunds=mergeRows((res[8]||[]).map(stripRow).map(function(r){
@@ -3971,7 +3987,7 @@ var sched=res[3]&&res[3][0];
       }),DB.refunds||[]).filter(function(r){return r&&r.id&&!isDeletedLocal("refunds",r.id);});
       }else if(res[8]){
         // 云端暂时为空：只清本地已标记删除的退款，其余保留并重新上推（防本地退款记录被空表抹掉）
-        DB.refunds=(DB.refunds||[]).filter(function(r){return r&&r.id&&!isDeletedLocal("refunds",r.id);});
+        DB.refunds=(DB.refunds||[]).filter(function(r){return r&&r.id&&!isDeletedLocal("refunds",r.id)&&!cloudRowNewer("refunds",r);});
       }
       DB.withdrawals=mergeRows((res[9]||[]).map(stripRow).map(function(w){
         if(w.customerid!=null){w.shareId=w.customerid;delete w.customerid;}
@@ -4076,8 +4092,8 @@ function pushAll(){
       o.updated_at=now;return o;
     }),"id"));
     var memSet={};DB.members.forEach(function(m){if(m&&m.name&&String(m.name).indexOf("__DEL__")===0)return;memSet[m.id]=1;});
-    jobs.push(cloudUpsert("appointments",DB.appointments.filter(function(a){return !isDeletedLocal("appointments",a.id);}).map(function(a){var x=apptToCloudRow(a,now);if(x.memberId&&!memSet[x.memberId])x.memberId=null;return x;}),"id"));
-    jobs.push(cloudUpsert("customers",DB.customers.filter(function(c){return !isDeletedLocal("customers",c.id)&&!(c.name&&String(c.name).indexOf("__DEL__")===0);}).map(function(c){
+    jobs.push(cloudUpsert("appointments",DB.appointments.filter(function(a){return !isDeletedLocal("appointments",a.id)&&!cloudRowNewer("appointments",a);}).map(function(a){var x=apptToCloudRow(a,now);if(x.memberId&&!memSet[x.memberId])x.memberId=null;return x;}),"id"));
+    jobs.push(cloudUpsert("customers",DB.customers.filter(function(c){return !isDeletedLocal("customers",c.id)&&!(c.name&&String(c.name).indexOf("__DEL__")===0)&&!cloudRowNewer("customers",c);}).map(function(c){
       var o={};
 ["id","name","phone","type","referrer","account_email","note","wx","login_enabled","login_pwd","login_pwd_plain"].forEach(function(k){
         if(k==="login_enabled")o.login_enabled=(c.login_enabled===undefined||c.login_enabled==null)?false:!!c.login_enabled;
@@ -4098,14 +4114,14 @@ function pushAll(){
         });
         o.updated_at=now;return o;
       }),"id"));
-      jobs.push(cloudUpsert("packagebuys",(DB.packageBuys||[]).filter(function(b){return b&&b.id&&!isDeletedLocal("packagebuys",b.id);}).map(function(b){
+      jobs.push(cloudUpsert("packagebuys",(DB.packageBuys||[]).filter(function(b){return b&&b.id&&!isDeletedLocal("packagebuys",b.id)&&!cloudRowNewer("packagebuys",b);}).map(function(b){
         var o={id:b.id,customerid:b.customerId||null,customer_name:b.client||null,pkgid:b.pkgId||null,pkg_name:b.name||null,
           price:(b.price!=null)?+b.price:0,cost:(b.pkgCost!=null)?+b.pkgCost:0,date:b.date||null,time:b.time||null,
           isshare:!!b.isShare,remaining:b.remaining||{},totals:b.totals||{},cash:b.cash||{},refunded:!!b.refunded,
           commeach:(b.commEach!=null)?+b.commEach:0,commtotal:(b.commTotal!=null)?+b.commTotal:0,commused:(b.commUsed!=null)?+b.commUsed:0};
         o.updated_at=now;return o;
       }),"id"));
-      jobs.push(cloudUpsert("refunds",(DB.refunds||[]).filter(function(r){return r&&r.id&&!isDeletedLocal("refunds",r.id);}).map(function(r){
+      jobs.push(cloudUpsert("refunds",(DB.refunds||[]).filter(function(r){return r&&r.id&&!isDeletedLocal("refunds",r.id)&&!cloudRowNewer("refunds",r);}).map(function(r){
         var o={id:r.id,cardid:r.cardId||null,customerid:r.customerId||null,customer_name:r.customer||null,
           cardname:r.cardName||null,date:r.date||null,time:r.time||null,
           amount:(r.amount!=null)?+r.amount:0,usedamount:(r.usedAmount!=null)?+r.usedAmount:0,
@@ -4136,7 +4152,7 @@ function pushAll(){
       if(isAdmin()){
         var apptIds={};(DB.appointments||[]).forEach(function(a){if(a&&a.id)apptIds[a.id]=true;});
         // 台账全量上推：预约已删除但台账保留（统计口径要求保留）时 apptid 置空（云端外键要求），本地仍保留 apptId
-        var cRows=DB.consumptions.filter(function(o){return !isDeletedLocal("consumptions",o.id);}).map(function(o){
+        var cRows=DB.consumptions.filter(function(o){return !isDeletedLocal("consumptions",o.id)&&!cloudRowNewer("consumptions",o);}).map(function(o){
           var r={};
           ["id","date","customer_id","customer","item","amount","method","note","kind"].forEach(function(k){r[k]=(o[k]!==undefined)?o[k]:null;});
           r.apptid=(o.apptId&&apptIds[o.apptId]&&!isDeletedLocal("appointments",o.apptId))?o.apptId:null;
@@ -4561,8 +4577,8 @@ if(!DB.withdrawals)DB.withdrawals=[];
     sweepGhostMemberIds();
     repairPkgFlags(); // 自愈直购套餐单标记
     // 墓碑标记的套餐卡/退款/提现不进入内存（防止被渲染或周期上推复活；云端残留由拉取过滤兜底）
-    DB.packageBuys=(DB.packageBuys||[]).filter(function(b){return b&&b.id&&!isDeletedLocal("packagebuys",b.id);});
-    DB.refunds=(DB.refunds||[]).filter(function(r){return r&&r.id&&!isDeletedLocal("refunds",r.id);});
+    DB.packageBuys=(DB.packageBuys||[]).filter(function(b){return b&&b.id&&!isDeletedLocal("packagebuys",b.id)&&!cloudRowNewer("packagebuys",b);});
+    DB.refunds=(DB.refunds||[]).filter(function(r){return r&&r.id&&!isDeletedLocal("refunds",r.id)&&!cloudRowNewer("refunds",r);});
     DB.withdrawals=(DB.withdrawals||[]).filter(function(w){return w&&w.id&&!isDeletedLocal("withdrawals",w.id);});
     return;
   }
@@ -5496,7 +5512,7 @@ if(a.due_date!=null){a.dueDate=a.due_date;delete a.due_date;}
     if(!x||!x.id)return;
     var l=byId[x.id];
     // 本地刚修改（updatedAt 较新）→ 本地优先，防止云端旧值覆盖（结账/核销等实时状态）
-    if(l&&l.updatedAt&&x.updated_at&&String(l.updatedAt)>String(x.updated_at))return;
+    if(l&&l.updatedAt&&x.updated_at&&Date.parse(l.updatedAt)>=Date.parse(x.updated_at))return;
     byId[x.id]=x;
   });
   // 股东端删除同步：上次拉取确认过、本次云端已不存在的预约 → 本地跟随删除（防手机残留已删预约/消费）
@@ -5562,7 +5578,7 @@ if(a.due_date!=null){a.dueDate=a.due_date;delete a.due_date;}
       return b;
     }),DB.packageBuys||[]);
   }else if(d.packageBuys){
-    DB.packageBuys=(DB.packageBuys||[]).filter(function(b){return b&&b.id&&!isDeletedLocal("packagebuys",b.id);});
+    DB.packageBuys=(DB.packageBuys||[]).filter(function(b){return b&&b.id&&!isDeletedLocal("packagebuys",b.id)&&!cloudRowNewer("packagebuys",b);});
   }
   // 退款记录合并到股东本地（退款后消费/佣金同步调整）
   if(d.refunds&&d.refunds.length){
