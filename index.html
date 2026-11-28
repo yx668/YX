@@ -3490,7 +3490,21 @@ function flushHiddenCustToCloud(){
   adminHideCust=[];saveHideCust();
   ids.forEach(function(id){
     DB.customers=(DB.customers||[]).filter(function(c){return c.id!==id;});
-    markDeleted("customers",id);
+    // 套餐卡与退款记录同步清理：否则删掉客户后卡变成孤儿（客户档案里再没有入口，看不见也删不掉），
+  // 还会继续挂在该客户名下计算预拿佣金/分红，导致报表与股东端对不上。
+  var pkgIds=(DB.packageBuys||[]).filter(function(b){return b&&b.customerId===id;}).map(function(b){return b.id;});
+  if(pkgIds.length){
+    DB.packageBuys=(DB.packageBuys||[]).filter(function(b){return pkgIds.indexOf(b.id)<0;});
+    pkgIds.forEach(function(x){markDeleted("packagebuys",x);});
+    if(cloudMode&&sess){cloudDeleteRows("packagebuys",pkgIds).catch(function(e){toast("云端删除套餐卡失败："+(e&&e.message?e.message:e),"err");});}
+  }
+  var refIds=(DB.refunds||[]).filter(function(r){return r&&(r.customerId===id||(r.cardId&&pkgIds.indexOf(r.cardId)>=0));}).map(function(r){return r.id;});
+  if(refIds.length){
+    DB.refunds=(DB.refunds||[]).filter(function(r){return refIds.indexOf(r.id)<0;});
+    refIds.forEach(function(x){markDeleted("refunds",x);});
+    if(cloudMode&&sess){cloudDeleteRows("refunds",refIds).catch(function(e){toast("云端删除退款记录失败："+(e&&e.message?e.message:e),"err");});}
+  }
+  markDeleted("customers",id);
     if(cloudMode&&sess)cloudSoftDelete("customers",id).catch(function(){});
   });
   saveDB();renderAll();
@@ -7040,6 +7054,20 @@ DB.customers=DB.customers.filter(function(x){return x.id!==id;});
     if(cloudMode&&sess){
       cloudDeleteRows("consumptions",consIds).catch(function(e){toast("云端删除台账失败："+(e&&e.message?e.message:e),"err");});
     }
+  }
+  // 套餐卡与退款记录同步清理：否则删掉客户后卡变成孤儿（客户档案里再没有入口，看不见也删不掉），
+  // 还会继续挂在该客户名下计算预拿佣金/分红，导致报表与股东端对不上。
+  var pkgIds=(DB.packageBuys||[]).filter(function(b){return b&&b.customerId===id;}).map(function(b){return b.id;});
+  if(pkgIds.length){
+    DB.packageBuys=(DB.packageBuys||[]).filter(function(b){return pkgIds.indexOf(b.id)<0;});
+    pkgIds.forEach(function(x){markDeleted("packagebuys",x);});
+    if(cloudMode&&sess){cloudDeleteRows("packagebuys",pkgIds).catch(function(e){toast("云端删除套餐卡失败："+(e&&e.message?e.message:e),"err");});}
+  }
+  var refIds=(DB.refunds||[]).filter(function(r){return r&&(r.customerId===id||(r.cardId&&pkgIds.indexOf(r.cardId)>=0));}).map(function(r){return r.id;});
+  if(refIds.length){
+    DB.refunds=(DB.refunds||[]).filter(function(r){return refIds.indexOf(r.id)<0;});
+    refIds.forEach(function(x){markDeleted("refunds",x);});
+    if(cloudMode&&sess){cloudDeleteRows("refunds",refIds).catch(function(e){toast("云端删除退款记录失败："+(e&&e.message?e.message:e),"err");});}
   }
   markDeleted("customers",id);
   if(cloudMode&&sess){cloudSoftDelete("customers",id).catch(function(e){toast("云端删除失败："+(e&&e.message?e.message:e),"err");});}
