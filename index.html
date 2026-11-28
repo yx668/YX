@@ -6486,9 +6486,9 @@ function renderSharePromo(me,ym){
       '</div>'+
       '<div style="margin-top:10px;background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1px solid #bbf7d0;border-radius:10px;padding:12px 14px">'+
       '<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:baseline">'+
-      '<div><div class="hint">我的有效点</div><div style="font-size:22px;font-weight:800;color:#15803d;line-height:1.3">'+validPts.toFixed(1)+' 点</div></div>'+
+      '<div><div class="hint">我的有效点</div><div style="font-size:22px;font-weight:800;color:#15803d;line-height:1.3">'+validPts.toFixed(1)+' 点</div>'+(S&&Math.abs(sDelta)>0.01?('<div class="hint">含本月新增 '+sDelta.toFixed(1)+' 点 · 结算单 '+(+S.valid_points||0).toFixed(1)+'</div>'):'')+'</div>'+
       '<div><div class="hint">全店总有效点</div><div style="font-size:22px;font-weight:800;color:var(--text-1);line-height:1.3">'+storeTotal.toFixed(1)+' 点</div></div>'+
-      '<div><div class="hint">我的占比</div><div style="font-size:22px;font-weight:800;color:var(--text-1);line-height:1.3">'+(storeTotal>0?(myRatio*100).toFixed(2):"0.00")+'%</div></div>'+
+      '<div><div class="hint">我的占比</div><div style="font-size:22px;font-weight:800;color:var(--text-1);line-height:1.3">'+(storeTotal>0?(myRatio*100).toFixed(2):"0.00")+'%</div>'+(S?'<div class="hint">结算单口径</div>':'')+'</div>'+
       '</div>'+
       '<div style="margin-top:10px;border-top:1px dashed #86efac;padding-top:10px;display:flex;gap:14px;flex-wrap:wrap;align-items:baseline">'+
       '<div><div class="hint">本月奖金池</div><div style="font-size:22px;font-weight:800;color:var(--text-1);line-height:1.3">'+fmtMoney(storePool)+'</div></div>'+
