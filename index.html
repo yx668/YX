@@ -3650,12 +3650,12 @@ return sFetch("/rest/v1/"+table+"?id=in.("+q+")",{method:"DELETE"})
       });
   });
 }
-/* v16 软删除广播：不物理删除云端行，而是把 name 改为 "__DEL__"+id 作为删除标记，
-   所有设备 pull 时看到该标记即本地删除该行且永不显示/上推——彻底杜绝「删了又复活」。 */
+/* 云端删除：直接物理删除（DELETE）——本地删除必须让云端同时删除，不在云端留 "__DEL__" 墓碑行。
+   防复活由本地墓碑（bkgbook_tomb_v1）+ 拉取时 isDeletedLocal 过滤承担。 */
 function cloudSoftDelete(table,id){
   return tokenReady().then(function(ok){
     if(!ok)throw new Error("请先登录");
-    return sFetch("/rest/v1/"+table+"?id=eq."+encodeURIComponent(id),{method:"PATCH",body:{name:"__DEL__"+id}})
+    return sFetch("/rest/v1/"+table+"?id=eq."+encodeURIComponent(id),{method:"DELETE",headers:{"Prefer":"return=minimal"}})
       .then(function(r){if(!r.ok)throw new Error(errMsg(r)||"云端删除失败");});
   });
 }
@@ -3678,7 +3678,7 @@ function normalizeItems(v){
   return [];
 }
 var cloudSelectedApptIds=[]; // 本机视图已确认存在于云端的预约 id（普通用户据此判断哪些预约需要上推）
-var cloudSelectedMemIds=[],cloudSelectedCustIds=[]; // 成员/客户：云端确认过但现在缺失 → 本地跟随删除（防其他设备删除后本机残留）
+var cloudSelectedMemIds=[],cloudSelectedCustIds=[],cloudSelectedSvcIds=[],cloudSelectedPkgIds=[]; // 成员/客户/服务/套餐：云端确认过但现在缺失 → 本地跟随删除（防其他设备删除后本机残留）
 /* 云端∪本地合并：缺省以云端为权威（同 id 云端覆盖本地），但本地存在而云端
    缺少的行必须保留——防止“拉取旧数据覆盖刚新增/离线修改”导致客户/成员/服务
    悄悄丢失（曾导致共享股东新增后消失）。 */
@@ -3746,6 +3746,13 @@ function cloudPullAll(){
           DB.services=mergeRows(svcCloud,DB.services);
         }
       }catch(e){DB.services=mergeRows(svcCloud,DB.services);}
+      // 服务删除跟随：云端确认过但现在已不存在（硬删除）→ 本地同步删（墓碑防复活，避免旧项目被本机重新上推）
+      if(!cloudPullFail.some(function(m){return m.indexOf("services")===0;})){
+        var svcCloudIds={};(res[1]||[]).forEach(function(r){if(r&&r.id)svcCloudIds[r.id]=1;});
+        DB.services.forEach(function(s){if(s&&s.id&&!svcCloudIds[s.id]&&cloudSelectedSvcIds.indexOf(s.id)>=0)markDeleted("services",s.id);});
+        DB.services=DB.services.filter(function(s){return !(s&&s.id&&isDeletedLocal("services",s.id));});
+        cloudSelectedSvcIds=(res[1]||[]).filter(function(r){return r&&r.id;}).map(function(r){return r.id;});
+      }
       var cloudRows=(res[2]||[]).map(stripRow).map(function(r){
         if(r.time==null)r.time="";
         if(r.date==null)r.date="";
@@ -3851,8 +3858,15 @@ var sched=res[3]&&res[3][0];
       DB.consumptions=(DB.consumptions||[]).filter(function(o){
         return !(o&&o.apptId&&isDeletedLocal("appointments",o.apptId));
       });
+      // 套餐定义：删除跟随（云端已硬删且本机确认过存在 → 本地同步删，防被重新上推）
+      if(!cloudPullFail.some(function(m){return m.indexOf("packages")===0;})){
+        var pkgCloudIds={};(res[6]||[]).forEach(function(r){if(r&&r.id)pkgCloudIds[r.id]=1;});
+        DB.packages.forEach(function(p){if(p&&p.id&&!pkgCloudIds[p.id]&&cloudSelectedPkgIds.indexOf(p.id)>=0)markDeleted("packages",p.id);});
+        DB.packages=(DB.packages||[]).filter(function(p){return !(p&&p.id&&isDeletedLocal("packages",p.id));});
+        cloudSelectedPkgIds=(res[6]||[]).filter(function(r){return r&&r.id;}).map(function(r){return r.id;});
+      }
       // 套餐定义 / 套餐购买卡 / 退款 / 提现（云端列名全小写，合并时转回本地字段）
-      DB.packages=mergeRows((res[6]||[]).filter(function(r){return !(r&&r.name&&String(r.name).indexOf("__DEL__")===0);}).map(stripRow).map(function(p){
+      DB.packages=mergeRows((res[6]||[]).filter(function(r){return !(r&&r.name&&String(r.name).indexOf("__DEL__")===0)&&!isDeletedLocal("packages",r.id);}).map(stripRow).map(function(p){
         if(p.priceshareholder!=null){p.priceShareholder=p.priceshareholder;delete p.priceshareholder;}
         if(p.isrent!=null){p.isRent=!!p.isrent;delete p.isrent;}
         if(p.priceShareholder==null)p.priceShareholder=p.price;
@@ -4011,7 +4025,7 @@ function pushAll(){
     }),"id"));
       jobs.push(cloudUpsert("schedule",[{id:(DB.schedule.id&&isValidUUID(DB.schedule.id))?DB.schedule.id:"00000000-0000-0000-0000-000000000001",date:DB.schedule.date||todayStr(),shift:DB.schedule.shift||"morning",start:DB.schedule.start||"09:00",end:DB.schedule.end||"20:00",updated_at:now}],"id"));
       // 套餐定义 / 套餐购买卡 / 退款 / 提现（云端表名全小写 packagebuys）
-      jobs.push(cloudUpsert("packages",DB.packages.filter(function(p){return !(p&&p.name&&String(p.name).indexOf("__DEL__")===0);}).map(function(p){
+      jobs.push(cloudUpsert("packages",DB.packages.filter(function(p){return !isDeletedLocal("packages",p.id)&&!(p&&p.name&&String(p.name).indexOf("__DEL__")===0);}).map(function(p){
         var o={};
         ["id","name","items","price","priceshareholder","cost","isrent","status"].forEach(function(k){
           if(k==="priceshareholder")o.priceshareholder=(p.priceShareholder!=null)?p.priceShareholder:(p.price!=null?p.price:null);
@@ -7149,9 +7163,10 @@ function delPkg(id){
   var p=(DB.packages||[]).find(function(x){return x.id===id;});
   if(!p)return;
   if(!confirm("确定删除套餐「"+(p.name||"")+"」？已售出的套餐卡不受影响。"))return;
-  p.name="__DEL__"+p.name;
-  // 同步软删云端（pushAll/cloudPullAll 均已过滤 __DEL__ 墓碑，不会复活）
-  if(cloudMode&&sess&&isValidUUID(p.id)){cloudSoftDelete("packages",p.id).catch(function(e){toast("云端删除套餐失败："+((e&&e.message)||"请检查登录后重试"),"err");});}
+  DB.packages=(DB.packages||[]).filter(function(x){return x.id!==id;});
+  markDeleted("packages",id);
+  // 同步删除云端（硬删，云端不留墓碑行；本地墓碑防被重新拉回/上推）
+  if(cloudMode&&sess&&isValidUUID(id)){cloudSoftDelete("packages",id).catch(function(e){toast("云端删除套餐失败："+((e&&e.message)||"请检查登录后重试"),"err");});}
   saveDB();toast("套餐已删除");
   renderPackages();
 }
