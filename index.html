@@ -6425,7 +6425,7 @@ function renderPromoAdmin(){
         var ccx=a.customer_id?customerById(a.customer_id):null;
         var nm=x.pkgBuy?("售卡·"+((((x.a.items||[]).filter(function(i2){return i2.kind==="pkg";})[0]||{}).name)||"套餐")):(sv?sv.name:(x.a.serviceName||"套餐核销"));
         if(x.redeem&&nm.indexOf("套餐核销")<0)nm+="（套餐核销·释放预拿）";
-        if(x.pkgBuy&&x.prepaid>0)nm+="（售卡·佣金进预拿）";
+        if(x.pkgBuy&&x.prepaid>0)nm+="（佣金进预拿）";
         return '<tr><td>'+esc(a.date)+'</td><td>'+esc(o.p.name)+'</td><td>'+esc(ccx?ccx.name:(a.client||"-"))+'</td><td>'+esc(nm)+'</td>'+
           '<td style="text-align:right">'+fmtMoney(x.value)+'</td><td style="text-align:right;color:var(--text-3)">'+fmtMoney(x.cost)+'</td>'+
           '<td style="text-align:right"><b style="color:#16a34a">'+fmtMoney(x.fee)+'</b>'+(x.pkgBuy&&x.prepaid>0?'<div class="hint">预拿 '+fmtMoney(x.prepaid)+'</div>':'')+'</td></tr>';
