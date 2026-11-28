@@ -9066,16 +9066,42 @@ function renderCustomerConsumptionManager(){
   $("customerConsumptionFoot").innerHTML='<button class="btn btn-ghost" type="button" onclick="closeModal(\'customerConsumptionMask\')">关闭</button>';
 }
 /* 股东详情：个人 / 团队预约消费记录查看 */
-function shareConsumptionRows(appts,title,lv1Cid){
-  var rows=appts.slice().sort(function(x,y){return x.date<y.date?1:(x.date>y.date?-1:(x.time<y.time?1:(x.time>y.time?-1:0)));});
-  var h='<div style="padding:12px 16px;border-bottom:1px solid var(--border);font-size:13px;color:var(--text-2)">共 '+rows.length+' 条预约消费记录</div>';
+function shareConsumptionRows(appts,title,lv1Cid,custIds){
+  // 退款记录：按客户范围（个人＝本人；团队＝名下客户）纳入同一列表，作为独立行显示，并从已收款合计中冲减
+  var refunds=[];
+  if(custIds&&custIds.length){
+    var cnset={};
+    custIds.forEach(function(id){var c=customerById(id);if(c&&c.name)cnset[c.name]=1;});
+    (DB.refunds||[]).forEach(function(r){
+      if(!r||!(+r.amount||0))return;
+      var hit=r.customerId?custIds.indexOf(r.customerId)>=0:!!cnset[r.customer||""];
+      if(hit)refunds.push({__refund:true,date:r.date||"",time:r.time||"",customer:r.customer||"",
+        cardName:r.cardName||"套餐",amount:Math.round((+r.amount||0)*100)/100,price:Math.round((+r.price||0)*100)/100});
+    });
+  }
+  var rows=appts.slice().concat(refunds).sort(function(x,y){
+    var A=(x.date||"")+" "+(x.time||""),B=(y.date||"")+" "+(y.time||"");
+    return A<B?1:(A>B?-1:0);
+  });
+  var h='<div style="padding:12px 16px;border-bottom:1px solid var(--border);font-size:13px;color:var(--text-2)">共 '+appts.length+' 条预约消费记录'+(refunds.length?(' · 退款 '+refunds.length+' 笔'):'')+'</div>';
   if(!rows.length){
     h+='<div class="empty"><div class="big">&#x1F4B0;</div><h3>暂无记录</h3><p>该范围内暂无预约消费记录。</p></div>';
   }else{
-    var total=0;
+    var total=0,refundTotal=0;
     var stm={confirmed:["待到店","tag-blue"],done:["已完成","tag-green"],cancelled:["已取消","tag-gray"],rented:["出租中","tag-warn"],returned:["已归还","tag-green"]};
     h+='<table><tr><th>日期</th><th>时间</th><th>客户</th><th>项目</th><th style="text-align:right">金额</th><th>收款</th><th>方式</th><th>成员</th><th>状态</th><th>备注</th>'+(isAdmin()?'<th style="text-align:right">操作</th>':"")+'</tr>';
     rows.forEach(function(a){
+      if(a.__refund){
+        refundTotal+=a.amount;
+        h+='<tr><td>'+a.date+'</td><td>'+(a.time||"-")+'</td><td>'+esc(a.customer||"")+'</td>'+
+          '<td><span class="tag" style="background:#fee2e2;color:#dc2626;border-color:#fecaca">退款 · '+esc(a.cardName)+'</span></td>'+
+          '<td style="text-align:right;color:#dc2626"><b>-'+fmtMoney(a.amount)+'</b></td>'+
+          '<td style="text-align:center">&#x21A9;</td><td>-</td><td>-</td>'+
+          '<td><span class="tag tag-gray">已退款</span></td>'+
+          '<td style="font-size:12px">原价 '+fmtMoney(a.price)+'</td>'+
+          (isAdmin()?'<td style="text-align:right">-</td>':"")+'</tr>';
+        return;
+      }
       var cn=(a.customer_id&&customerById(a.customer_id))?customerById(a.customer_id).name:"散客";
       var sv=a.serviceId?serviceById(a.serviceId):null;
       var item=sv?sv.name:(a.kind==="rent"?"苗衣出租":"预约");
@@ -9093,7 +9119,8 @@ function shareConsumptionRows(appts,title,lv1Cid){
         (isAdmin()?'<td style="text-align:right"><button class="btn btn-danger btn-xs" type="button" data-id="'+a.id+'" onclick="delShareAppt(this)">删除</button></td>':"")+'</tr>';
     });
     h+='</table>';
-    h+='<div style="padding:10px 16px;font-size:13px;color:var(--text-2)">已收款合计：<b style="color:var(--primary)">'+fmtMoney(Math.round(total*100)/100)+'</b></div>';
+    h+='<div style="padding:10px 16px;font-size:13px;color:var(--text-2)">已收款合计：<b style="color:var(--primary)">'+fmtMoney(Math.round((total-refundTotal)*100)/100)+'</b>'+
+      (refundTotal?'　<span style="color:var(--text-3)">（收款 '+fmtMoney(Math.round(total*100)/100)+' − 退款 <span style="color:#dc2626">'+fmtMoney(Math.round(refundTotal*100)/100)+'</span>）</span>':"")+'</div>';
   }
   $("shareConsumptionTitle").textContent=title;
   $("shareConsumptionBody").innerHTML=h;
@@ -9117,13 +9144,13 @@ function delShareAppt(btn){
 function openSharePersonalConsumption(cid){
   var c=customerById(cid);if(!c)return;
   var appts=(DB.appointments||[]).filter(function(a){return a.customer_id===cid&&a.status!=="cancelled";});
-  shareConsumptionRows(appts,c.name+" · 个人消费详情",cid);
+  shareConsumptionRows(appts,c.name+" · 个人消费详情",cid,[cid]);
 }
 function openShareTeamConsumption(cid){
   var c=customerById(cid);if(!c)return;
   var lv1m=lv1IdsOf(cid);
   var appts=(DB.appointments||[]).filter(function(a){return a.customer_id&&lv1m[a.customer_id]&&a.status!=="cancelled";});
-  shareConsumptionRows(appts,c.name+" · 团队消费详情（名下客户）",null);
+  shareConsumptionRows(appts,c.name+" · 团队消费详情（名下客户）",null,Object.keys(lv1m));
 }
 /* 消费管理中心：编辑记录 */
 function editCCRecord(id,isAppt){
